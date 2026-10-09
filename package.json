@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "dev:api": "npm run dev -w @wulu/api",
-    "dev:web": "npm run dev -w @wulu/web"
+    "dev:web": "npm run dev -w @wulu/web",
+    "build:api": "npm run build -w @wulu/domain -w @wulu/news -w @wulu/market-data -w @wulu/regime -w @wulu/strategies -w @wulu/backtest -w @wulu/confirmation -w @wulu/journal -w @wulu/options -w @wulu/scanner -w @wulu/api",
+    "start:api": "npm run start -w @wulu/api"
   },
   "engines": {
     "node": ">=20"
