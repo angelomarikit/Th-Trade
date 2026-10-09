@@ -1,14 +1,26 @@
 import type { ConditionMatrix, SetupState, TradeLevels } from "@wulu/domain";
 
+export const NEAR_ACTIVE_CONFIRMATION_REQUIREMENT =
+  "ENTRY ACTIVE requires completed 5-minute confirmation, volume, structure, liquidity, minimum ~2R to Target 1 (unless strategy overrides), and fresh verified data. NEAR ACTIVE is never entry permission.";
+
 export interface NearActiveView {
   active: boolean;
   conditionsPassed: number;
   conditionsTotal: number;
   trigger: number;
+  /** Last − trigger (signed). */
   distanceToTriggerAbs: number;
   distanceToTriggerPct: number;
+  /** Human-readable distance for mobile / decision cards. */
+  distanceLabel: string;
   stillWaitingFor: string[];
   statusLabel: string;
+  /** Exact confirmation gate text — Near Active ≠ enter. */
+  confirmationRequirement: string;
+  /** Always false by design. */
+  permissionToEnter: false;
+  dataTimestamp: string | null;
+  setupQualityScore: number | null;
 }
 
 export function buildNearActiveView(input: {
@@ -16,10 +28,18 @@ export function buildNearActiveView(input: {
   matrix: ConditionMatrix;
   levels: TradeLevels;
   lastPrice: number;
+  dataTimestamp?: string | null;
+  setupQualityScore?: number | null;
 }): NearActiveView {
   const { state, matrix, levels, lastPrice } = input;
   const distanceAbs = lastPrice - levels.trigger;
   const distancePct = levels.trigger !== 0 ? (distanceAbs / levels.trigger) * 100 : 0;
+  const approach =
+    Math.abs(distancePct) < 0.05
+      ? "AT TRIGGER"
+      : distanceAbs > 0
+        ? `${distancePct.toFixed(2)}% ABOVE TRIGGER`
+        : `${Math.abs(distancePct).toFixed(2)}% BELOW TRIGGER`;
 
   return {
     active: state === "NEAR_ACTIVE",
@@ -28,6 +48,7 @@ export function buildNearActiveView(input: {
     trigger: levels.trigger,
     distanceToTriggerAbs: distanceAbs,
     distanceToTriggerPct: distancePct,
+    distanceLabel: approach,
     stillWaitingFor: matrix.waitingFor,
     statusLabel:
       state === "NEAR_ACTIVE"
@@ -36,6 +57,20 @@ export function buildNearActiveView(input: {
           ? "ENTRY ACTIVE — LONG"
           : state === "ENTRY_ACTIVE_SHORT"
             ? "ENTRY ACTIVE — SHORT"
-            : state.replaceAll("_", " "),
+            : state === "MISSED"
+              ? "MISSED — DO NOT CHASE"
+              : state === "INVALIDATED"
+                ? "INVALIDATED"
+                : state === "DATA_NOT_VERIFIED"
+                  ? "DATA NOT VERIFIED"
+                  : state === "NO_TRADE"
+                    ? "NO TRADE"
+                    : state === "WAIT"
+                      ? "WAIT"
+                      : state.replaceAll("_", " "),
+    confirmationRequirement: NEAR_ACTIVE_CONFIRMATION_REQUIREMENT,
+    permissionToEnter: false,
+    dataTimestamp: input.dataTimestamp ?? null,
+    setupQualityScore: input.setupQualityScore ?? null,
   };
 }

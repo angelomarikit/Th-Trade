@@ -1223,6 +1223,119 @@ a {
   color: var(--red);
 }
 
+.decision-card {
+  margin-bottom: 0.75rem;
+}
+
+.decision-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.decision-card-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.75rem;
+  margin: 0;
+}
+
+.decision-grid .span-2 {
+  grid-column: 1 / -1;
+}
+
+.decision-grid dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.decision-grid dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+}
+
+.decision-muted {
+  color: var(--muted);
+  font-family: var(--sans) !important;
+  font-size: 0.78rem !important;
+  font-weight: 400;
+}
+
+.decision-gate {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(245, 185, 66, 0.35);
+  border-radius: 6px;
+  background: rgba(245, 185, 66, 0.08);
+}
+
+.decision-sections {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.decision-section-toggle {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.decision-section-body {
+  padding: 0.45rem 0.55rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.decision-section-body ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+}
+
+.catalyst-dl {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.catalyst-dl dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.catalyst-dl dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 720px) {
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+  .decision-grid .span-2 {
+    grid-column: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -99,6 +99,38 @@ export interface SetupResponse {
       } | null;
       whyThisContract: string[];
     } | null;
+    nearActive?: {
+      active: boolean;
+      trigger: number;
+      distanceToTriggerAbs: number;
+      distanceToTriggerPct: number;
+      distanceLabel: string;
+      conditionsPassed: number;
+      conditionsTotal: number;
+      stillWaitingFor: string[];
+      confirmationRequirement: string;
+      permissionToEnter: false;
+      dataTimestamp: string | null;
+      setupQualityScore: number | null;
+    };
+    relativeMomentum?: {
+      feed: string;
+      feedLimitation: string;
+      symbolIntradayPct: number | null;
+      spyIntradayPct: number | null;
+      qqqIntradayPct: number | null;
+      sectorEtf: string;
+      sectorIntradayPct: number | null;
+      vsSpyPct: number | null;
+      vsQqqPct: number | null;
+      vsSectorPct: number | null;
+      gapPct: number | null;
+      rvol: number | null;
+      vwapLocation: string;
+      intradayTrend: string;
+      rankScore: number;
+      notes: string[];
+    } | null;
   };
   card: {
     lastPrice: number;
@@ -294,4 +326,26 @@ export function fetchRegime() {
     strategyGates: Record<string, boolean>;
     generatedAt: string;
   }>("/v1/regime");
+}
+
+export function fetchRank(tickers: string[]) {
+  const qs = encodeURIComponent(tickers.join(","));
+  return getJson<{
+    feed: string;
+    provider: string;
+    disclaimer: string;
+    count: number;
+    ranked: Array<{
+      symbol: string;
+      rank: number;
+      momentum: {
+        vsSpyPct: number | null;
+        rankScore: number;
+        rvol: number | null;
+        vwapLocation: string;
+        intradayTrend: string;
+        notes: string[];
+      };
+    }>;
+  }>(`/v1/rank?tickers=${qs}`);
 }

@@ -441,6 +441,21 @@ async function main() {
             matchedStrategies: card.matchedStrategies,
             historicalEdge: card.historicalEdge,
             options: card.options,
+            nearActive: {
+              active: card.nearActive.active,
+              trigger: card.nearActive.trigger,
+              distanceToTriggerAbs: card.nearActive.distanceToTriggerAbs,
+              distanceToTriggerPct: card.nearActive.distanceToTriggerPct,
+              distanceLabel: card.nearActive.distanceLabel,
+              conditionsPassed: card.nearActive.conditionsPassed,
+              conditionsTotal: card.nearActive.conditionsTotal,
+              stillWaitingFor: card.nearActive.stillWaitingFor,
+              confirmationRequirement: card.nearActive.confirmationRequirement,
+              permissionToEnter: card.nearActive.permissionToEnter,
+              dataTimestamp: card.nearActive.dataTimestamp,
+              setupQualityScore: card.nearActive.setupQualityScore,
+            },
+            relativeMomentum: card.relativeMomentum,
           },
           signalRecommendation,
           card,
@@ -467,6 +482,23 @@ async function main() {
           reasons: brief.regimeReasons,
           strategyGates: brief.strategyGates,
           generatedAt: brief.generatedAt,
+        });
+      }
+
+      if (url.pathname === "/v1/rank" && req.method === "GET") {
+        const tickersParam = url.searchParams.get("tickers");
+        if (!tickersParam?.trim()) {
+          return json(res, 400, { error: "tickers query required (comma-separated)" });
+        }
+        const tickers = tickersParam.split(",").map((t) => t.trim()).filter(Boolean);
+        const ranked = await scanner.rankWatchlist(tickers);
+        return json(res, 200, {
+          feed: process.env.ALPACA_DATA_FEED ?? "iex",
+          provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
+          disclaimer:
+            "Relative-momentum ranking is context only. Green with the market ≠ relatively strong. Ranking never grants entry permission.",
+          count: ranked.length,
+          ranked,
         });
       }
 

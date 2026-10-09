@@ -1,5 +1,6 @@
 import { BelowChartTabs } from "../components/scanner/BelowChartTabs";
 import { CandleChart } from "../components/scanner/CandleChart";
+import { DecisionCard } from "../components/scanner/DecisionCard";
 import { InstrumentHeader } from "../components/scanner/InstrumentHeader";
 import { SetupInspector } from "../components/scanner/SetupInspector";
 import { useTerminal } from "../context/TerminalContext";
@@ -46,6 +47,7 @@ export function ScannerPage() {
       <div className={`scanner-layout ${inspectorOpen ? "" : "no-inspector"}`} style={{ flex: 1, minHeight: 0 }}>
         <div className="scanner-main">
           <InstrumentHeader />
+          <DecisionCard />
           <CandleChart
             bars={bars?.bars ?? null}
             loading={barsLoading}

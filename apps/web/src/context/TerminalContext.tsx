@@ -154,10 +154,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const pushAlert = useCallback((a: Omit<LocalAlert, "id" | "at">) => {
     setAlerts((prev) => {
-      const next = [
-        { ...a, id: crypto.randomUUID(), at: Date.now() },
-        ...prev,
-      ].slice(0, 100);
+      // Dedupe identical kind+symbol+message within 60s — alert ≠ entry permission.
+      const now = Date.now();
+      const dup = prev.find(
+        (x) =>
+          x.kind === a.kind &&
+          x.symbol === a.symbol &&
+          x.message === a.message &&
+          now - x.at < 60_000,
+      );
+      if (dup) return prev;
+      const next = [{ ...a, id: crypto.randomUUID(), at: now }, ...prev].slice(0, 100);
       writeJson(STORAGE_KEYS.alerts, next);
       return next;
     });
@@ -229,19 +236,40 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           setCreditsLocal(remaining);
         }
         const status = next.liveCard.status;
+        const state = next.liveCard.state ?? next.card.state;
         const fresh = next.liveCard.dataFresh ?? next.card.dataFresh;
         const action = next.signalRecommendation?.action;
+        const alertKind = classifySetupAlert(status, state, fresh);
         if (prevStatus.current && prevStatus.current !== status) {
           pushAlert({
-            kind: "status_change",
-            message: `${t} status → ${status}${action ? ` · ${action}` : ""}`,
+            kind: alertKind,
+            message: `${t} → ${status}${action ? ` · signal ${action}` : ""} (alert ≠ entry)`,
+            symbol: t,
+          });
+        } else if (!prevStatus.current && status) {
+          pushAlert({
+            kind: alertKind === "data_stale" ? "data_stale" : "setup_found",
+            message: `${t} setup ${status}${action ? ` · ${action}` : ""}`,
             symbol: t,
           });
         }
         if (prevFresh.current === true && fresh === false) {
           pushAlert({
             kind: "data_stale",
-            message: `${t} data not verified / stale`,
+            message: `${t} data not verified / stale — fail closed`,
+            symbol: t,
+          });
+        }
+        const distPct = next.liveCard.nearActive?.distanceToTriggerPct;
+        if (
+          next.liveCard.nearActive?.active &&
+          distPct != null &&
+          Math.abs(distPct) <= 0.15 &&
+          prevStatus.current !== status
+        ) {
+          pushAlert({
+            kind: "trigger_approached",
+            message: `${t} trigger approached (${next.liveCard.nearActive.distanceLabel})`,
             symbol: t,
           });
         }
@@ -381,4 +409,18 @@ export function useTerminal() {
   const ctx = useContext(TerminalContext);
   if (!ctx) throw new Error("useTerminal outside provider");
   return ctx;
+}
+
+/** Map setup status → local alert kind. Never implies order permission. */
+function classifySetupAlert(status: string, state: string | undefined, fresh: boolean): string {
+  const u = `${status} ${state ?? ""}`.toUpperCase();
+  if (!fresh || u.includes("DATA NOT VERIFIED") || u.includes("DATA_NOT_VERIFIED")) {
+    return "data_stale";
+  }
+  if (u.includes("NEAR")) return "near_active";
+  if (u.includes("ENTRY ACTIVE") || u.includes("ENTRY_ACTIVE")) return "entry_zone_active";
+  if (u.includes("MISSED")) return "missed";
+  if (u.includes("INVALIDATED")) return "invalidated";
+  if (u.includes("CONFIRM") || u.includes("COMPLETED")) return "completed_confirmation";
+  return "setup_found";
 }

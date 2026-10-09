@@ -7,3 +7,4 @@ export * from "./alignment.js";
 export * from "./morningBrief.js";
 export * from "./RegimeService.js";
 export * from "./fixtures.js";
+export * from "./relativeMomentum.js";

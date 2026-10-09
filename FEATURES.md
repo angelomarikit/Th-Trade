@@ -1,7 +1,8 @@
 # Wulu Trading Scanner — Product Summary
 
-**Status:** Phases A–G built. Signals-only terminal (no auto-orders).  
-**Last updated:** 2026-10-10
+**Status:** Phases A–G built + Competitive Intelligence sprint (Near Active detail, RS ranking, decision card). Signals-only terminal (no auto-orders).  
+**Last updated:** 2026-10-10  
+**See also:** `SPRINT_REPORT.md`
 
 Wulu is a hybrid market-intelligence scanner: live Alpaca data + confirmation matrix + rule-based Signal Recommendation, with optional ChatGPT narration and Supabase auth/plans/credits.
 
@@ -36,6 +37,20 @@ A desktop/mobile trading terminal that helps you **decide** what to do (BUY / SE
 - Near Active + waiting-for list when setup is close but not ready
 - Session awareness (RTH / premarket / closed) with America/New_York clock
 - Data freshness checks (fail closed when stale)
+
+### 1b. Near Active intelligence & decision card
+
+- NEAR ACTIVE shows trigger, distance, conditions passed/missing, confirmation requirement
+- Explicit `permissionToEnter: false` — Near Active is never entry
+- Mobile-readable Decision Card on Scanner (STATUS, WHY MOVING, levels, expandable sections)
+- MISSED labeled **MISSED — DO NOT CHASE**; INVALIDATED preserved
+
+### 1c. Relative strength / momentum ranking
+
+- Compares symbol vs SPY, QQQ, sector ETF from live bars (IEX-labeled when applicable)
+- Intraday %, gap approx, RVOL, VWAP location, intraday trend, rankScore
+- `GET /v1/rank?tickers=` + Overview watchlist ranking table
+- Green-with-market is **not** treated as automatic relative strength
 
 ### 2. Signal Recommendation (automatic BUY / SELL / WAIT)
 

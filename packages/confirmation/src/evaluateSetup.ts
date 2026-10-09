@@ -17,6 +17,7 @@ import type {
   MatchedStrategyInfo,
   OptionsCardInfo,
   RegimeCardInfo,
+  RelativeMomentumCardInfo,
 } from "./liveCard.js";
 
 
@@ -37,6 +38,7 @@ export interface EvaluateSetupInput {
   priceReactionScore?: number;
   marketAlignmentScore?: number;
   sectorAlignmentScore?: number;
+  relativeMomentum?: RelativeMomentumCardInfo | null;
 }
 
 
@@ -74,18 +76,21 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
   assertEntryNotFromNewsAlone(state, built.matrix);
 
-  const near = buildNearActiveView({
-    state,
-    matrix: built.matrix,
-    levels,
-    lastPrice: input.snapshot.lastPrice,
-  });
-
   const setupScore = setupScoreFromMatrix(built.matrix, {
     catalystQuality: input.catalystQualityScore,
     priceReaction: input.priceReactionScore,
     marketAlignment: input.marketAlignmentScore,
     sectorAlignment: input.sectorAlignmentScore,
+  });
+
+  const evaluatedAt = now.toISOString();
+  const near = buildNearActiveView({
+    state,
+    matrix: built.matrix,
+    levels,
+    lastPrice: input.snapshot.lastPrice,
+    dataTimestamp: evaluatedAt,
+    setupQualityScore: setupScore.total,
   });
 
   return {
@@ -111,7 +116,8 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     lastPrice: input.snapshot.lastPrice,
     rewardToRisk: built.rewardToRisk,
     dataFresh: freshness.ok,
-    evaluatedAt: now.toISOString(),
+    evaluatedAt,
+    relativeMomentum: input.relativeMomentum ?? null,
     session: {
       session: session.session,
       etLabel: session.etLabel,

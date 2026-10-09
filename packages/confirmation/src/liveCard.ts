@@ -47,6 +47,27 @@ export interface LiveSetupCard {
   matchedStrategies: MatchedStrategyInfo[];
   /** Phase F — only populated when FEATURE_OPTIONS_ENGINE=true and ENTRY ACTIVE */
   options: OptionsCardInfo | null;
+  /** Relative strength / momentum vs SPY, QQQ, sector — context only, not entry permission */
+  relativeMomentum: RelativeMomentumCardInfo | null;
+}
+
+export interface RelativeMomentumCardInfo {
+  feed: string;
+  feedLimitation: string;
+  symbolIntradayPct: number | null;
+  spyIntradayPct: number | null;
+  qqqIntradayPct: number | null;
+  sectorEtf: string;
+  sectorIntradayPct: number | null;
+  vsSpyPct: number | null;
+  vsQqqPct: number | null;
+  vsSectorPct: number | null;
+  gapPct: number | null;
+  rvol: number | null;
+  vwapLocation: "ABOVE" | "BELOW" | "AT" | "UNKNOWN";
+  intradayTrend: "BULLISH" | "BEARISH" | "RANGE";
+  rankScore: number;
+  notes: string[];
 }
 
 export interface OptionsCardInfo {

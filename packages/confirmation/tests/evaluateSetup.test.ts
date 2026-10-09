@@ -40,6 +40,12 @@ describe("evaluateSetup", () => {
     expect(card.statusLabel).toBe("NEAR ACTIVE");
     expect(card.conditionsPassed).toBeGreaterThanOrEqual(1);
     expect(card.nearActive.stillWaitingFor.length).toBeGreaterThan(0);
+    expect(card.nearActive.active).toBe(true);
+    expect(card.nearActive.permissionToEnter).toBe(false);
+    expect(card.nearActive.confirmationRequirement).toMatch(/never entry permission/i);
+    expect(card.nearActive.distanceLabel.length).toBeGreaterThan(0);
+    expect(card.nearActive.setupQualityScore).toBe(card.setupScore.total);
+    expect(card.nearActive.dataTimestamp).toBe(card.evaluatedAt);
     expect(
       card.matrix.rows.find((r) => r.id === "FIVE_MIN_CONFIRMATION")?.status,
     ).toBe("WAITING");
@@ -48,6 +54,7 @@ describe("evaluateSetup", () => {
     expect(card.historicalEdge).toBeNull();
     expect(card.matchedStrategies).toEqual([]);
     expect(card.options).toBeNull();
+    expect(card.relativeMomentum).toBeNull();
   });
 
   it("fail-closes to DATA_NOT_VERIFIED on stale quotes", async () => {

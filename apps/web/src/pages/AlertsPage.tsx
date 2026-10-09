@@ -9,7 +9,9 @@ export function AlertsPage() {
     <div className="page">
       <h1 className="page-title">Alerts</h1>
       <p className="page-sub">
-        Local in-app history only. Email / SMS / push delivery is not configured.
+        Local in-app history only (setup found, near active, trigger approached, entry zone,
+        missed, invalidated, data stale). Deduped within 60s. Alert ≠ entry permission. Email /
+        SMS / push / WhatsApp are not wired or claimed.
       </p>
 
       {alerts.length === 0 ? (

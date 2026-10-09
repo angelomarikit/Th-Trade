@@ -4,6 +4,7 @@ import type { MarketDataProvider } from "@wulu/market-data";
 import type { MarketReactionContext, NewsService } from "@wulu/news";
 import {
   buildMorningBrief,
+  buildRelativeMomentum,
   formatMorningBriefText,
   RegimeService,
   type MorningBrief,
@@ -106,6 +107,16 @@ export class SetupScanner {
       edge ??
       this.tryFallbackEdge(symbol, bars, request.side, regimeCtx.regime.primary, why.hasVerifiedCatalyst);
 
+    const feed = process.env.ALPACA_DATA_FEED ?? "iex";
+    const relativeMomentum = buildRelativeMomentum({
+      symbolSnapshot: snapshot,
+      spy: regimeCtx.spy,
+      qqq: regimeCtx.qqq,
+      sectorEtf: regimeCtx.sectorEtf,
+      sector: regimeCtx.sector,
+      feed,
+    });
+
     let card = evaluateSetup({
       symbol,
       side: request.side,
@@ -156,6 +167,7 @@ export class SetupScanner {
       marketAlignmentScore: statusToScore(regimeCtx.marketRegime.status),
       sectorAlignmentScore: statusToScore(regimeCtx.sectorAlignment.status),
       options: null,
+      relativeMomentum,
     });
 
     card = {
@@ -220,6 +232,43 @@ export class SetupScanner {
   }
 
 
+
+  /**
+   * Rank watchlist symbols by computed relative momentum (actual bars).
+   * Ranking is context only — never entry permission.
+   */
+  async rankWatchlist(tickers: string[]): Promise<
+    Array<{
+      symbol: string;
+      rank: number;
+      momentum: ReturnType<typeof buildRelativeMomentum>;
+    }>
+  > {
+    const unique = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, 25);
+    const { qqq } = await this.regimeService.getRegime();
+    const rows: Array<{ symbol: string; momentum: ReturnType<typeof buildRelativeMomentum> }> = [];
+    for (const symbol of unique) {
+      try {
+        const snapshot = await this.marketData.getSnapshot(symbol);
+        const ctx = await this.regimeService.getContextForSymbol(symbol, "LONG", snapshot);
+        rows.push({
+          symbol,
+          momentum: buildRelativeMomentum({
+            symbolSnapshot: snapshot,
+            spy: ctx.spy,
+            qqq: ctx.qqq ?? qqq,
+            sectorEtf: ctx.sectorEtf,
+            sector: ctx.sector,
+            feed: process.env.ALPACA_DATA_FEED ?? "iex",
+          }),
+        });
+      } catch {
+        // Skip failed symbols — never invent rankings
+      }
+    }
+    rows.sort((a, b) => b.momentum.rankScore - a.momentum.rankScore);
+    return rows.map((r, i) => ({ symbol: r.symbol, rank: i + 1, momentum: r.momentum }));
+  }
 
   async morningBrief(input?: {
     tickers?: Array<{ symbol: string; side: TradeSide }>;
