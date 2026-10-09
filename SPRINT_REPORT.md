@@ -19,6 +19,8 @@
 **Safe checkpoint created before changes:** `8f9d711`  
 `checkpoint: pre competitive-intelligence sprint baseline`
 
+**Sprint commits:** `c342609` (features) · `6fc5caa` (build fix)
+
 ## 3. Starting test count
 
 **43 passed** (14 files) before sprint changes.
