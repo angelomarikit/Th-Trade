@@ -46,7 +46,7 @@ export function Sidebar() {
   return (
     <aside className={`sidebar ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <div className="sidebar-brand">
-        <div className="brand-mark" aria-hidden="true" />
+        <img className="brand-mark" src="/logo.jpg" alt="The Trade — WULU Scanner" width={32} height={32} />
         <div className="brand-text">
           <strong>WULU</strong>
           <span>SCANNER</span>

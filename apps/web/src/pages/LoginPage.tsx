@@ -32,7 +32,7 @@ export function LoginPage() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-brand">
-          <div className="brand-mark" />
+          <img className="brand-mark brand-mark-lg" src="/logo.jpg" alt="The Trade — WULU Scanner" width={56} height={56} />
           <div>
             <strong>WULU SCANNER</strong>
             <span>Sign in to your desk</span>
