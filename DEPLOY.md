@@ -40,11 +40,16 @@ Confirm `.env` is **not** listed in `git status` before push.
 ### 2.1 Create the service
 
 1. Go to [https://railway.app](https://railway.app) → login with GitHub  
-2. **New Project** → **Deploy from GitHub repo** → select `wulu-trading-scanner`  
-3. Railway should detect `railway.toml` (build: `npm run build:api`, start: `npm run start:api`)  
-4. Open the service → **Settings** → generate a public domain (**Networking** → **Generate Domain**)  
-   - Example: `https://wulu-trading-scanner-production.up.railway.app`  
-   - Save this — this is your **API URL**
+2. **New Project** → **Deploy from GitHub repo** → select your repo  
+3. This repo ships a **`Dockerfile`** for the API (avoids Railpack mis-detecting npm workspaces as Nx/Next)  
+4. In the service → **Settings**:
+   - Builder: **Dockerfile** (or leave default — Railway uses `Dockerfile` when present)
+   - Root Directory: **empty** (repo root)
+   - Custom Build / Start: optional; Dockerfile already runs `npm run build:api` / `start:api`
+5. If an old failed deploy used Railpack: open **Settings → Build** and set builder to **Dockerfile**, then **Redeploy**
+6. **Networking** → **Generate Domain**  
+   - Example: `https://xxx.up.railway.app`  
+   - That URL is your **API base** for `VITE_API_BASE`
 
 ### 2.2 Paste variables from your local `.env`
 

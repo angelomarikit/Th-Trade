@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.env
+.env.*
+!.env.example
+apps/web
+coverage
+*.sqlite
+*.sqlite-journal
+data
+.turbo
+*.log
+.DS_Store
+agent-transcripts
