@@ -5,7 +5,6 @@ node_modules
 .env
 .env.*
 !.env.example
-apps/web
 coverage
 *.sqlite
 *.sqlite-journal
@@ -13,4 +12,7 @@ data
 .turbo
 *.log
 .DS_Store
-agent-transcripts
+
+# Web app source not needed for API image — keep package.json for npm workspaces
+apps/web/**
+!apps/web/package.json
