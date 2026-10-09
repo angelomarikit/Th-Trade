@@ -63,8 +63,16 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
 
 
-  const leftZone =
-    input.previousState === "NEAR_ACTIVE" && !built.zoneExecutable;
+  const prev = input.previousState;
+  const wasNearOrActive =
+    prev === "NEAR_ACTIVE" ||
+    prev === "ENTRY_ACTIVE_LONG" ||
+    prev === "ENTRY_ACTIVE_SHORT";
+
+  const leftZone = wasNearOrActive && !built.zoneExecutable;
+  const structureRow = built.matrix.rows.find((r) => r.id === "STRUCTURE");
+  // Wire SM input previously unused — clear structure FAIL after near/entry → INVALIDATED
+  const structureInvalidated = wasNearOrActive && structureRow?.status === "FAIL";
 
   const state = decideSetupState({
     side: input.side,
@@ -72,6 +80,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     zoneExecutable: built.zoneExecutable,
     previousState: input.previousState,
     leftExecutableZone: leftZone,
+    structureInvalidated,
   });
 
   assertEntryNotFromNewsAlone(state, built.matrix);

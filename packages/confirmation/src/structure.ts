@@ -49,6 +49,14 @@ export function evaluateStructure(
           : `Structure PASS: higher-low hold with close ${last.close.toFixed(2)}`,
       };
     }
+    // Clear breakdown against LONG thesis → FAIL (feeds INVALIDATED when previously near/entry)
+    if (last.close < prior.low) {
+      return {
+        pass: false,
+        waiting: false,
+        reason: `Structure FAIL: breakdown close ${last.close.toFixed(2)} < prior low ${prior.low.toFixed(2)} against LONG`,
+      };
+    }
     return {
       pass: false,
       waiting: true,
@@ -65,6 +73,14 @@ export function evaluateStructure(
       reason: breakdown
         ? `Structure PASS: 5m close ${last.close.toFixed(2)} < prior low ${prior.low.toFixed(2)}`
         : `Structure PASS: lower-high hold with close ${last.close.toFixed(2)}`,
+    };
+  }
+  // Clear breakout against SHORT thesis → FAIL
+  if (last.close > prior.high) {
+    return {
+      pass: false,
+      waiting: false,
+      reason: `Structure FAIL: breakout close ${last.close.toFixed(2)} > prior high ${prior.high.toFixed(2)} against SHORT`,
     };
   }
   return {

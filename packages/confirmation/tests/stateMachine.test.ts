@@ -80,4 +80,25 @@ describe("setup state machine", () => {
       decideSetupState({ side: "LONG", matrix, zoneExecutable: true }),
     ).toBe("ENTRY_ACTIVE_LONG");
   });
+
+  it("returns INVALIDATED when structureInvalidated is set", () => {
+    const matrix = buildConditionMatrix([
+      row("DATA_FRESHNESS", "PASS"),
+      row("LIQUIDITY", "PASS"),
+      row("RELATIVE_VOLUME", "PASS"),
+      row("VWAP", "PASS"),
+      row("STRUCTURE", "FAIL"),
+      row("FIVE_MIN_CONFIRMATION", "WAITING"),
+      row("RISK_REWARD", "PASS"),
+    ]);
+    expect(
+      decideSetupState({
+        side: "LONG",
+        matrix,
+        zoneExecutable: true,
+        previousState: "NEAR_ACTIVE",
+        structureInvalidated: true,
+      }),
+    ).toBe("INVALIDATED");
+  });
 });
