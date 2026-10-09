@@ -1,0 +1,26 @@
+{
+  "name": "wulu-trading-scanner",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Wulu Trading Scanner — hybrid market intelligence (greenfield)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @wulu/domain -w @wulu/news -w @wulu/market-data -w @wulu/regime -w @wulu/strategies -w @wulu/backtest -w @wulu/confirmation -w @wulu/journal -w @wulu/options -w @wulu/scanner -w @wulu/api -w @wulu/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
+    "dev:api": "npm run dev -w @wulu/api",
+    "dev:web": "npm run dev -w @wulu/web"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

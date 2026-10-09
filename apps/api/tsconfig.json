@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/news" },
+    { "path": "../../packages/market-data" },
+    { "path": "../../packages/regime" },
+    { "path": "../../packages/strategies" },
+    { "path": "../../packages/backtest" },
+    { "path": "../../packages/confirmation" },
+    { "path": "../../packages/journal" },
+    { "path": "../../packages/options" },
+    { "path": "../../packages/scanner" }
+  ]
+
+
+
+
+
+}

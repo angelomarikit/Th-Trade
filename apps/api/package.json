@@ -1,0 +1,30 @@
+{
+  "name": "@wulu/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "@wulu/backtest": "0.1.0",
+    "@wulu/confirmation": "0.1.0",
+    "@wulu/domain": "0.1.0",
+    "@wulu/journal": "0.1.0",
+    "@wulu/market-data": "0.1.0",
+    "@wulu/news": "0.1.0",
+    "@wulu/options": "0.1.0",
+    "@wulu/regime": "0.1.0",
+    "@wulu/scanner": "0.1.0",
+    "@wulu/strategies": "0.1.0",
+    "dotenv": "^18.0.6",
+    "openai": "^7.31.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3"
+  }
+}

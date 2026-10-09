@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../backtest" },
+    { "path": "../confirmation" },
+    { "path": "../domain" },
+    { "path": "../journal" },
+    { "path": "../market-data" },
+    { "path": "../news" },
+    { "path": "../options" },
+    { "path": "../regime" },
+    { "path": "../strategies" }
+  ]
+
+
+
+
+}
