@@ -264,7 +264,8 @@ export interface EdgeResponse {
   text: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+/** Strip trailing slash so `https://api.example.com/` + `/health` does not become `//health`. */
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
 
 async function getJson<T>(path: string, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

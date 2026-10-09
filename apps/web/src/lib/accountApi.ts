@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
 
 export interface PlanInfo {
   id: string;

@@ -38,7 +38,12 @@ loadEnv({ path: path.join(rootDir, ".env") });
 process.env.JOURNAL_ROOT = process.env.JOURNAL_ROOT ?? rootDir;
 
 const port = Number(process.env.PORT ?? 8787);
-const corsOrigin = process.env.CORS_ORIGIN ?? "*";
+/** Normalize: browsers send Origin without trailing slash. */
+const corsOrigin = (process.env.CORS_ORIGIN ?? "*")
+  .split(",")
+  .map((s) => s.trim().replace(/\/+$/, ""))
+  .filter(Boolean)
+  .join(",") || "*";
 
 function envFlag(name: string): string {
   return (process.env[name] ?? "").trim() ? "yes" : "NO";
@@ -679,13 +684,14 @@ function applyCors(
   req: import("node:http").IncomingMessage,
   res: import("node:http").ServerResponse,
 ) {
-  const origin = req.headers.origin;
+  const origin = (req.headers.origin ?? "").replace(/\/+$/, "");
+  const allowed = corsOrigin === "*" ? ["*"] : corsOrigin.split(",");
   const allow =
     corsOrigin === "*"
       ? "*"
-      : origin && corsOrigin.split(",").map((s) => s.trim()).includes(origin)
+      : origin && allowed.includes(origin)
         ? origin
-        : corsOrigin.split(",")[0]?.trim() || "*";
+        : allowed[0] || "*";
   res.setHeader("Access-Control-Allow-Origin", allow);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader(
