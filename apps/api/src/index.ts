@@ -32,13 +32,26 @@ import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.j
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+// Local .env is optional. On Railway/Docker, set Variables in the host dashboard —
+// dotenv will report "injected env (0)" when no .env file exists (that is normal).
 loadEnv({ path: path.join(rootDir, ".env") });
 process.env.JOURNAL_ROOT = process.env.JOURNAL_ROOT ?? rootDir;
 
 const port = Number(process.env.PORT ?? 8787);
 const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 
+function envFlag(name: string): string {
+  return (process.env[name] ?? "").trim() ? "yes" : "NO";
+}
+
 async function main() {
+  console.log(
+    `[env] ALPACA_API_KEY_ID=${envFlag("ALPACA_API_KEY_ID")} ` +
+      `ALPACA_API_SECRET_KEY=${envFlag("ALPACA_API_SECRET_KEY")} ` +
+      `NEWS_PROVIDER=${process.env.NEWS_PROVIDER ?? "(unset)"} ` +
+      `MARKET_DATA_PROVIDER=${process.env.MARKET_DATA_PROVIDER ?? "(unset)"}`,
+  );
+
   const news = createNewsServiceFromEnv();
   const scanner = createSetupScannerFromEnv();
   const optionsEngine = createOptionsEngineFromEnv();

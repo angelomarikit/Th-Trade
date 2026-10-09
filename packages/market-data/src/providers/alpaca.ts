@@ -43,7 +43,14 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
   constructor(private readonly config: AlpacaMarketDataConfig) {
     if (!config.apiKeyId || !config.apiSecretKey) {
-      throw new Error("AlpacaMarketDataProvider requires API key and secret");
+      const idSet = Boolean((process.env.ALPACA_API_KEY_ID ?? "").trim());
+      const secretSet = Boolean((process.env.ALPACA_API_SECRET_KEY ?? "").trim());
+      throw new Error(
+        `AlpacaMarketDataProvider requires API key and secret. ` +
+          `Env check: ALPACA_API_KEY_ID=${idSet ? "set" : "MISSING"}, ` +
+          `ALPACA_API_SECRET_KEY=${secretSet ? "set" : "MISSING"}. ` +
+          `On Railway → Variables, add both exact names (no quotes), then Redeploy.`,
+      );
     }
     this.baseUrl = (config.baseUrl ?? "https://data.alpaca.markets").replace(/\/$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
