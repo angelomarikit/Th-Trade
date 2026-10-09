@@ -50,27 +50,35 @@ export function buildNearActiveView(input: {
     distanceToTriggerPct: distancePct,
     distanceLabel: approach,
     stillWaitingFor: matrix.waitingFor,
-    statusLabel:
-      state === "NEAR_ACTIVE"
-        ? "NEAR ACTIVE"
-        : state === "ENTRY_ACTIVE_LONG"
-          ? "ENTRY ACTIVE — LONG"
-          : state === "ENTRY_ACTIVE_SHORT"
-            ? "ENTRY ACTIVE — SHORT"
-            : state === "MISSED"
-              ? "MISSED — DO NOT CHASE"
-              : state === "INVALIDATED"
-                ? "INVALIDATED"
-                : state === "DATA_NOT_VERIFIED"
-                  ? "DATA NOT VERIFIED"
-                  : state === "NO_TRADE"
-                    ? "NO TRADE"
-                    : state === "WAIT"
-                      ? "WAIT"
-                      : state.replaceAll("_", " "),
+    statusLabel: statusLabelFor(state),
     confirmationRequirement: NEAR_ACTIVE_CONFIRMATION_REQUIREMENT,
     permissionToEnter: false,
     dataTimestamp: input.dataTimestamp ?? null,
     setupQualityScore: input.setupQualityScore ?? null,
   };
+}
+
+function statusLabelFor(state: SetupState): string {
+  switch (state) {
+    case "NEAR_ACTIVE":
+      return "NEAR ACTIVE";
+    case "ENTRY_ACTIVE_LONG":
+      return "ENTRY ACTIVE — LONG";
+    case "ENTRY_ACTIVE_SHORT":
+      return "ENTRY ACTIVE — SHORT";
+    case "MISSED":
+      return "MISSED — DO NOT CHASE";
+    case "INVALIDATED":
+      return "INVALIDATED";
+    case "DATA_NOT_VERIFIED":
+      return "DATA NOT VERIFIED";
+    case "NO_TRADE":
+      return "NO TRADE";
+    case "WAIT":
+      return "WAIT";
+    default: {
+      const _exhaustive: never = state;
+      return String(_exhaustive).replace(/_/g, " ");
+    }
+  }
 }
