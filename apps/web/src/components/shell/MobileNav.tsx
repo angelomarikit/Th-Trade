@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 const ITEMS = [
   { to: "/", end: true, label: "Home", icon: LayoutDashboard },
   { to: "/scanner", label: "Scan", icon: Radar },
-  { to: "/watchlist", label: "List", icon: Star },
+  { to: "/watchlist", label: "Monitor", icon: Star },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/settings", label: "More", icon: Settings },
 ];

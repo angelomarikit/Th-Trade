@@ -350,3 +350,105 @@ export function fetchRank(tickers: string[]) {
     }>;
   }>(`/v1/rank?tickers=${qs}`);
 }
+
+export interface MonitorSymbolState {
+  symbol: string;
+  side: "LONG" | "SHORT";
+  status: string;
+  state: string;
+  lastPrice: number | null;
+  alertAt: number | null;
+  entryZone: { low: number; high: number; executable: boolean } | null;
+  stop: number | null;
+  t1: number | null;
+  t2: number | null;
+  conditionsPassed: number;
+  conditionsTotal: number;
+  setupScore: number | null;
+  waitingFor: string[];
+  dataFresh: boolean;
+  session: string | null;
+  distanceLabel: string | null;
+  nearActive: boolean;
+  rankScore: number | null;
+  vsSpyPct: number | null;
+  evaluatedAt: string | null;
+  error: string | null;
+  updatedAt: string;
+}
+
+export interface MonitorSnapshot {
+  sessionId: string;
+  maxSymbols: number;
+  intervalMs: number;
+  running: boolean;
+  symbols: Array<{ symbol: string; side: "LONG" | "SHORT" }>;
+  states: MonitorSymbolState[];
+  ranked: Array<{
+    symbol: string;
+    side: "LONG" | "SHORT";
+    status: string;
+    setupScore: number | null;
+    nearActive: boolean;
+  }>;
+  lastTickAt: string | null;
+  tickCount: number;
+  note: string;
+}
+
+async function monitorFetch(
+  path: string,
+  opts?: { method?: string; body?: unknown; accessToken?: string | null },
+): Promise<MonitorSnapshot> {
+  const headers: Record<string, string> = {};
+  if (opts?.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
+  if (opts?.body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: opts?.method ?? "GET",
+    headers: Object.keys(headers).length ? headers : undefined,
+    body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<MonitorSnapshot>;
+}
+
+export function fetchMonitor(accessToken?: string | null) {
+  return monitorFetch("/v1/monitor", { accessToken });
+}
+
+export function setMonitorWatchlist(
+  symbols: Array<{ symbol: string; side: "LONG" | "SHORT" }>,
+  accessToken?: string | null,
+) {
+  return monitorFetch("/v1/monitor/watchlist", {
+    method: "PUT",
+    body: { symbols },
+    accessToken,
+  });
+}
+
+export function addMonitorSymbol(
+  symbol: string,
+  side: "LONG" | "SHORT" = "LONG",
+  accessToken?: string | null,
+) {
+  return monitorFetch("/v1/monitor/symbols", {
+    method: "POST",
+    body: { symbol, side },
+    accessToken,
+  });
+}
+
+export function removeMonitorSymbol(symbol: string, accessToken?: string | null) {
+  return monitorFetch(`/v1/monitor/symbols/${encodeURIComponent(symbol)}`, {
+    method: "DELETE",
+    accessToken,
+  });
+}
+
+export function forceMonitorTick(accessToken?: string | null) {
+  return monitorFetch("/v1/monitor/tick", { method: "POST", accessToken });
+}

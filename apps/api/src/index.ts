@@ -17,6 +17,9 @@ import {
   createMarketDataFromEnv,
   createOptionsEngineFromEnv,
   createSetupScannerFromEnv,
+  MonitorHub,
+  MonitorLimitError,
+  type MonitorSymbolConfig,
 } from "@wulu/scanner";
 import { getPlan, PAID_TIERS, PLANS, type PlanTier } from "./billing/plans.js";
 import {
@@ -60,6 +63,10 @@ async function main() {
   const news = createNewsServiceFromEnv();
   const scanner = createSetupScannerFromEnv();
   const optionsEngine = createOptionsEngineFromEnv();
+  const monitorHub = new MonitorHub(scanner, {
+    maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
+    intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
+  });
 
   const marketData = createMarketDataFromEnv();
   const flags = loadFeatureFlags();
@@ -67,6 +74,18 @@ async function main() {
   const journal = scanner.signalJournal;
   const supabaseReady = isSupabaseConfigured();
   const openaiReady = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
+
+  async function resolveMonitorSession(authHeader: string | undefined): Promise<string> {
+    if (supabaseReady && authHeader) {
+      try {
+        const user = await requireUser(authHeader);
+        return user.id;
+      } catch {
+        /* unauthenticated clients share the default desk session */
+      }
+    }
+    return "default";
+  }
 
   const server = createServer(async (req, res) => {
     try {
@@ -492,6 +511,73 @@ async function main() {
         });
       }
 
+      // ── Step 2: server-side multi-stock monitor ──────────────────────────
+      if (url.pathname === "/v1/monitor" && req.method === "GET") {
+        const sessionId = await resolveMonitorSession(req.headers.authorization);
+        const mon = monitorHub.get(sessionId);
+        return json(res, 200, mon.snapshot());
+      }
+
+      if (url.pathname === "/v1/monitor/watchlist" && req.method === "PUT") {
+        const sessionId = await resolveMonitorSession(req.headers.authorization);
+        const body = (await readJson(req)) as {
+          symbols?: Array<{ symbol?: string; side?: string }>;
+        };
+        const items: MonitorSymbolConfig[] = (body.symbols ?? []).map((s) => ({
+          symbol: (s.symbol ?? "").trim().toUpperCase(),
+          side: (s.side === "SHORT" ? "SHORT" : "LONG") as TradeSide,
+        }));
+        const mon = monitorHub.get(sessionId);
+        try {
+          mon.setWatchlist(items);
+          if (mon.list().length > 0) await mon.tick();
+          return json(res, 200, mon.snapshot());
+        } catch (err) {
+          if (err instanceof MonitorLimitError) {
+            return json(res, 400, { error: err.message });
+          }
+          throw err;
+        }
+      }
+
+      if (url.pathname === "/v1/monitor/symbols" && req.method === "POST") {
+        const sessionId = await resolveMonitorSession(req.headers.authorization);
+        const body = (await readJson(req)) as { symbol?: string; side?: string };
+        const symbol = (body.symbol ?? "").trim().toUpperCase();
+        if (!symbol) return json(res, 400, { error: "symbol required" });
+        const side = (body.side === "SHORT" ? "SHORT" : "LONG") as TradeSide;
+        const mon = monitorHub.get(sessionId);
+        try {
+          mon.add(symbol, side);
+          await mon.tick();
+          return json(res, 200, mon.snapshot());
+        } catch (err) {
+          if (err instanceof MonitorLimitError) {
+            return json(res, 400, { error: err.message });
+          }
+          throw err;
+        }
+      }
+
+      if (url.pathname.startsWith("/v1/monitor/symbols/") && req.method === "DELETE") {
+        const sessionId = await resolveMonitorSession(req.headers.authorization);
+        const symbol = decodeURIComponent(url.pathname.slice("/v1/monitor/symbols/".length))
+          .trim()
+          .toUpperCase();
+        if (!symbol) return json(res, 400, { error: "symbol required" });
+        const mon = monitorHub.get(sessionId);
+        mon.remove(symbol);
+        if (mon.list().length > 0) await mon.tick();
+        return json(res, 200, mon.snapshot());
+      }
+
+      if (url.pathname === "/v1/monitor/tick" && req.method === "POST") {
+        const sessionId = await resolveMonitorSession(req.headers.authorization);
+        const mon = monitorHub.get(sessionId);
+        await mon.tick();
+        return json(res, 200, mon.snapshot());
+      }
+
       if (url.pathname === "/v1/regime" && req.method === "GET") {
         const { brief } = await scanner.morningBrief();
         return json(res, 200, {
@@ -677,7 +763,19 @@ async function main() {
     console.log("  POST /v1/recommend");
     console.log("  GET /v1/bars?ticker=NVDA&timeframe=5m");
     console.log("  GET /v1/setup?ticker=NVDA&side=LONG");
+    console.log("  GET /v1/monitor");
+    console.log("  PUT /v1/monitor/watchlist");
+    console.log("  POST /v1/monitor/symbols");
+    console.log("  DELETE /v1/monitor/symbols/:ticker");
+    console.log("  POST /v1/monitor/tick");
   });
+
+  const shutdown = () => {
+    monitorHub.stopAll();
+    server.close();
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 function applyCors(
@@ -693,7 +791,7 @@ function applyCors(
         ? origin
         : allowed[0] || "*";
   res.setHeader("Access-Control-Allow-Origin", allow);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, Accept, Authorization",

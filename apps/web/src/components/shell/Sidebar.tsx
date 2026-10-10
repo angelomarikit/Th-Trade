@@ -21,7 +21,7 @@ import { useTerminal } from "../../context/TerminalContext";
 const PRIMARY = [
   { to: "/", end: true, label: "Overview", icon: LayoutDashboard },
   { to: "/scanner", label: "Scanner", icon: Radar },
-  { to: "/watchlist", label: "Watchlist", icon: Star },
+  { to: "/watchlist", label: "Live Monitor", icon: Star },
   { to: "/signals", label: "Signals", icon: Activity },
   { to: "/charts", label: "Charts", icon: CandlestickChart },
 ];
