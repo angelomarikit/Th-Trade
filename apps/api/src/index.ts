@@ -17,6 +17,7 @@ import {
   createMarketDataFromEnv,
   createOptionsEngineFromEnv,
   createSetupScannerFromEnv,
+  DEFAULT_MONITOR_WATCHLIST,
   MonitorHub,
   MonitorLimitError,
   type MonitorSymbolConfig,
@@ -31,6 +32,12 @@ import {
   spendCredits,
   getSupabaseAdmin,
 } from "./billing/supabaseAdmin.js";
+import { HybridAlertEventStore } from "./monitor/alertStore.js";
+import {
+  loadAllMonitorWatchlists,
+  loadMonitorWatchlist,
+  saveMonitorWatchlist,
+} from "./monitor/persistence.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
 
 
@@ -63,9 +70,15 @@ async function main() {
   const news = createNewsServiceFromEnv();
   const scanner = createSetupScannerFromEnv();
   const optionsEngine = createOptionsEngineFromEnv();
+  const alertStore = new HybridAlertEventStore();
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
+    feed: process.env.ALPACA_DATA_FEED ?? "iex",
+    alertStore,
+    persistWatchlist: async (userId, symbols) => {
+      await saveMonitorWatchlist(userId, symbols);
+    },
   });
 
   const marketData = createMarketDataFromEnv();
@@ -75,14 +88,37 @@ async function main() {
   const supabaseReady = isSupabaseConfigured();
   const openaiReady = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
 
-  async function resolveMonitorSession(authHeader: string | undefined): Promise<string> {
+  // Resume persisted watchlists after deploy/restart (Railway long-running API process).
+  try {
+    const rows = await loadAllMonitorWatchlists();
+    for (const row of rows) {
+      monitorHub.restoreSession(row.userId, row.symbols);
+    }
+    if (rows.length > 0) {
+      console.log(`[monitor] restored ${rows.length} persisted watchlist(s)`);
+      monitorHub.start();
+    }
+  } catch (err) {
+    console.warn(
+      "[monitor] resume skipped:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  async function resolveMonitorSession(
+    authHeader: string | undefined,
+    opts?: { requireAuth?: boolean },
+  ): Promise<string> {
     if (supabaseReady && authHeader) {
       try {
         const user = await requireUser(authHeader);
         return user.id;
-      } catch {
-        /* unauthenticated clients share the default desk session */
+      } catch (err) {
+        if (opts?.requireAuth) throw err;
       }
+    }
+    if (opts?.requireAuth && supabaseReady) {
+      throw new AuthError(401, "Sign in required to manage a persistent watchlist");
     }
     return "default";
   }
@@ -117,6 +153,12 @@ async function main() {
           supabaseConfigured: supabaseReady,
           openaiConfigured: openaiReady,
           billing: { stripe: "not_wired", mode: "manual_plan_select" },
+          monitor: {
+            ...monitorHub.metrics(),
+            maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
+            intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
+            automaticOrders: false,
+          },
         });
       }
 
@@ -511,71 +553,135 @@ async function main() {
         });
       }
 
-      // ── Step 2: server-side multi-stock monitor ──────────────────────────
+      // ── Phase 2: server-side multi-stock monitor ─────────────────────────
       if (url.pathname === "/v1/monitor" && req.method === "GET") {
-        const sessionId = await resolveMonitorSession(req.headers.authorization);
-        const mon = monitorHub.get(sessionId);
-        return json(res, 200, mon.snapshot());
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization);
+          // Restore from DB on first GET if memory empty (post-restart / new process)
+          if (sessionId !== "default" && monitorHub.get(sessionId).list().length === 0) {
+            const stored = await loadMonitorWatchlist(sessionId);
+            if (stored?.length) {
+              monitorHub.restoreSession(sessionId, stored);
+              monitorHub.start();
+            }
+          }
+          return json(res, 200, {
+            ...monitorHub.snapshot(sessionId),
+            hub: monitorHub.metrics(),
+            defaultWatchlist: DEFAULT_MONITOR_WATCHLIST,
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
       }
 
       if (url.pathname === "/v1/monitor/watchlist" && req.method === "PUT") {
-        const sessionId = await resolveMonitorSession(req.headers.authorization);
-        const body = (await readJson(req)) as {
-          symbols?: Array<{ symbol?: string; side?: string }>;
-        };
-        const items: MonitorSymbolConfig[] = (body.symbols ?? []).map((s) => ({
-          symbol: (s.symbol ?? "").trim().toUpperCase(),
-          side: (s.side === "SHORT" ? "SHORT" : "LONG") as TradeSide,
-        }));
-        const mon = monitorHub.get(sessionId);
         try {
-          mon.setWatchlist(items);
-          if (mon.list().length > 0) await mon.tick();
-          return json(res, 200, mon.snapshot());
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const body = (await readJson(req)) as {
+            symbols?: Array<{ symbol?: string; side?: string }>;
+          };
+          const items: MonitorSymbolConfig[] = (body.symbols ?? []).map((s) => ({
+            symbol: (s.symbol ?? "").trim().toUpperCase(),
+            side: (s.side === "SHORT" ? "SHORT" : "LONG") as TradeSide,
+          }));
+          const snap = await monitorHub.setWatchlist(sessionId, items);
+          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
         } catch (err) {
           if (err instanceof MonitorLimitError) {
             return json(res, 400, { error: err.message });
           }
-          throw err;
+          return authError(res, err);
         }
       }
 
       if (url.pathname === "/v1/monitor/symbols" && req.method === "POST") {
-        const sessionId = await resolveMonitorSession(req.headers.authorization);
-        const body = (await readJson(req)) as { symbol?: string; side?: string };
-        const symbol = (body.symbol ?? "").trim().toUpperCase();
-        if (!symbol) return json(res, 400, { error: "symbol required" });
-        const side = (body.side === "SHORT" ? "SHORT" : "LONG") as TradeSide;
-        const mon = monitorHub.get(sessionId);
         try {
-          mon.add(symbol, side);
-          await mon.tick();
-          return json(res, 200, mon.snapshot());
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const body = (await readJson(req)) as {
+            symbol?: string;
+            side?: string;
+            replace?: string;
+          };
+          const symbol = (body.symbol ?? "").trim().toUpperCase();
+          if (!symbol) return json(res, 400, { error: "symbol required" });
+          const side = (body.side === "SHORT" ? "SHORT" : "LONG") as TradeSide;
+          const replace = (body.replace ?? "").trim().toUpperCase();
+          const snap = replace
+            ? await monitorHub.replaceSymbol(sessionId, replace, symbol, side)
+            : await monitorHub.addSymbol(sessionId, symbol, side);
+          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
         } catch (err) {
           if (err instanceof MonitorLimitError) {
             return json(res, 400, { error: err.message });
           }
-          throw err;
+          if (err instanceof Error && err.message.includes("watchlist")) {
+            return json(res, 400, { error: err.message });
+          }
+          return authError(res, err);
         }
       }
 
       if (url.pathname.startsWith("/v1/monitor/symbols/") && req.method === "DELETE") {
-        const sessionId = await resolveMonitorSession(req.headers.authorization);
-        const symbol = decodeURIComponent(url.pathname.slice("/v1/monitor/symbols/".length))
-          .trim()
-          .toUpperCase();
-        if (!symbol) return json(res, 400, { error: "symbol required" });
-        const mon = monitorHub.get(sessionId);
-        mon.remove(symbol);
-        if (mon.list().length > 0) await mon.tick();
-        return json(res, 200, mon.snapshot());
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const symbol = decodeURIComponent(url.pathname.slice("/v1/monitor/symbols/".length))
+            .trim()
+            .toUpperCase();
+          if (!symbol) return json(res, 400, { error: "symbol required" });
+          const snap = await monitorHub.removeSymbol(sessionId, symbol);
+          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
+        } catch (err) {
+          return authError(res, err);
+        }
       }
 
       if (url.pathname === "/v1/monitor/tick" && req.method === "POST") {
+        await monitorHub.tick();
         const sessionId = await resolveMonitorSession(req.headers.authorization);
-        const mon = monitorHub.get(sessionId);
-        await mon.tick();
-        return json(res, 200, mon.snapshot());
+        return json(res, 200, {
+          ...monitorHub.snapshot(sessionId),
+          hub: monitorHub.metrics(),
+        });
+      }
+
+      if (url.pathname === "/v1/monitor/events" && req.method === "GET") {
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
+          const events = await monitorHub.listAlerts(sessionId, limit);
+          return json(res, 200, {
+            count: events.length,
+            events,
+            delivery: "recorded_only",
+            note: "Phase 2 records status-change events; SMS/push not sent yet.",
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
+      }
+
+      if (url.pathname === "/v1/monitor/defaults" && req.method === "POST") {
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const snap = await monitorHub.setWatchlist(sessionId, DEFAULT_MONITOR_WATCHLIST);
+          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
+        } catch (err) {
+          if (err instanceof MonitorLimitError) {
+            return json(res, 400, { error: err.message });
+          }
+          return authError(res, err);
+        }
       }
 
       if (url.pathname === "/v1/regime" && req.method === "GET") {
@@ -768,6 +874,8 @@ async function main() {
     console.log("  POST /v1/monitor/symbols");
     console.log("  DELETE /v1/monitor/symbols/:ticker");
     console.log("  POST /v1/monitor/tick");
+    console.log("  GET /v1/monitor/events");
+    console.log("  POST /v1/monitor/defaults");
   });
 
   const shutdown = () => {

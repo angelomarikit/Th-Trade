@@ -5,15 +5,14 @@ import { useTerminal } from "../context/TerminalContext";
 import {
   addMonitorSymbol,
   fetchMonitor,
+  fetchMonitorEvents,
   forceMonitorTick,
+  loadDefaultMonitorWatchlist,
   removeMonitorSymbol,
-  setMonitorWatchlist,
   type MonitorSnapshot,
   type MonitorSymbolState,
 } from "../lib/api";
-import { fmtPrice } from "../lib/format";
-
-const DEFAULT_SIX = ["TSLA", "MU", "NVDA", "AMD", "SPY", "QQQ"];
+import { fmtPct, fmtPrice } from "../lib/format";
 
 export function WatchlistPage() {
   const { session } = useAuth();
@@ -22,6 +21,9 @@ export function WatchlistPage() {
   const token = session?.access_token ?? null;
 
   const [snap, setSnap] = useState<MonitorSnapshot | null>(null);
+  const [events, setEvents] = useState<
+    Array<{ id: string; symbol: string; previousStatus: string; newStatus: string; eventAt: string; reason: string }>
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -32,6 +34,14 @@ export function WatchlistPage() {
       const next = await fetchMonitor(token);
       setSnap(next);
       setError(null);
+      if (token) {
+        try {
+          const ev = await fetchMonitorEvents(token, 12);
+          setEvents(ev.events);
+        } catch {
+          /* events require auth / migration */
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -76,10 +86,7 @@ export function WatchlistPage() {
   async function loadDefaultSix() {
     setBusy(true);
     try {
-      const next = await setMonitorWatchlist(
-        DEFAULT_SIX.map((symbol) => ({ symbol, side: "LONG" as const })),
-        token,
-      );
+      const next = await loadDefaultMonitorWatchlist(token);
       setSnap(next);
       setError(null);
     } catch (err) {
@@ -110,16 +117,16 @@ export function WatchlistPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Live Monitor</h1>
+      <h1 className="page-title">WULU LIVE WATCHLIST</h1>
       <p className="page-sub">
-        Server-side multi-stock monitoring (Step 2). Up to {snap?.maxSymbols ?? 6} symbols scanned
-        about every {Math.round((snap?.intervalMs ?? 20_000) / 1000)}s on the API — the browser does
-        not need to stay open for scans to continue.
+        Server-side multi-stock monitor (Phase 2). Up to {snap?.maxSymbols ?? 6} symbols · shared scan
+        cycle ~{Math.round((snap?.intervalMs ?? 20_000) / 1000)}s · feed{" "}
+        {(snap?.feed ?? "iex").toUpperCase()} (not consolidated volume). Browser may close; API keeps
+        scanning. Auto-trading remains disabled.
       </p>
 
       <div className="scan-controls" style={{ marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span
-          className="status-pill"
           style={{
             border: "1px solid var(--border)",
             borderRadius: 8,
@@ -128,11 +135,12 @@ export function WatchlistPage() {
             fontSize: "0.8rem",
           }}
         >
-          {snap?.running ? "RUNNING" : "IDLE"} · ticks {snap?.tickCount ?? 0}
+          {snap?.running ? "RUNNING" : "IDLE"} · hub ticks {snap?.hub?.tickCount ?? snap?.tickCount ?? 0}
+          {snap?.hub?.lastCycleMs != null ? ` · cycle ${snap.hub.lastCycleMs}ms` : ""}
           {snap?.lastTickAt ? ` · last ${new Date(snap.lastTickAt).toLocaleTimeString()}` : ""}
         </span>
         <button type="button" className="scan-btn" disabled={busy} onClick={() => void loadDefaultSix()}>
-          Load TSLA / MU / NVDA / AMD / SPY / QQQ
+          Load default six
         </button>
         <button type="button" className="scan-btn" disabled={busy} onClick={() => void onForceTick()}>
           Scan now
@@ -171,7 +179,7 @@ export function WatchlistPage() {
           <option value="SHORT">SHORT</option>
         </select>
         <button type="submit" className="scan-btn" disabled={busy}>
-          Add to monitor
+          Add
         </button>
       </form>
 
@@ -181,17 +189,14 @@ export function WatchlistPage() {
         </p>
       ) : null}
 
-      {snap?.note ? (
-        <p className="page-sub" style={{ marginTop: 0 }}>
-          {snap.note}
-        </p>
-      ) : null}
-
       <div className="panel" style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>Ranked by setup readiness</h2>
+        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
+          Ranked opportunities ({ordered.length}/{snap?.maxSymbols ?? 6})
+        </h2>
         {ordered.length === 0 ? (
           <p className="page-sub" style={{ margin: 0 }}>
-            No symbols monitored yet. Load the default six or add tickers above.
+            No symbols monitored. Load the default six (TSLA, MU, NVDA, AMD, SPY, QQQ) or add tickers.
+            Sign in to persist your watchlist across restarts.
           </p>
         ) : (
           <div style={{ display: "grid", gap: "0.65rem" }}>
@@ -211,41 +216,35 @@ export function WatchlistPage() {
         )}
       </div>
 
-      <div className="panel">
-        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>Watchlist ({snap?.symbols.length ?? 0}/{snap?.maxSymbols ?? 6})</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Side</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(snap?.symbols ?? []).map((s) => {
-              const st = statesBySymbol.get(s.symbol);
-              return (
-                <tr key={s.symbol}>
-                  <td>{s.symbol}</td>
-                  <td>{s.side}</td>
-                  <td>{st?.status ?? "…"}</td>
+      {events.length > 0 ? (
+        <div className="panel">
+          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
+            Status events (recorded — no push/SMS yet)
+          </h2>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Symbol</th>
+                <th>Change</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((ev) => (
+                <tr key={ev.id}>
+                  <td>{new Date(ev.eventAt).toLocaleTimeString()}</td>
+                  <td>{ev.symbol}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      disabled={busy}
-                      onClick={() => void onRemove(s.symbol)}
-                    >
-                      Remove
-                    </button>
+                    {ev.previousStatus} → {ev.newStatus}
                   </td>
+                  <td>{ev.reason}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -261,53 +260,62 @@ function MonitorCard({
   onRemove: () => void;
   busy: boolean;
 }) {
+  const statusClass =
+    row.status === "ENTRY ACTIVE"
+      ? "green"
+      : row.status === "NEAR ACTIVE" || row.status === "CONFIRMATION"
+        ? "amber"
+        : row.status === "DATA NOT VERIFIED" || row.status === "INVALIDATED" || row.status === "MISSED"
+          ? "red"
+          : "";
+
   return (
     <article
-      style={{
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        padding: "0.75rem 0.9rem",
-        background: "var(--surface)",
-        cursor: "pointer",
-      }}
+      className="panel"
+      style={{ cursor: "pointer", margin: 0, padding: "0.75rem 0.9rem" }}
       onClick={onOpen}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
         <strong style={{ fontFamily: "var(--mono)" }}>
           {row.symbol} — {row.side}
         </strong>
-        <span style={{ fontFamily: "var(--mono)", fontSize: "0.85rem" }}>{row.status}</span>
+        <span className={`badge ${statusClass}`}>{row.status}</span>
       </div>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: "0.35rem 0.75rem",
           marginTop: "0.55rem",
-          fontSize: "0.85rem",
+          fontSize: "0.82rem",
           fontFamily: "var(--mono)",
         }}
       >
         <span>Price: {fmtPrice(row.lastPrice)}</span>
+        <span>Chg: {fmtPct(row.pctChange)}</span>
         <span>Trigger: {fmtPrice(row.alertAt)}</span>
+        <span>Dist: {row.distanceLabel ?? "—"}</span>
         <span>
-          Entry:{" "}
-          {row.entryZone
-            ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
-            : "—"}
+          VWAP: {row.vwapStatus ?? "—"}
+          {row.vwapLocation ? ` (${row.vwapLocation})` : ""}
         </span>
-        <span>Stop: {fmtPrice(row.stop)}</span>
-        <span>T1: {fmtPrice(row.t1)}</span>
-        <span>T2: {fmtPrice(row.t2)}</span>
+        <span>RVOL: {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}</span>
+        <span>5m: {row.fiveMinStatus ?? "—"}</span>
+        <span>Quality: {row.setupScore != null ? `${row.setupScore}/100` : "—"}</span>
         <span>
-          Quality: {row.setupScore != null ? `${row.setupScore}/100` : "—"}
+          Feed: {(row.feed ?? "iex").toUpperCase()}
+          {!row.dataFresh ? " · NOT VERIFIED" : ""}
         </span>
         <span>
-          Conditions: {row.conditionsPassed}/{row.conditionsTotal}
+          Data:{" "}
+          {row.marketDataAt ? new Date(row.marketDataAt).toLocaleTimeString() : "—"}
         </span>
-        <span>{row.distanceLabel ?? ""}</span>
-        <span>{row.dataFresh ? "Data fresh" : "DATA NOT VERIFIED"}</span>
       </div>
+      {!row.dataFresh ? (
+        <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
+          DATA NOT VERIFIED — NO ACTIONABLE SIGNAL
+        </p>
+      ) : null}
       {row.waitingFor.length > 0 ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", opacity: 0.85 }}>
           Waiting: {row.waitingFor.slice(0, 3).join(" · ")}

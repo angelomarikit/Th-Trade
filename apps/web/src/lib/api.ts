@@ -357,21 +357,31 @@ export interface MonitorSymbolState {
   status: string;
   state: string;
   lastPrice: number | null;
+  pctChange: number | null;
   alertAt: number | null;
+  distanceToTriggerPct: number | null;
+  distanceLabel: string | null;
   entryZone: { low: number; high: number; executable: boolean } | null;
   stop: number | null;
   t1: number | null;
   t2: number | null;
+  rewardToRisk: number | null;
   conditionsPassed: number;
   conditionsTotal: number;
   setupScore: number | null;
   waitingFor: string[];
   dataFresh: boolean;
   session: string | null;
-  distanceLabel: string | null;
   nearActive: boolean;
   rankScore: number | null;
   vsSpyPct: number | null;
+  vwapStatus: string | null;
+  vwapLocation: string | null;
+  rvol: number | null;
+  fiveMinStatus: string | null;
+  feed: string | null;
+  feedLimitation: string | null;
+  marketDataAt: string | null;
   evaluatedAt: string | null;
   error: string | null;
   updatedAt: string;
@@ -390,10 +400,23 @@ export interface MonitorSnapshot {
     status: string;
     setupScore: number | null;
     nearActive: boolean;
+    readinessScore?: number;
   }>;
   lastTickAt: string | null;
   tickCount: number;
+  lastCycleMs?: number | null;
   note: string;
+  feed?: string;
+  automaticOrders?: false;
+  hub?: {
+    tickCount: number;
+    lastTickAt: string | null;
+    lastCycleMs: number | null;
+    uniquePairsLastCycle: number;
+    failedScansLastCycle: number;
+    running: boolean;
+  };
+  defaultWatchlist?: Array<{ symbol: string; side: "LONG" | "SHORT" }>;
 }
 
 async function monitorFetch(
@@ -451,4 +474,24 @@ export function removeMonitorSymbol(symbol: string, accessToken?: string | null)
 
 export function forceMonitorTick(accessToken?: string | null) {
   return monitorFetch("/v1/monitor/tick", { method: "POST", accessToken });
+}
+
+export function loadDefaultMonitorWatchlist(accessToken?: string | null) {
+  return monitorFetch("/v1/monitor/defaults", { method: "POST", accessToken });
+}
+
+export function fetchMonitorEvents(accessToken?: string | null, limit = 50) {
+  return getJson<{
+    count: number;
+    events: Array<{
+      id: string;
+      symbol: string;
+      previousStatus: string;
+      newStatus: string;
+      eventAt: string;
+      reason: string;
+    }>;
+    delivery: string;
+    note: string;
+  }>(`/v1/monitor/events?limit=${limit}`, accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
 }
