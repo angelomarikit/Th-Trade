@@ -134,4 +134,25 @@ describe("Phase 3 signal intelligence", () => {
   it("keeps automatic trading disabled", () => {
     expect(EXECUTION_POLICY.automaticOrders).toBe(false);
   });
+
+  it("marks performance records as not live-validated by default", async () => {
+    const { cardToPerformanceRecord } = await import("../src/signalPerformance.js");
+    const bars = Array.from({ length: 40 }, (_, i) => {
+      const m = String((i * 5) % 60).padStart(2, "0");
+      const h = 14 + Math.floor((i * 5) / 60);
+      return bar(
+        `2024-06-03T${String(h).padStart(2, "0")}:${m}:00Z`,
+        100 + i * 0.1,
+        100.5 + i * 0.1,
+        99.5 + i * 0.1,
+        100.2 + i * 0.1,
+      );
+    });
+    const replay = runSignalReplay({ symbol: "AMD", side: "LONG", bars5m: bars });
+    const last = replay.steps[replay.steps.length - 1]!;
+    const row = cardToPerformanceRecord(last.card, "HISTORICAL_REPLAY", null);
+    expect(row.liveValidated).toBe(false);
+    expect(row.userId).toBeNull();
+    expect(row.source).toBe("HISTORICAL_REPLAY");
+  });
 });

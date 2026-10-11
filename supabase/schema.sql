@@ -132,3 +132,53 @@ create policy "monitor_watchlists_select_own" on public.monitor_watchlists
 drop policy if exists "monitor_alerts_select_own" on public.monitor_alert_events;
 create policy "monitor_alerts_select_own" on public.monitor_alert_events
   for select using (auth.uid() = user_id);
+
+-- Phase 3/4 — signal history + alert preferences (see migrations/20261012_phase3_signal_history.sql)
+create table if not exists public.signal_performance_records (
+  id text primary key,
+  user_id uuid references public.profiles (id) on delete set null,
+  symbol text not null,
+  side text not null default 'LONG',
+  strategy_type text not null default 'SCANNER',
+  setup_id text not null,
+  signal_timestamp timestamptz not null,
+  data_timestamp timestamptz,
+  market_session text,
+  trigger_level double precision,
+  entry_zone jsonb,
+  stop_level double precision,
+  target1 double precision,
+  target2 double precision,
+  target3 double precision,
+  quality_score_10 integer,
+  setup_score_100 integer,
+  false_breakout_risk text,
+  state text not null,
+  actionable boolean not null default false,
+  data_quality_ok boolean not null default false,
+  confirmation_summary jsonb not null default '[]'::jsonb,
+  outcome_status text not null default 'UNKNOWN',
+  outcome_r double precision,
+  source text not null default 'LIVE',
+  live_validated boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.user_alert_preferences (
+  user_id uuid primary key references public.profiles (id) on delete cascade,
+  in_app_enabled boolean not null default true,
+  browser_enabled boolean not null default false,
+  email_enabled boolean not null default false,
+  sms_enabled boolean not null default false,
+  push_enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.monitor_alert_events
+  add column if not exists delivery_status text not null default 'recorded';
+
+alter table public.monitor_alert_events
+  add column if not exists delivery_channels jsonb not null default '[]'::jsonb;
+
+alter table public.monitor_alert_events
+  add column if not exists delivered_at timestamptz;

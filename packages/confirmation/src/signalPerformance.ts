@@ -3,6 +3,8 @@ import type { LiveSetupCard } from "./liveCard.js";
 /** Foundation record for future strategy evaluation — not a published win-rate claim. */
 export interface SignalPerformanceRecord {
   id: string;
+  /** Supabase user id when known; null for anonymous / replay. */
+  userId: string | null;
   symbol: string;
   side: string;
   strategyType: string;
@@ -26,6 +28,8 @@ export interface SignalPerformanceRecord {
   outcomeStatus: "UNKNOWN" | "WIN" | "LOSS" | "BREAKEVEN" | "AMBIGUOUS" | "INVALIDATED" | "MISSED";
   outcomeR: number | null;
   source: "LIVE" | "HISTORICAL_REPLAY";
+  /** Never true until operator-confirmed RTH validation. */
+  liveValidated: boolean;
 }
 
 export interface SignalPerformanceStore {
@@ -67,11 +71,13 @@ export class MemorySignalPerformanceStore implements SignalPerformanceStore {
 export function cardToPerformanceRecord(
   card: LiveSetupCard,
   source: "LIVE" | "HISTORICAL_REPLAY" = "LIVE",
+  userId: string | null = null,
 ): SignalPerformanceRecord {
   const entryActive =
     card.state === "ENTRY_ACTIVE_LONG" || card.state === "ENTRY_ACTIVE_SHORT";
   return {
-    id: `${card.setupId}:${card.evaluatedAt}`,
+    id: `${card.setupId}:${card.evaluatedAt}${userId ? `:${userId}` : ""}`,
+    userId,
     symbol: card.symbol,
     side: card.side,
     strategyType: card.signalIntelligence?.entryModel ?? "SCANNER",
@@ -100,5 +106,6 @@ export function cardToPerformanceRecord(
           : "UNKNOWN",
     outcomeR: null,
     source,
+    liveValidated: false,
   };
 }

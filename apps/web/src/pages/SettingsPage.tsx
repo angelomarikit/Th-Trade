@@ -92,6 +92,25 @@ export function SettingsPage() {
         </div>
       </div>
 
+      <div className="panel" style={{ marginBottom: "0.75rem" }}>
+        <div className="panel-h">
+          <h3>Alerts & signal history</h3>
+          <Link to="/alerts" className="badge teal">
+            Alerts
+          </Link>
+        </div>
+        <div className="tab-body">
+          <p className="disclaimer" style={{ marginBottom: "0.5rem" }}>
+            Configure browser/in-app alert delivery on the Alerts page. Signal history and historical
+            replay live on Signals. Email/SMS/push are not wired. Apply Supabase migration{" "}
+            <code>20261012_phase3_signal_history.sql</code> for durable storage across Railway restarts.
+          </p>
+          <Link to="/signals" className="icon-btn">
+            Open Signals & performance
+          </Link>
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel-h">
           <h3>Backend capability</h3>

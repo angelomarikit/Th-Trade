@@ -1,8 +1,9 @@
 import type { AlertEventStore, MonitorAlertEvent } from "@wulu/scanner";
 import { MemoryAlertEventStore } from "@wulu/scanner";
 import { insertMonitorAlertEvent, listMonitorAlertEvents } from "./persistence.js";
+import { planAlertDelivery } from "./signalHistory.js";
 
-/** Memory + optional Supabase dual-write for Phase 2 alert prep. */
+/** Memory + optional Supabase dual-write for alert prep + delivery planning. */
 export class HybridAlertEventStore implements AlertEventStore {
   private readonly memory = new MemoryAlertEventStore();
 
@@ -10,6 +11,8 @@ export class HybridAlertEventStore implements AlertEventStore {
     const ok = await this.memory.record(event);
     if (!ok) return false;
     await insertMonitorAlertEvent(event);
+    // Plan channels only — never places orders; SMS/email/push senders not wired.
+    void planAlertDelivery(event.userId, event.id);
     return true;
   }
 

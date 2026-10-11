@@ -119,10 +119,12 @@ export function WatchlistPage() {
     <div className="page">
       <h1 className="page-title">WULU LIVE WATCHLIST</h1>
       <p className="page-sub">
-        Server-side multi-stock monitor (Phase 2). Up to {snap?.maxSymbols ?? 6} symbols · shared scan
-        cycle ~{Math.round((snap?.intervalMs ?? 20_000) / 1000)}s · feed{" "}
+        Server-side multi-stock monitor (Phase 3 intelligence on Phase 2 hub). Up to{" "}
+        {snap?.maxSymbols ?? 6} symbols · shared scan cycle ~
+        {Math.round((snap?.intervalMs ?? 20_000) / 1000)}s · feed{" "}
         {(snap?.feed ?? "iex").toUpperCase()} (not consolidated volume). Browser may close; API keeps
-        scanning. Auto-trading remains disabled.
+        scanning. Auto-trading remains disabled. Statuses are not live-validated until RTH testing —
+        see Signals for history/replay and Alerts for status-change notifications.
       </p>
 
       <div className="scan-controls" style={{ marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>

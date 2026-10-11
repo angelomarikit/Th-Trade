@@ -375,8 +375,11 @@ export interface MonitorHubOptions {
   alertStore?: AlertEventStore;
   /** Persist watchlist after mutations (Supabase / noop). */
   persistWatchlist?: (userId: string, symbols: MonitorSymbolConfig[]) => Promise<void>;
-  /** Optional Phase 3 performance foundation logger (status-change cards). */
-  onSignalCard?: (card: import("@wulu/confirmation").LiveSetupCard) => void;
+  /** Optional Phase 3/4 performance logger — called per user monitor after each card apply. */
+  onSignalCard?: (
+    card: import("@wulu/confirmation").LiveSetupCard,
+    userId: string,
+  ) => void;
 }
 
 /**
@@ -400,7 +403,7 @@ export class MonitorHub {
     | ((userId: string, symbols: MonitorSymbolConfig[]) => Promise<void>)
     | null;
   private readonly onSignalCard:
-    | ((card: import("@wulu/confirmation").LiveSetupCard) => void)
+    | ((card: import("@wulu/confirmation").LiveSetupCard, userId: string) => void)
     | null;
 
   constructor(
@@ -544,8 +547,8 @@ export class MonitorHub {
           for (const mon of monitors) {
             const evt = mon.applyCard(cfg, card, this.feed);
             if (evt && this.alertStore) await this.alertStore.record(evt);
-            // Foundation: log every evaluated card (store dedupes by setupId:evaluatedAt).
-            if (this.onSignalCard) this.onSignalCard(card);
+            // Foundation: log every evaluated card per user (store dedupes by id).
+            if (this.onSignalCard) this.onSignalCard(card, mon.userId);
           }
         } catch (err) {
           failed += 1;

@@ -494,12 +494,104 @@ export function fetchMonitorEvents(accessToken?: string | null, limit = 50) {
     events: Array<{
       id: string;
       symbol: string;
+      side?: string;
       previousStatus: string;
       newStatus: string;
       eventAt: string;
       reason: string;
+      dataFresh?: boolean;
     }>;
     delivery: string;
     note: string;
+    preferences?: AlertPreferences;
+    automaticOrders?: boolean;
   }>(`/v1/monitor/events?limit=${limit}`, accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
+}
+
+export interface AlertPreferences {
+  userId: string;
+  inAppEnabled: boolean;
+  browserEnabled: boolean;
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  pushEnabled: boolean;
+  updatedAt: string;
+}
+
+export function fetchAlertPreferences(accessToken?: string | null) {
+  return getJson<{
+    preferences: AlertPreferences;
+    channelsSupported: string[];
+    channelsNotWired: string[];
+    automaticOrders: boolean;
+  }>("/v1/alert-preferences", accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
+}
+
+export function saveAlertPreferencesApi(
+  body: { inAppEnabled?: boolean; browserEnabled?: boolean },
+  accessToken?: string | null,
+) {
+  return fetch(`${API_BASE}/v1/alert-preferences`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+    return res.json() as Promise<{ preferences: AlertPreferences; note: string }>;
+  });
+}
+
+export interface SignalPerformanceRow {
+  id: string;
+  userId: string | null;
+  symbol: string;
+  side: string;
+  state: string;
+  source: "LIVE" | "HISTORICAL_REPLAY";
+  qualityScore10: number | null;
+  actionable: boolean;
+  dataQualityOk: boolean;
+  liveValidated: boolean;
+  falseBreakoutRisk: string | null;
+  signalTimestamp: string;
+  outcomeStatus: string;
+}
+
+export function fetchSignalPerformance(accessToken?: string | null, limit = 50) {
+  return getJson<{
+    summary: {
+      total: number;
+      actionable: number;
+      invalidated: number;
+      missed: number;
+      liveValidated?: number;
+      note: string;
+    };
+    records: SignalPerformanceRow[];
+    note: string;
+    automaticOrders: boolean;
+  }>(
+    `/v1/signal-performance?limit=${limit}`,
+    accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  );
+}
+
+export function fetchSignalReplay(
+  ticker: string,
+  side: "LONG" | "SHORT" = "LONG",
+  limit = 40,
+) {
+  return getJson<{
+    symbol: string;
+    side: string;
+    label: string;
+    steps: Array<{ barIndex: number; asOf: string; card: { state: string; statusLabel?: string } }>;
+    transitions: Array<{ from: string; to: string; at: string; barIndex: number }>;
+    automaticOrders: boolean;
+    liveValidated?: boolean;
+    note?: string;
+  }>(`/v1/replay?ticker=${encodeURIComponent(ticker)}&side=${side}&limit=${limit}`);
 }

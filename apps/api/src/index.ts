@@ -2,11 +2,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
-import {
-  cardToPerformanceRecord,
-  MemorySignalPerformanceStore,
-  runSignalReplay,
-} from "@wulu/confirmation";
+import { cardToPerformanceRecord, runSignalReplay } from "@wulu/confirmation";
 import {
   calculatePositionSize,
   loadFeatureFlags,
@@ -43,6 +39,11 @@ import {
   loadMonitorWatchlist,
   saveMonitorWatchlist,
 } from "./monitor/persistence.js";
+import {
+  getAlertPreferences,
+  HybridSignalPerformanceStore,
+  saveAlertPreferences,
+} from "./monitor/signalHistory.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
 
 
@@ -76,14 +77,15 @@ async function main() {
   const scanner = createSetupScannerFromEnv();
   const optionsEngine = createOptionsEngineFromEnv();
   const alertStore = new HybridAlertEventStore();
-  const signalPerformanceStore = new MemorySignalPerformanceStore();
+  const signalPerformanceStore = new HybridSignalPerformanceStore();
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
     feed: process.env.ALPACA_DATA_FEED ?? "iex",
     alertStore,
-    onSignalCard: (card) => {
-      signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE"));
+    onSignalCard: (card, userId) => {
+      const uid = userId === "default" ? null : userId;
+      signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE", uid));
     },
     persistWatchlist: async (userId, symbols) => {
       await saveMonitorWatchlist(userId, symbols);
@@ -672,11 +674,57 @@ async function main() {
           });
           const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
           const events = await monitorHub.listAlerts(sessionId, limit);
+          const prefs =
+            sessionId !== "default"
+              ? await getAlertPreferences(sessionId)
+              : await getAlertPreferences("default");
           return json(res, 200, {
             count: events.length,
             events,
-            delivery: "recorded_only",
-            note: "Phase 2 records status-change events; SMS/push not sent yet.",
+            delivery: "recorded_for_in_app_and_optional_browser",
+            preferences: prefs,
+            note: "Status-change events are recorded. SMS/email/push senders are not wired. Automatic orders remain disabled. Signals are not live-validated until RTH confirmation.",
+            automaticOrders: false,
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
+      }
+
+      if (url.pathname === "/v1/alert-preferences" && req.method === "GET") {
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const prefs = await getAlertPreferences(sessionId);
+          return json(res, 200, {
+            preferences: prefs,
+            channelsSupported: ["in_app", "browser"],
+            channelsNotWired: ["email", "sms", "push"],
+            automaticOrders: false,
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
+      }
+
+      if (url.pathname === "/v1/alert-preferences" && req.method === "PUT") {
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: true,
+          });
+          const body = (await readJson(req)) as {
+            inAppEnabled?: boolean;
+            browserEnabled?: boolean;
+          };
+          const prefs = await saveAlertPreferences(sessionId, {
+            inAppEnabled: body.inAppEnabled,
+            browserEnabled: body.browserEnabled,
+          });
+          return json(res, 200, {
+            preferences: prefs,
+            note: "Email/SMS/push cannot be enabled until delivery providers are wired.",
+            automaticOrders: false,
           });
         } catch (err) {
           return authError(res, err);
@@ -727,7 +775,7 @@ async function main() {
           const step = replay.steps[idx];
           if (step) {
             signalPerformanceStore.record(
-              cardToPerformanceRecord(step.card, "HISTORICAL_REPLAY"),
+              cardToPerformanceRecord(step.card, "HISTORICAL_REPLAY", null),
             );
           }
         }
@@ -735,15 +783,26 @@ async function main() {
           ...replay,
           automaticOrders: false,
           feed: process.env.ALPACA_DATA_FEED ?? "iex",
+          liveValidated: false,
+          note: "HISTORICAL REPLAY — NOT LIVE. Not a substitute for RTH signal verification.",
         });
       }
 
       if (url.pathname === "/v1/signal-performance" && req.method === "GET") {
         const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
+        let userId: string | null = null;
+        try {
+          userId = await resolveMonitorSession(req.headers.authorization);
+          if (userId === "default") userId = null;
+        } catch {
+          userId = null;
+        }
+        const records = await signalPerformanceStore.listMerged(limit, userId);
+        const summary = await signalPerformanceStore.summaryMerged(userId);
         return json(res, 200, {
-          summary: signalPerformanceStore.summary(),
-          records: signalPerformanceStore.list(limit),
-          note: "Foundation counts only — not a published win rate. LIVE vs HISTORICAL_REPLAY are labeled per record.",
+          summary,
+          records,
+          note: "Foundation counts only — not a published win rate. liveValidated stays false until RTH confirmation. LIVE vs HISTORICAL_REPLAY labeled per record.",
           automaticOrders: false,
         });
       }
@@ -942,6 +1001,7 @@ async function main() {
     console.log("  POST /v1/monitor/defaults");
     console.log("  GET /v1/replay?ticker=NVDA&side=LONG");
     console.log("  GET /v1/signal-performance");
+    console.log("  GET/PUT /v1/alert-preferences");
   });
 
   const shutdown = () => {
