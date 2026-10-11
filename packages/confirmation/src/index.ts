@@ -18,3 +18,4 @@ export * from "./retest.js";
 export * from "./qualityScore10.js";
 export * from "./signalReplay.js";
 export * from "./signalPerformance.js";
+export * from "./outcomeTracking.js";

@@ -9,8 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  fetchAlertPreferences,
   fetchBars,
   fetchHealth,
+  fetchMonitorEvents,
   fetchSetup,
   type BarsResponse,
   type HealthResponse,
@@ -319,6 +321,55 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }, 30_000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Server monitor alerts → in-app feed (+ browser notification when enabled).
+  const serverAlertSeen = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const token = session?.access_token ?? null;
+    if (!token) return;
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const [ev, prefs] = await Promise.all([
+          fetchMonitorEvents(token, 30),
+          fetchAlertPreferences(token).catch(() => null),
+        ]);
+        if (cancelled) return;
+        const browserOn = Boolean(prefs?.preferences.browserEnabled);
+        for (const e of ev.events) {
+          if (serverAlertSeen.current.has(e.id)) continue;
+          serverAlertSeen.current.add(e.id);
+          if (prefs?.preferences.inAppEnabled === false) continue;
+          pushAlert({
+            kind: `monitor_${e.newStatus}`.slice(0, 40),
+            message: `${e.symbol}${e.side ? ` ${e.side}` : ""}: ${e.previousStatus} → ${e.newStatus} · ${e.reason}`.slice(
+              0,
+              200,
+            ),
+            symbol: e.symbol,
+          });
+          if (
+            browserOn &&
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted"
+          ) {
+            new Notification(`WULU · ${e.symbol}`, {
+              body: `${e.previousStatus} → ${e.newStatus}`,
+              tag: e.id,
+            });
+          }
+        }
+      } catch {
+        /* auth/monitor optional while browsing other pages */
+      }
+    };
+    void pull();
+    const id = window.setInterval(() => void pull(), 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [session?.access_token, pushAlert]);
 
   useEffect(() => {
     void scan({ brief: true });

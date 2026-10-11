@@ -113,6 +113,11 @@ export class HybridSignalPerformanceStore {
     void insertSignalPerformanceRecord(row);
   }
 
+  upsert(row: SignalPerformanceRecord): void {
+    this.memory.upsert(row);
+    void insertSignalPerformanceRecord(row);
+  }
+
   list(limit = 100): SignalPerformanceRecord[] {
     return this.memory.list(limit);
   }
@@ -133,13 +138,18 @@ export class HybridSignalPerformanceStore {
 
   async summaryMerged(userId?: string | null) {
     const rows = await this.listMerged(500, userId);
+    const resolved = rows.filter((r) => r.outcomeStatus !== "UNKNOWN");
     return {
       total: rows.length,
       actionable: rows.filter((r) => r.actionable).length,
       invalidated: rows.filter((r) => r.state.includes("INVALIDATED")).length,
       missed: rows.filter((r) => r.state.includes("MISSED")).length,
       liveValidated: rows.filter((r) => r.liveValidated).length,
-      note: "Counts only — not a validated live win rate. liveValidated stays false until RTH operator confirmation.",
+      resolved: resolved.length,
+      wins: resolved.filter((r) => r.outcomeStatus === "WIN").length,
+      losses: resolved.filter((r) => r.outcomeStatus === "LOSS").length,
+      ambiguous: resolved.filter((r) => r.outcomeStatus === "AMBIGUOUS").length,
+      note: "Counts only — not a validated live win rate. Hypothetical 5m outcomes ≠ published edge. liveValidated stays false until RTH confirmation.",
     };
   }
 }

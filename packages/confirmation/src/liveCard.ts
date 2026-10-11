@@ -44,6 +44,13 @@ export interface LiveSetupCard {
   } | null;
   signalIntelligence: SignalIntelligenceInfo | null;
   lastPrice: number;
+  /** Last completed 5m bar extremes for outcome tracking (null if unavailable). */
+  lastCompletedBar: {
+    high: number;
+    low: number;
+    close: number;
+    timestamp: string;
+  } | null;
   rewardToRisk: number;
   dataFresh: boolean;
   evaluatedAt: string;

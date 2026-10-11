@@ -2,7 +2,13 @@ import type { TradeSide } from "@wulu/domain";
 import type { Bar, MarketSnapshot } from "@wulu/market-data";
 import { evaluateSetup, type EvaluateSetupInput } from "./evaluateSetup.js";
 import type { LiveSetupCard } from "./liveCard.js";
+import {
+  outcomeTags,
+  SignalOutcomeTracker,
+  type OutcomeResolution,
+} from "./outcomeTracking.js";
 import type { RetestPhase } from "./retest.js";
+import { cardToPerformanceRecord, type SignalPerformanceRecord } from "./signalPerformance.js";
 
 export interface ReplayStepResult {
   barIndex: number;
@@ -22,6 +28,7 @@ export interface SignalReplayResult {
     at: string;
     barIndex: number;
   }>;
+  outcomes: OutcomeResolution[];
   disclaimer: string;
 }
 
@@ -48,6 +55,8 @@ export function runSignalReplay(input: {
 
   const steps: ReplayStepResult[] = [];
   const transitions: SignalReplayResult["transitions"] = [];
+  const outcomes: OutcomeResolution[] = [];
+  const tracker = new SignalOutcomeTracker();
   let prevState: LiveSetupCard["state"] | undefined;
   let prevRetest: RetestPhase | undefined;
 
@@ -103,6 +112,9 @@ export function runSignalReplay(input: {
       label: "HISTORICAL REPLAY — NOT LIVE",
       card,
     });
+
+    const track = tracker.onCard(card, null, "HISTORICAL_REPLAY", card.lastCompletedBar);
+    if (track.resolution) outcomes.push(track.resolution);
   }
 
   return {
@@ -111,7 +123,28 @@ export function runSignalReplay(input: {
     label: "HISTORICAL REPLAY — NOT LIVE",
     steps,
     transitions,
+    outcomes,
     disclaimer:
-      "Replay uses completed 5m OHLCV only. No invented ticks. Stops/targets inside the same bar are ambiguous. IEX ≠ consolidated volume. NOT LIVE.",
+      "Replay uses completed 5m OHLCV only. No invented ticks. Stops/targets inside the same bar are ambiguous. Hypothetical outcomes are NOT a live win rate. IEX ≠ consolidated volume. NOT LIVE.",
+  };
+}
+
+/** Build a durable performance row from an outcome resolution (replay / live). */
+export function resolutionToPerformanceRecord(
+  resolution: OutcomeResolution,
+  card: LiveSetupCard,
+  source: "LIVE" | "HISTORICAL_REPLAY",
+  userId: string | null,
+): SignalPerformanceRecord {
+  const base = cardToPerformanceRecord(card, source, userId);
+  return {
+    ...base,
+    id: resolution.id,
+    signalTimestamp: card.evaluatedAt,
+    actionable: true,
+    outcomeStatus: resolution.outcomeStatus,
+    outcomeR: resolution.outcomeR,
+    confirmationSummary: [...outcomeTags(resolution), ...base.confirmationSummary].slice(0, 16),
+    liveValidated: false,
   };
 }

@@ -18,6 +18,10 @@ export function SignalsPage() {
     invalidated: number;
     missed: number;
     liveValidated?: number;
+    resolved?: number;
+    wins?: number;
+    losses?: number;
+    ambiguous?: number;
     note: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +57,14 @@ export function SignalsPage() {
         .slice(0, 6)
         .map((t) => `${t.from}→${t.to}`)
         .join(" · ");
+      const outcomeBits = (r.outcomes ?? [])
+        .slice(0, 4)
+        .map((o) => `${o.detail}${o.outcomeR != null ? ` R=${o.outcomeR.toFixed(2)}` : ""}`)
+        .join(" · ");
       setReplayInfo(
         `${r.label} · ${r.symbol} ${r.side} · ${r.steps.length} steps · ${r.transitions.length} transitions` +
           (states ? ` · ${states}` : " · no state transitions in window") +
+          (outcomeBits ? ` · outcomes: ${outcomeBits}` : " · no resolved outcomes in window") +
           " · NOT live-validated",
       );
       await refresh();
@@ -88,11 +97,18 @@ export function SignalsPage() {
         >
           <span>Total: {summary.total}</span>
           <span>Actionable: {summary.actionable}</span>
+          <span>Resolved: {summary.resolved ?? "—"}</span>
+          <span>Wins*: {summary.wins ?? "—"}</span>
+          <span>Losses*: {summary.losses ?? "—"}</span>
           <span>Invalidated: {summary.invalidated}</span>
           <span>Missed: {summary.missed}</span>
           <span>Live validated: {summary.liveValidated ?? 0}</span>
         </div>
       ) : null}
+      <p className="disclaimer" style={{ marginTop: "-0.35rem" }}>
+        *Hypothetical 5m-bar outcomes (replay/live tracking) — not a published win rate. Ambiguous
+        same-bar stop+target cases are excluded from win/loss claims.
+      </p>
 
       <form className="scan-controls" onSubmit={onReplay} style={{ marginBottom: "0.85rem", flexWrap: "wrap" }}>
         <input

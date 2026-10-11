@@ -2,7 +2,12 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
-import { cardToPerformanceRecord, runSignalReplay } from "@wulu/confirmation";
+import {
+  cardToPerformanceRecord,
+  resolutionToPerformanceRecord,
+  runSignalReplay,
+  SignalOutcomeTracker,
+} from "@wulu/confirmation";
 import {
   calculatePositionSize,
   loadFeatureFlags,
@@ -78,6 +83,7 @@ async function main() {
   const optionsEngine = createOptionsEngineFromEnv();
   const alertStore = new HybridAlertEventStore();
   const signalPerformanceStore = new HybridSignalPerformanceStore();
+  const outcomeTracker = new SignalOutcomeTracker();
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
@@ -86,6 +92,25 @@ async function main() {
     onSignalCard: (card, userId) => {
       const uid = userId === "default" ? null : userId;
       signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE", uid));
+      const track = outcomeTracker.onCard(card, uid, "LIVE", card.lastCompletedBar);
+      if (track.opened) {
+        signalPerformanceStore.upsert({
+          ...cardToPerformanceRecord(card, "LIVE", uid),
+          id: track.opened.id,
+          actionable: true,
+          outcomeStatus: "UNKNOWN",
+          confirmationSummary: [
+            "outcomeDetail:OPEN",
+            `entryPrice:${track.opened.entryPrice}`,
+            ...card.nearActive.stillWaitingFor.slice(0, 6),
+          ],
+        });
+      }
+      if (track.resolution) {
+        signalPerformanceStore.upsert(
+          resolutionToPerformanceRecord(track.resolution, card, "LIVE", uid),
+        );
+      }
     },
     persistWatchlist: async (userId, symbols) => {
       await saveMonitorWatchlist(userId, symbols);
@@ -764,7 +789,7 @@ async function main() {
           side: sideParam as TradeSide,
           bars5m,
         });
-        // Record replay transitions + last step for performance foundation (labeled HISTORICAL_REPLAY).
+        // Record replay transitions, last step, opens/resolutions (labeled HISTORICAL_REPLAY).
         const replayIndexes = new Set<number>(
           replay.transitions.map((t) => t.barIndex),
         );
@@ -779,12 +804,37 @@ async function main() {
             );
           }
         }
+        for (const resolution of replay.outcomes) {
+          const step =
+            replay.steps.find((s) => s.asOf === resolution.resolvedAt) ??
+            replay.steps[replay.steps.length - 1];
+          if (step) {
+            signalPerformanceStore.upsert(
+              resolutionToPerformanceRecord(
+                resolution,
+                step.card,
+                "HISTORICAL_REPLAY",
+                null,
+              ),
+            );
+          }
+        }
         return json(res, 200, {
           ...replay,
           automaticOrders: false,
           feed: process.env.ALPACA_DATA_FEED ?? "iex",
           liveValidated: false,
-          note: "HISTORICAL REPLAY — NOT LIVE. Not a substitute for RTH signal verification.",
+          note: "HISTORICAL REPLAY — NOT LIVE. Hypothetical outcomes on 5m bars are not a published win rate.",
+        });
+      }
+
+      if (url.pathname === "/v1/signal-outcomes" && req.method === "GET") {
+        const open = outcomeTracker.listOpen();
+        return json(res, 200, {
+          open,
+          count: open.length,
+          automaticOrders: false,
+          note: "Open tracked entries awaiting stop/target resolution. Outcomes are hypothetical until RTH-validated.",
         });
       }
 
@@ -1001,6 +1051,7 @@ async function main() {
     console.log("  POST /v1/monitor/defaults");
     console.log("  GET /v1/replay?ticker=NVDA&side=LONG");
     console.log("  GET /v1/signal-performance");
+    console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");
   });
 

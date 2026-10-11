@@ -3,6 +3,7 @@ import {
   assessFreshness,
   classifyUsEquitySession,
   confirmationProfileForSession,
+  lastCompletedBar,
   type MarketSnapshot,
 } from "@wulu/market-data";
 import type { WhyMovingBlock } from "@wulu/news";
@@ -180,6 +181,16 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       entryModel: retest.model === "NONE" ? (breakout.mode === "CONFIRMED_CLOSE" ? "CONFIRMED_BREAKOUT" : "NONE") : retest.model,
     },
     lastPrice: input.snapshot.lastPrice,
+    lastCompletedBar: (() => {
+      const b = lastCompletedBar(input.snapshot.bars5m);
+      if (!b) return null;
+      return {
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        timestamp: b.timestamp.toISOString(),
+      };
+    })(),
     rewardToRisk: built.rewardToRisk,
     dataFresh: freshness.ok,
     evaluatedAt,

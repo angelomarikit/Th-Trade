@@ -53,17 +53,31 @@ export class MemorySignalPerformanceStore implements SignalPerformanceStore {
     if (this.rows.length > 5_000) this.rows.length = 5_000;
   }
 
+  /** Insert or replace by id (used for outcome updates / open-track rows). */
+  upsert(row: SignalPerformanceRecord): void {
+    const idx = this.rows.findIndex((r) => r.id === row.id);
+    if (idx >= 0) this.rows[idx] = row;
+    else this.rows.unshift(row);
+    if (this.rows.length > 5_000) this.rows.length = 5_000;
+  }
+
   list(limit = 100): SignalPerformanceRecord[] {
     return this.rows.slice(0, limit);
   }
 
   summary() {
+    const resolved = this.rows.filter((r) => r.outcomeStatus !== "UNKNOWN");
+    const wins = resolved.filter((r) => r.outcomeStatus === "WIN").length;
+    const losses = resolved.filter((r) => r.outcomeStatus === "LOSS").length;
     return {
       total: this.rows.length,
       actionable: this.rows.filter((r) => r.actionable).length,
       invalidated: this.rows.filter((r) => r.state.includes("INVALIDATED")).length,
       missed: this.rows.filter((r) => r.state.includes("MISSED")).length,
-      note: "Counts only — not a validated live win rate. Do not publish success % without sufficient evidence.",
+      resolved: resolved.length,
+      wins,
+      losses,
+      note: "Counts only — not a validated live win rate. Hypothetical outcomes use completed 5m bars; liveValidated stays false until RTH confirmation.",
     };
   }
 }

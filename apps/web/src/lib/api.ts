@@ -568,6 +568,10 @@ export function fetchSignalPerformance(accessToken?: string | null, limit = 50) 
       invalidated: number;
       missed: number;
       liveValidated?: number;
+      resolved?: number;
+      wins?: number;
+      losses?: number;
+      ambiguous?: number;
       note: string;
     };
     records: SignalPerformanceRow[];
@@ -589,9 +593,18 @@ export function fetchSignalReplay(
     side: string;
     label: string;
     steps: Array<{ barIndex: number; asOf: string; card: { state: string; statusLabel?: string } }>;
-    transitions: Array<{ from: string; to: string; at: string; barIndex: number }>;
-    automaticOrders: boolean;
-    liveValidated?: boolean;
-    note?: string;
+  transitions: Array<{ from: string; to: string; at: string; barIndex: number }>;
+  outcomes?: Array<{
+    id: string;
+    detail: string;
+    outcomeStatus: string;
+    outcomeR: number | null;
+    durationMs: number;
+    barsElapsed: number;
+    note: string;
+  }>;
+  automaticOrders: boolean;
+  liveValidated?: boolean;
+  note?: string;
   }>(`/v1/replay?ticker=${encodeURIComponent(ticker)}&side=${side}&limit=${limit}`);
 }
