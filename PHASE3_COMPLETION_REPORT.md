@@ -196,11 +196,9 @@ Tracks phases for Model B (break → confirm → revisit → hold → direction 
 
 ## 13. Exact Git commit hash
 
-Recorded after commit in this branch tip. Starting baseline was:
-
-`79cdd7b76ac5730815f10941f7c2e8fcc2370e46`
-
-(Final Phase 3 commit hash is written by the commit step / `git rev-parse HEAD`.)
+- **Phase 3 feature commit:** `1a6f57e5cd0613dde51cd05cada5e7e2476ef5e3`
+- **Starting production baseline:** `79cdd7b76ac5730815f10941f7c2e8fcc2370e46`
+- **Branch:** `phase3/intelligent-signals` (confirm tip with `git rev-parse HEAD`)
 
 ---
 
