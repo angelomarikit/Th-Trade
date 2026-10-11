@@ -103,7 +103,7 @@ export function confirmationProfileForSession(
       maxSpreadPct: 0.2,
       requireRegimeAlignmentForEntry: true,
       requireSectorAlignmentForEntry: false,
-      minRewardToRisk: 1.8,
+      minRewardToRisk: 2,
       maxDataAgeMs: session.maxDataAgeMs,
       reason: session.reason,
     };
@@ -116,7 +116,7 @@ export function confirmationProfileForSession(
     maxSpreadPct: 0.35,
     requireRegimeAlignmentForEntry: false,
     requireSectorAlignmentForEntry: false,
-    minRewardToRisk: 1.5,
+    minRewardToRisk: 2,
     maxDataAgeMs: session.maxDataAgeMs,
     reason: session.reason,
   };

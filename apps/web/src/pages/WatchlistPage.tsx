@@ -294,6 +294,20 @@ function MonitorCard({
         <span>Price: {fmtPrice(row.lastPrice)}</span>
         <span>Chg: {fmtPct(row.pctChange)}</span>
         <span>Trigger: {fmtPrice(row.alertAt)}</span>
+        <span>
+          Entry:{" "}
+          {row.entryZone
+            ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
+            : "—"}
+        </span>
+        <span>Stop: {fmtPrice(row.stop)}</span>
+        <span>T1: {fmtPrice(row.t1)}</span>
+        <span>T2: {fmtPrice(row.t2)}</span>
+        <span>T3: {fmtPrice(row.target3)}</span>
+        <span>
+          R:R:{" "}
+          {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}:1` : "—"}
+        </span>
         <span>Dist: {row.distanceLabel ?? "—"}</span>
         <span>
           VWAP: {row.vwapStatus ?? "—"}
@@ -301,7 +315,11 @@ function MonitorCard({
         </span>
         <span>RVOL: {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}</span>
         <span>5m: {row.fiveMinStatus ?? "—"}</span>
-        <span>Quality: {row.setupScore != null ? `${row.setupScore}/100` : "—"}</span>
+        <span>Score: {row.qualityScore10 != null ? `${row.qualityScore10}/10` : "—"} (not win %)</span>
+        <span>Setup: {row.setupScore != null ? `${row.setupScore}/100` : "—"}</span>
+        <span>Invalidation: {fmtPrice(row.invalidation)}</span>
+        <span>Fake-break risk: {row.falseBreakoutRisk ?? "NONE"}</span>
+        <span>Retest: {row.retestPhase ?? "—"}{row.retestRequired ? " (required)" : ""}</span>
         <span>
           Feed: {(row.feed ?? "iex").toUpperCase()}
           {!row.dataFresh ? " · NOT VERIFIED" : ""}
@@ -311,6 +329,11 @@ function MonitorCard({
           {row.marketDataAt ? new Date(row.marketDataAt).toLocaleTimeString() : "—"}
         </span>
       </div>
+      {row.actionHint ? (
+        <p style={{ margin: "0.45rem 0 0", fontSize: "0.82rem", fontWeight: 600 }}>
+          Action: {row.actionHint}
+        </p>
+      ) : null}
       {!row.dataFresh ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
           DATA NOT VERIFIED — NO ACTIONABLE SIGNAL

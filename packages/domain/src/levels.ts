@@ -8,6 +8,10 @@ export interface TradeLevels {
   stop: number;
   target1: number;
   target2: number;
+  /** Optional measured-move / next structure target */
+  target3?: number;
+  /** Structural invalidation level (may equal or sit beyond stop) */
+  invalidation?: number;
 }
 
 export interface RiskRewardMetrics {
@@ -18,8 +22,8 @@ export interface RiskRewardMetrics {
   minimumRequired: number;
 }
 
-/** Default minimum R:R for Phase B (can be strategy-overridden later). */
-export const MIN_REWARD_TO_RISK = 1.5;
+/** Default minimum R:R to Target 1 for ENTRY ACTIVE (Phase 3). */
+export const MIN_REWARD_TO_RISK = 2;
 
 export function computeRiskReward(
   levels: TradeLevels,

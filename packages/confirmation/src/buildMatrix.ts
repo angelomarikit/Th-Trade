@@ -49,7 +49,7 @@ export function buildSetupConditionMatrix(input: MatrixBuildInput): MatrixBuildR
   const profile = input.profile;
   const minRvol = profile?.minRelativeVolume ?? 1.2;
   const maxSpread = profile?.maxSpreadPct ?? 0.35;
-  const minRr = profile?.minRewardToRisk ?? 1.5;
+  const minRr = profile?.minRewardToRisk ?? 2;
   const regimeRequired = profile?.requireRegimeAlignmentForEntry ?? false;
   const sectorRequired = profile?.requireSectorAlignmentForEntry ?? false;
 

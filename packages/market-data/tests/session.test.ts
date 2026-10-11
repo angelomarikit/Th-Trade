@@ -19,7 +19,7 @@ describe("US equity session + RTH tightening", () => {
     expect(profile.minRelativeVolume).toBe(1.5);
     expect(profile.maxSpreadPct).toBe(0.2);
     expect(profile.requireRegimeAlignmentForEntry).toBe(true);
-    expect(profile.minRewardToRisk).toBe(1.8);
+    expect(profile.minRewardToRisk).toBe(2);
   });
 
   it("fail-closes when session is weekend", () => {

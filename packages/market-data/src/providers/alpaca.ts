@@ -1,6 +1,12 @@
 import type { MarketDataProvider } from "../MarketDataProvider.js";
 import type { Bar, MarketSnapshot, Quote } from "../types.js";
 import { loadAlpacaCredentials } from "../credentials.js";
+import {
+  fetchAlpacaWithRetry,
+  gateOptsFromEnv,
+  getSharedAlpacaGate,
+  type AlpacaRequestGate,
+} from "../rateLimit.js";
 
 export interface AlpacaMarketDataConfig {
   apiKeyId: string;
@@ -9,6 +15,9 @@ export interface AlpacaMarketDataConfig {
   fetchImpl?: typeof fetch;
   /** iex is common on free/paper data; sip if entitled */
   feed?: "iex" | "sip";
+  /** Override shared process gate (tests). */
+  requestGate?: AlpacaRequestGate;
+  maxRetries?: number;
 }
 
 interface AlpacaBar {
@@ -40,6 +49,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly feed: "iex" | "sip";
+  private readonly gate: AlpacaRequestGate;
+  private readonly maxRetries: number;
 
   constructor(private readonly config: AlpacaMarketDataConfig) {
     if (!config.apiKeyId || !config.apiSecretKey) {
@@ -55,6 +66,9 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     this.baseUrl = (config.baseUrl ?? "https://data.alpaca.markets").replace(/\/$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.feed = config.feed ?? "iex";
+    const envOpts = gateOptsFromEnv();
+    this.gate = config.requestGate ?? getSharedAlpacaGate(envOpts);
+    this.maxRetries = config.maxRetries ?? envOpts.maxRetries ?? 4;
   }
 
   async getQuote(symbol: string): Promise<Quote | null> {
@@ -130,12 +144,12 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
   async getSnapshot(symbol: string): Promise<MarketSnapshot> {
     const sym = symbol.toUpperCase();
-    const [quote, trade, bars1m, bars5m] = await Promise.all([
-      this.getQuote(sym),
-      this.getLatestTrade(sym),
-      this.getBars({ symbol: sym, timeframe: "1Min", limit: 120 }),
-      this.getBars({ symbol: sym, timeframe: "5Min", limit: 78 }),
-    ]);
+    // Sequential on purpose — parallel bursts were a primary source of Alpaca 429s
+    // under six-symbol monitoring. The shared gate also spaces requests globally.
+    const quote = await this.getQuote(sym);
+    const trade = await this.getLatestTrade(sym);
+    const bars1m = await this.getBars({ symbol: sym, timeframe: "1Min", limit: 120 });
+    const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78 });
 
     const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
     const lastPrice =
@@ -162,13 +176,21 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 
   private async getJson<T>(url: string): Promise<T> {
-    const res = await this.fetchImpl(url, {
-      headers: {
-        "APCA-API-KEY-ID": this.config.apiKeyId,
-        "APCA-API-SECRET-KEY": this.config.apiSecretKey,
-        Accept: "application/json",
+    const res = await fetchAlpacaWithRetry(
+      this.fetchImpl,
+      url,
+      {
+        headers: {
+          "APCA-API-KEY-ID": this.config.apiKeyId,
+          "APCA-API-SECRET-KEY": this.config.apiSecretKey,
+          Accept: "application/json",
+        },
       },
-    });
+      {
+        gate: this.gate,
+        maxRetries: this.maxRetries,
+      },
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(`Alpaca market data HTTP ${res.status}: ${body.slice(0, 200)}`);

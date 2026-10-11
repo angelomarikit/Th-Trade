@@ -3,6 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import {
+  cardToPerformanceRecord,
+  MemorySignalPerformanceStore,
+  runSignalReplay,
+} from "@wulu/confirmation";
+import {
   calculatePositionSize,
   loadFeatureFlags,
   POSITION_SIZE_NOT_CALCULATED_MESSAGE,
@@ -71,11 +76,15 @@ async function main() {
   const scanner = createSetupScannerFromEnv();
   const optionsEngine = createOptionsEngineFromEnv();
   const alertStore = new HybridAlertEventStore();
+  const signalPerformanceStore = new MemorySignalPerformanceStore();
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
     feed: process.env.ALPACA_DATA_FEED ?? "iex",
     alertStore,
+    onSignalCard: (card) => {
+      signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE"));
+    },
     persistWatchlist: async (userId, symbols) => {
       await saveMonitorWatchlist(userId, symbols);
     },
@@ -138,6 +147,11 @@ async function main() {
         return json(res, 200, {
           ok: true,
           phase: "G",
+          /** Railway injects these; useful to confirm which git commit is live */
+          gitCommit:
+            (process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? "").trim() || null,
+          gitCommitMessage:
+            (process.env.RAILWAY_GIT_COMMIT_MESSAGE ?? "").trim() || null,
           newsProvider: news.providerName,
           marketDataProvider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
           alpacaFeed: process.env.ALPACA_DATA_FEED ?? "iex",
@@ -684,6 +698,52 @@ async function main() {
         }
       }
 
+      if (url.pathname === "/v1/replay" && req.method === "GET") {
+        const ticker = (url.searchParams.get("ticker") ?? "").trim().toUpperCase();
+        const sideParam = (url.searchParams.get("side") ?? "LONG").toUpperCase();
+        if (!ticker) return json(res, 400, { error: "ticker query required" });
+        if (sideParam !== "LONG" && sideParam !== "SHORT") {
+          return json(res, 400, { error: "side must be LONG or SHORT" });
+        }
+        const limit = Math.min(Number(url.searchParams.get("limit") ?? 78), 150);
+        const bars5m = await marketData.getBars({
+          symbol: ticker,
+          timeframe: "5Min",
+          limit,
+        });
+        const replay = runSignalReplay({
+          symbol: ticker,
+          side: sideParam as TradeSide,
+          bars5m,
+        });
+        for (const step of replay.steps) {
+          if (
+            step.card.state.includes("ENTRY_ACTIVE") ||
+            step.card.state === "INVALIDATED" ||
+            step.card.state === "MISSED"
+          ) {
+            signalPerformanceStore.record(
+              cardToPerformanceRecord(step.card, "HISTORICAL_REPLAY"),
+            );
+          }
+        }
+        return json(res, 200, {
+          ...replay,
+          automaticOrders: false,
+          feed: process.env.ALPACA_DATA_FEED ?? "iex",
+        });
+      }
+
+      if (url.pathname === "/v1/signal-performance" && req.method === "GET") {
+        const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
+        return json(res, 200, {
+          summary: signalPerformanceStore.summary(),
+          records: signalPerformanceStore.list(limit),
+          note: "Foundation counts only — not a published win rate. LIVE vs HISTORICAL_REPLAY are labeled per record.",
+          automaticOrders: false,
+        });
+      }
+
       if (url.pathname === "/v1/regime" && req.method === "GET") {
         const { brief } = await scanner.morningBrief();
         return json(res, 200, {
@@ -876,6 +936,8 @@ async function main() {
     console.log("  POST /v1/monitor/tick");
     console.log("  GET /v1/monitor/events");
     console.log("  POST /v1/monitor/defaults");
+    console.log("  GET /v1/replay?ticker=NVDA&side=LONG");
+    console.log("  GET /v1/signal-performance");
   });
 
   const shutdown = () => {

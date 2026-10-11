@@ -93,7 +93,7 @@ export function deriveRecommendation(input: RecommendInput): DeterministicRecomm
     blockers.push("Historical expectancy negative for matched family");
   }
 
-  if (status.includes("ENTRY ACTIVE") && passRatio >= 0.8 && input.rewardToRisk >= 1.5) {
+  if (status.includes("ENTRY ACTIVE") && passRatio >= 0.8 && input.rewardToRisk >= 2) {
     if (blockers.length) {
       return {
         recommendation: "PREPARE",

@@ -383,6 +383,14 @@ export interface MonitorSymbolState {
   feedLimitation: string | null;
   marketDataAt: string | null;
   evaluatedAt: string | null;
+  qualityScore10: number | null;
+  falseBreakoutRisk: string | null;
+  actionHint: string | null;
+  retestPhase: string | null;
+  retestRequired: boolean;
+  target3: number | null;
+  invalidation: number | null;
+  setupId: string | null;
   error: string | null;
   updatedAt: string;
 }

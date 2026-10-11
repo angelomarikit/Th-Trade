@@ -6,9 +6,13 @@ import {
   type MarketSnapshot,
 } from "@wulu/market-data";
 import type { WhyMovingBlock } from "@wulu/news";
+import { analyzeBreakout } from "./breakoutAnalysis.js";
 import { buildSetupConditionMatrix, type AlignmentInput } from "./buildMatrix.js";
 import { deriveLevels } from "./deriveLevels.js";
+import { detectFakeBreakoutRisk, worstFakeBreakoutSeverity } from "./fakeBreakout.js";
 import { buildNearActiveView } from "./nearActive.js";
+import { scoreSetupQuality10 } from "./qualityScore10.js";
+import { evaluateRetest, type RetestPhase } from "./retest.js";
 import { setupScoreFromMatrix } from "./scoreFromMatrix.js";
 import { assertEntryNotFromNewsAlone, decideSetupState } from "./stateMachine.js";
 import type {
@@ -20,13 +24,14 @@ import type {
   RelativeMomentumCardInfo,
 } from "./liveCard.js";
 
-
 export interface EvaluateSetupInput {
   symbol: string;
   side: TradeSide;
   snapshot: MarketSnapshot;
   whyMoving: WhyMovingBlock;
   previousState?: SetupState;
+  previousRetestPhase?: RetestPhase;
+  preferRetestModel?: boolean;
   now?: Date;
   marketRegime?: AlignmentInput;
   sectorAlignment?: AlignmentInput;
@@ -41,14 +46,36 @@ export interface EvaluateSetupInput {
   relativeMomentum?: RelativeMomentumCardInfo | null;
 }
 
-
-
 export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const now = input.now ?? new Date();
   const session = classifyUsEquitySession(now);
   const profile = confirmationProfileForSession(session);
   const freshness = assessFreshness(input.snapshot, now, profile.maxDataAgeMs, session);
   const levels = deriveLevels(input.snapshot.bars5m, input.side, input.snapshot.lastPrice);
+
+  const breakout = analyzeBreakout({
+    side: input.side,
+    bars5m: input.snapshot.bars5m,
+    trigger: levels.trigger,
+  });
+
+  const retest = evaluateRetest({
+    side: input.side,
+    bars5m: input.snapshot.bars5m,
+    level: levels.trigger,
+    previousPhase: input.previousRetestPhase,
+    preferRetestModel: input.preferRetestModel ?? false,
+  });
+
+  const fakeWarnings = detectFakeBreakoutRisk({
+    side: input.side,
+    bars5m: input.snapshot.bars5m,
+    trigger: levels.trigger,
+    rvol: input.relativeMomentum?.rvol ?? null,
+    minRvol: profile.minRelativeVolume,
+    retestFailed: retest.phase === "RETEST_FAILED",
+  });
+  const falseBreakoutRisk = worstFakeBreakoutSeverity(fakeWarnings);
 
   const built = buildSetupConditionMatrix({
     side: input.side,
@@ -61,8 +88,6 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     profile,
   });
 
-
-
   const prev = input.previousState;
   const wasNearOrActive =
     prev === "NEAR_ACTIVE" ||
@@ -71,8 +96,15 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
   const leftZone = wasNearOrActive && !built.zoneExecutable;
   const structureRow = built.matrix.rows.find((r) => r.id === "STRUCTURE");
-  // Wire SM input previously unused — clear structure FAIL after near/entry → INVALIDATED
   const structureInvalidated = wasNearOrActive && structureRow?.status === "FAIL";
+  const fakeBreakoutInvalidated =
+    wasNearOrActive &&
+    fakeWarnings.some(
+      (w) =>
+        w.suggestedAction === "INVALIDATE" &&
+        w.sideRelevance === input.side &&
+        !w.earlyWarning,
+    );
 
   const state = decideSetupState({
     side: input.side,
@@ -80,7 +112,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     zoneExecutable: built.zoneExecutable,
     previousState: input.previousState,
     leftExecutableZone: leftZone,
-    structureInvalidated,
+    structureInvalidated: structureInvalidated || fakeBreakoutInvalidated,
   });
 
   assertEntryNotFromNewsAlone(state, built.matrix);
@@ -92,6 +124,17 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     sectorAlignment: input.sectorAlignmentScore,
   });
 
+  const qualityScore10 = scoreSetupQuality10({
+    matrix: built.matrix,
+    dataFresh: freshness.ok,
+    breakout,
+    fakeWarnings,
+    retest,
+    rvol: input.relativeMomentum?.rvol ?? null,
+    rewardToRisk: built.rewardToRisk,
+    zoneExecutable: built.zoneExecutable,
+  });
+
   const evaluatedAt = now.toISOString();
   const near = buildNearActiveView({
     state,
@@ -101,6 +144,9 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     dataTimestamp: evaluatedAt,
     setupQualityScore: setupScore.total,
   });
+
+  const actionHint = actionHintFor(state, breakout.mode, retest, falseBreakoutRisk, freshness.ok);
+  const setupId = `${input.symbol.toUpperCase()}:${input.side}:${levels.trigger.toFixed(4)}`;
 
   return {
     symbol: input.symbol.toUpperCase(),
@@ -121,11 +167,23 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     stop: levels.stop,
     target1: levels.target1,
     target2: levels.target2,
+    target3: levels.target3 ?? null,
+    invalidation: levels.invalidation ?? levels.stop,
     setupScore,
+    qualityScore10,
+    signalIntelligence: {
+      breakout,
+      fakeBreakoutWarnings: fakeWarnings,
+      falseBreakoutRisk,
+      retest,
+      actionHint,
+      entryModel: retest.model === "NONE" ? (breakout.mode === "CONFIRMED_CLOSE" ? "CONFIRMED_BREAKOUT" : "NONE") : retest.model,
+    },
     lastPrice: input.snapshot.lastPrice,
     rewardToRisk: built.rewardToRisk,
     dataFresh: freshness.ok,
     evaluatedAt,
+    setupId,
     relativeMomentum: input.relativeMomentum ?? null,
     session: {
       session: session.session,
@@ -140,4 +198,27 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   };
 }
 
-
+function actionHintFor(
+  state: SetupState,
+  breakoutMode: string,
+  retest: { phase: string; retestRequired: boolean },
+  fakeRisk: string,
+  dataFresh: boolean,
+): string {
+  if (!dataFresh) return "DATA NOT VERIFIED — NO TRADE";
+  if (state === "ENTRY_ACTIVE_LONG" || state === "ENTRY_ACTIVE_SHORT") {
+    return "ENTRY ACTIVE — all mandatory checks passed; still verify live";
+  }
+  if (state === "INVALIDATED") return "INVALIDATED — do not trade this setup";
+  if (state === "MISSED") return "MISSED — do not chase";
+  if (state === "NO_TRADE") return "NO TRADE — mandatory checks failed";
+  if (fakeRisk === "CONFIRMED_FAIL") return "WAIT — confirmed trap / failed break pattern";
+  if (retest.retestRequired && retest.phase === "WAITING_RETEST") {
+    return "WAIT FOR RETEST CONFIRMATION";
+  }
+  if (breakoutMode === "BREAKING" || breakoutMode === "APPROACHING") {
+    return "WAIT FOR CONFIRMATION";
+  }
+  if (state === "NEAR_ACTIVE") return "WAIT FOR CONFIRMATION";
+  return "WAIT";
+}

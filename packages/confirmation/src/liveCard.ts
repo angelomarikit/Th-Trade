@@ -5,7 +5,10 @@ import type {
   TradeSide,
 } from "@wulu/domain";
 import type { WhyMovingBlock } from "@wulu/news";
+import type { BreakoutAnalysis } from "./breakoutAnalysis.js";
+import type { FakeBreakoutWarning } from "./fakeBreakout.js";
 import type { NearActiveView } from "./nearActive.js";
+import type { RetestState } from "./retest.js";
 
 export interface RegimeCardInfo {
   primary: string;
@@ -30,11 +33,21 @@ export interface LiveSetupCard {
   stop: number;
   target1: number;
   target2: number;
+  target3?: number | null;
+  invalidation?: number | null;
   setupScore: SetupScore;
+  /** Phase 3 — transparent 1–10 score (NOT win probability) */
+  qualityScore10: {
+    score: number;
+    reasons: string[];
+    disclaimer: string;
+  } | null;
+  signalIntelligence: SignalIntelligenceInfo | null;
   lastPrice: number;
   rewardToRisk: number;
   dataFresh: boolean;
   evaluatedAt: string;
+  setupId: string;
   session: {
     session: string;
     etLabel: string;
@@ -113,5 +126,14 @@ export interface MatchedStrategyInfo {
   strategyName: string;
   family: string;
   reason: string;
+}
+
+export interface SignalIntelligenceInfo {
+  breakout: BreakoutAnalysis;
+  fakeBreakoutWarnings: FakeBreakoutWarning[];
+  falseBreakoutRisk: "NONE" | "LOW" | "MODERATE" | "HIGH" | "CONFIRMED_FAIL";
+  retest: RetestState;
+  actionHint: string;
+  entryModel: "CONFIRMED_BREAKOUT" | "BREAK_AND_RETEST" | "NONE";
 }
 

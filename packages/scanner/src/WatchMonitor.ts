@@ -57,6 +57,14 @@ export interface MonitoredSymbolState {
   feedLimitation: string | null;
   marketDataAt: string | null;
   evaluatedAt: string | null;
+  qualityScore10: number | null;
+  falseBreakoutRisk: string | null;
+  actionHint: string | null;
+  retestPhase: string | null;
+  retestRequired: boolean;
+  target3: number | null;
+  invalidation: number | null;
+  setupId: string | null;
   error: string | null;
   updatedAt: string;
 }
@@ -211,6 +219,14 @@ export class WatchMonitor {
       feedLimitation: card.relativeMomentum?.feedLimitation ?? null,
       marketDataAt: card.nearActive.dataTimestamp ?? card.evaluatedAt,
       evaluatedAt: card.evaluatedAt,
+      qualityScore10: card.qualityScore10?.score ?? null,
+      falseBreakoutRisk: card.signalIntelligence?.falseBreakoutRisk ?? null,
+      actionHint: card.signalIntelligence?.actionHint ?? null,
+      retestPhase: card.signalIntelligence?.retest.phase ?? null,
+      retestRequired: card.signalIntelligence?.retest.retestRequired ?? false,
+      target3: card.target3 ?? null,
+      invalidation: card.invalidation ?? null,
+      setupId: card.setupId,
       error: null,
       updatedAt,
     };
@@ -274,6 +290,14 @@ export class WatchMonitor {
       feedLimitation: prev?.feedLimitation ?? null,
       marketDataAt: prev?.marketDataAt ?? null,
       evaluatedAt: prev?.evaluatedAt ?? null,
+      qualityScore10: prev?.qualityScore10 ?? null,
+      falseBreakoutRisk: prev?.falseBreakoutRisk ?? null,
+      actionHint: "DATA NOT VERIFIED — NO TRADE",
+      retestPhase: prev?.retestPhase ?? null,
+      retestRequired: prev?.retestRequired ?? false,
+      target3: prev?.target3 ?? null,
+      invalidation: prev?.invalidation ?? null,
+      setupId: prev?.setupId ?? null,
       error: message,
       updatedAt,
     };
@@ -351,6 +375,8 @@ export interface MonitorHubOptions {
   alertStore?: AlertEventStore;
   /** Persist watchlist after mutations (Supabase / noop). */
   persistWatchlist?: (userId: string, symbols: MonitorSymbolConfig[]) => Promise<void>;
+  /** Optional Phase 3 performance foundation logger (status-change cards). */
+  onSignalCard?: (card: import("@wulu/confirmation").LiveSetupCard) => void;
 }
 
 /**
@@ -373,6 +399,9 @@ export class MonitorHub {
   private readonly persistWatchlist:
     | ((userId: string, symbols: MonitorSymbolConfig[]) => Promise<void>)
     | null;
+  private readonly onSignalCard:
+    | ((card: import("@wulu/confirmation").LiveSetupCard) => void)
+    | null;
 
   constructor(
     private readonly scanner: SetupScanner,
@@ -383,6 +412,7 @@ export class MonitorHub {
     this.feed = opts?.feed ?? "iex";
     this.alertStore = opts?.alertStore ?? null;
     this.persistWatchlist = opts?.persistWatchlist ?? null;
+    this.onSignalCard = opts?.onSignalCard ?? null;
   }
 
   get(sessionId: string): WatchMonitor {
@@ -514,6 +544,7 @@ export class MonitorHub {
           for (const mon of monitors) {
             const evt = mon.applyCard(cfg, card, this.feed);
             if (evt && this.alertStore) await this.alertStore.record(evt);
+            if (evt && this.onSignalCard) this.onSignalCard(card);
           }
         } catch (err) {
           failed += 1;
