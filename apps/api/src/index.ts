@@ -716,12 +716,16 @@ async function main() {
           side: sideParam as TradeSide,
           bars5m,
         });
-        for (const step of replay.steps) {
-          if (
-            step.card.state.includes("ENTRY_ACTIVE") ||
-            step.card.state === "INVALIDATED" ||
-            step.card.state === "MISSED"
-          ) {
+        // Record replay transitions + last step for performance foundation (labeled HISTORICAL_REPLAY).
+        const replayIndexes = new Set<number>(
+          replay.transitions.map((t) => t.barIndex),
+        );
+        if (replay.steps.length > 0) {
+          replayIndexes.add(replay.steps.length - 1);
+        }
+        for (const idx of replayIndexes) {
+          const step = replay.steps[idx];
+          if (step) {
             signalPerformanceStore.record(
               cardToPerformanceRecord(step.card, "HISTORICAL_REPLAY"),
             );

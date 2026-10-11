@@ -544,7 +544,8 @@ export class MonitorHub {
           for (const mon of monitors) {
             const evt = mon.applyCard(cfg, card, this.feed);
             if (evt && this.alertStore) await this.alertStore.record(evt);
-            if (evt && this.onSignalCard) this.onSignalCard(card);
+            // Foundation: log every evaluated card (store dedupes by setupId:evaluatedAt).
+            if (this.onSignalCard) this.onSignalCard(card);
           }
         } catch (err) {
           failed += 1;

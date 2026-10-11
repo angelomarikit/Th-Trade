@@ -44,6 +44,7 @@ export class MemorySignalPerformanceStore implements SignalPerformanceStore {
   private rows: SignalPerformanceRecord[] = [];
 
   record(row: SignalPerformanceRecord): void {
+    if (this.rows.some((r) => r.id === row.id)) return;
     this.rows.unshift(row);
     if (this.rows.length > 5_000) this.rows.length = 5_000;
   }
