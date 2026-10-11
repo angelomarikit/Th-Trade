@@ -10,7 +10,8 @@
 
 | Check | Result |
 |-------|--------|
-| Phase 3 tip | `f7d1ec5ea2980b38300bf04f459c5ff4766a779c` |
+| Phase 3 tip (live after perf-collection fix) | `5e9c5dc58f323f0efe0d5c83cd051b6977844761` |
+| Prior tip at first deploy | `f7d1ec5ea2980b38300bf04f459c5ff4766a779c` |
 | Feature commit | `1a6f57e5cd0613dde51cd05cada5e7e2476ef5e3` |
 | Rollback tag (Phase 2) | `pre-phase3-deploy-rollback` → `79cdd7b` |
 | Deploy candidate tag | `phase3-deploy-candidate` → `f7d1ec5` |
