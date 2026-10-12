@@ -10,6 +10,7 @@ import { ChartsPage } from "./pages/ChartsPage";
 import { JournalPage } from "./pages/JournalPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewsPage } from "./pages/NewsPage";
+import { OpportunitiesPage } from "./pages/OpportunitiesPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PositionsPage } from "./pages/PositionsPage";
@@ -37,6 +38,7 @@ export function App() {
             >
               <Route index element={<OverviewPage />} />
               <Route path="scanner" element={<ScannerPage />} />
+              <Route path="opportunities" element={<OpportunitiesPage />} />
               <Route path="watchlist" element={<WatchlistPage />} />
               <Route path="signals" element={<SignalsPage />} />
               <Route path="charts" element={<ChartsPage />} />

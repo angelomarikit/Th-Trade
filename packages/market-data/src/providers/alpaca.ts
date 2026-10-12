@@ -1,5 +1,5 @@
 import type { MarketDataProvider } from "../MarketDataProvider.js";
-import type { Bar, MarketSnapshot, Quote } from "../types.js";
+import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "../types.js";
 import { loadAlpacaCredentials } from "../credentials.js";
 import {
   fetchAlpacaWithRetry,
@@ -175,6 +175,32 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
   }
 
 
+  /**
+   * Batch discovery snapshots — one HTTP call per chunk (default 40 symbols).
+   * Does not pull full 1m/5m history; use getSnapshot for confirmation.
+   */
+  async getDiscoverySnapshots(symbols: string[]): Promise<DiscoverySnapshot[]> {
+    const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+    const chunkSize = Math.max(1, Number(process.env.ALPACA_SNAPSHOT_CHUNK ?? 40) || 40);
+    const out: DiscoverySnapshot[] = [];
+    const now = new Date();
+
+    for (let i = 0; i < unique.length; i += chunkSize) {
+      const chunk = unique.slice(i, i + chunkSize);
+      const url =
+        `${this.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(chunk.join(","))}` +
+        `&feed=${this.feed}`;
+      const data = await this.getJson<Record<string, AlpacaStockSnapshot>>(url);
+      for (const sym of chunk) {
+        const snap = data[sym];
+        if (!snap) continue;
+        const mapped = mapAlpacaDiscoverySnapshot(sym, snap, now);
+        if (mapped) out.push(mapped);
+      }
+    }
+    return out;
+  }
+
   private async getJson<T>(url: string): Promise<T> {
     const res = await fetchAlpacaWithRetry(
       this.fetchImpl,
@@ -197,6 +223,50 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     }
     return (await res.json()) as T;
   }
+}
+
+interface AlpacaStockSnapshot {
+  latestTrade?: { p?: number; t?: string };
+  latestQuote?: { bp?: number; ap?: number; t?: string };
+  minuteBar?: { o?: number; h?: number; l?: number; c?: number; v?: number; t?: string };
+  dailyBar?: { o?: number; h?: number; l?: number; c?: number; v?: number; t?: string };
+  prevDailyBar?: { o?: number; h?: number; l?: number; c?: number; v?: number; t?: string };
+}
+
+function mapAlpacaDiscoverySnapshot(
+  symbol: string,
+  snap: AlpacaStockSnapshot,
+  receivedAt: Date,
+): DiscoverySnapshot | null {
+  const lastPrice =
+    snap.latestTrade?.p ??
+    (snap.latestQuote?.bp != null && snap.latestQuote?.ap != null
+      ? (snap.latestQuote.bp + snap.latestQuote.ap) / 2
+      : null) ??
+    snap.minuteBar?.c ??
+    snap.dailyBar?.c ??
+    null;
+  if (lastPrice == null || !(lastPrice > 0)) return null;
+
+  const tsRaw =
+    snap.latestTrade?.t ?? snap.latestQuote?.t ?? snap.minuteBar?.t ?? snap.dailyBar?.t ?? null;
+
+  return {
+    symbol,
+    lastPrice,
+    prevClose: snap.prevDailyBar?.c ?? null,
+    dayOpen: snap.dailyBar?.o ?? null,
+    dayHigh: snap.dailyBar?.h ?? null,
+    dayLow: snap.dailyBar?.l ?? null,
+    dayVolume: snap.dailyBar?.v ?? null,
+    prevDayVolume: snap.prevDailyBar?.v ?? null,
+    minuteClose: snap.minuteBar?.c ?? null,
+    minuteVolume: snap.minuteBar?.v ?? null,
+    bid: snap.latestQuote?.bp ?? null,
+    ask: snap.latestQuote?.ap ?? null,
+    marketTimestamp: tsRaw ? new Date(tsRaw) : null,
+    receivedAt,
+  };
 }
 
 export function createAlpacaMarketDataFromEnv(

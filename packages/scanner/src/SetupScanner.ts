@@ -7,7 +7,10 @@ import {
   buildRelativeMomentum,
   formatMorningBriefText,
   RegimeService,
+  resolveDiscoveryUniverse,
+  scoreDiscoveryUniverse,
   type MorningBrief,
+  type ScoredOpportunity,
 } from "@wulu/regime";
 import { matchStrategiesOnBars } from "@wulu/strategies";
 import { HistoricalEdgeService } from "@wulu/backtest";
@@ -232,6 +235,124 @@ export class SetupScanner {
   }
 
 
+
+  /**
+   * Phase 5: scan curated universe via cheap batch snapshots, rank LONG/SHORT.
+   * Optionally run existing evaluateSetup confirmation on top N (unchanged gates).
+   * Ranking never grants ENTRY ACTIVE.
+   */
+  async discoverOpportunities(opts?: {
+    universe?: string[];
+    topN?: number;
+    confirmTop?: number;
+  }): Promise<{
+    feed: string;
+    universeSize: number;
+    scanned: number;
+    elapsedMs: number;
+    long: ScoredOpportunity[];
+    short: ScoredOpportunity[];
+    confirmed: Array<{
+      symbol: string;
+      side: TradeSide;
+      discoveryRank: number;
+      discoveryScore: number;
+      state: string;
+      statusLabel: string;
+      rewardToRisk: number;
+      qualityScore10: number | null;
+    }>;
+    disclaimer: string;
+    automaticOrders: false;
+  }> {
+    const started = Date.now();
+    const universe = opts?.universe?.length
+      ? [...new Set(opts.universe.map((s) => s.toUpperCase()))]
+      : resolveDiscoveryUniverse();
+    const topN = Math.min(Math.max(opts?.topN ?? 15, 1), 40);
+    const confirmTop = Math.min(Math.max(opts?.confirmTop ?? 0, 0), 8);
+
+    if (!this.marketData.getDiscoverySnapshots) {
+      throw new Error("Market data provider does not support discovery snapshots");
+    }
+
+    const snaps = await this.marketData.getDiscoverySnapshots(universe);
+
+    const catalystBySymbol: Record<string, { boost: number; headline: string | null }> = {};
+    try {
+      const events = await this.news.getCatalystEvents({
+        tickers: snaps.slice(0, 40).map((s) => s.symbol),
+      });
+      for (const ev of events.slice(0, 80)) {
+        for (const t of ev.tickers ?? []) {
+          const sym = String(t).toUpperCase();
+          const importance = Number(ev.scores?.catalystImportance?.score ?? 0);
+          const boost = importance >= 70 ? 8 : importance >= 50 ? 5 : importance >= 30 ? 2 : 0;
+          const prev = catalystBySymbol[sym];
+          if (!prev || boost > prev.boost) {
+            catalystBySymbol[sym] = {
+              boost,
+              headline: ev.headline ?? null,
+            };
+          }
+        }
+      }
+    } catch {
+      // News optional — discovery still works without catalysts
+    }
+
+    const scored = scoreDiscoveryUniverse({ snaps, catalystBySymbol });
+    const long = scored.long.slice(0, topN).map((r, i) => ({ ...r, rank: i + 1 }));
+    const short = scored.short.slice(0, topN).map((r, i) => ({ ...r, rank: i + 1 }));
+
+    const confirmed: Array<{
+      symbol: string;
+      side: TradeSide;
+      discoveryRank: number;
+      discoveryScore: number;
+      state: string;
+      statusLabel: string;
+      rewardToRisk: number;
+      qualityScore10: number | null;
+    }> = [];
+
+    if (confirmTop > 0) {
+      const toConfirm = [
+        ...long.slice(0, confirmTop).map((r) => ({ ...r, side: "LONG" as const })),
+        ...short.slice(0, confirmTop).map((r) => ({ ...r, side: "SHORT" as const })),
+      ];
+      for (const row of toConfirm) {
+        try {
+          const card = await this.scan({ symbol: row.symbol, side: row.side, recordJournal: false });
+          confirmed.push({
+            symbol: row.symbol,
+            side: row.side,
+            discoveryRank: (row as ScoredOpportunity & { rank?: number }).rank ?? 0,
+            discoveryScore: row.rankScore,
+            state: card.state,
+            statusLabel: card.statusLabel,
+            rewardToRisk: card.rewardToRisk,
+            qualityScore10: card.qualityScore10?.score ?? null,
+          });
+        } catch {
+          // Skip failed confirmation — never invent ENTRY ACTIVE
+        }
+      }
+    }
+
+    return {
+      feed: process.env.ALPACA_DATA_FEED ?? "iex",
+      universeSize: universe.length,
+      scanned: snaps.length,
+      elapsedMs: Date.now() - started,
+      long: long as ScoredOpportunity[],
+      short: short as ScoredOpportunity[],
+      confirmed,
+      disclaimer:
+        "Discovery ranks are context only — not ENTRY permission. Confirmation uses unchanged Phase 3/4 gates (min 2R). IEX ≠ consolidated volume. Auto-trading disabled. Not a published win rate.",
+      automaticOrders: false,
+    };
+  }
 
   /**
    * Rank watchlist symbols by computed relative momentum (actual bars).

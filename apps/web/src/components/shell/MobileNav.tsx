@@ -1,11 +1,11 @@
-import { LayoutDashboard, Newspaper, Radar, Settings, Star } from "lucide-react";
+import { LayoutDashboard, Radar, Search, Settings, Star } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
   { to: "/", end: true, label: "Home", icon: LayoutDashboard },
+  { to: "/opportunities", label: "Discover", icon: Search },
   { to: "/scanner", label: "Scan", icon: Radar },
   { to: "/watchlist", label: "Monitor", icon: Star },
-  { to: "/news", label: "News", icon: Newspaper },
   { to: "/settings", label: "More", icon: Settings },
 ];
 

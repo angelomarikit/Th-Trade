@@ -1,4 +1,4 @@
-import type { Bar, MarketSnapshot, Quote } from "./types.js";
+import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "./types.js";
 
 export interface BarsQuery {
   symbol: string;
@@ -13,4 +13,9 @@ export interface MarketDataProvider {
   getQuote(symbol: string): Promise<Quote | null>;
   getBars(query: BarsQuery): Promise<Bar[]>;
   getSnapshot(symbol: string): Promise<MarketSnapshot>;
+  /**
+   * Cheap multi-symbol discovery snapshots (batch when provider supports it).
+   * Default implementations may fall back to sequential getSnapshot mapping.
+   */
+  getDiscoverySnapshots?(symbols: string[]): Promise<DiscoverySnapshot[]>;
 }

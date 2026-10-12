@@ -9,7 +9,8 @@ import {
 import { toUserFacingStatus } from "./displayStatus.js";
 import type { SetupScanner } from "./SetupScanner.js";
 
-export const MONITOR_MAX_SYMBOLS_DEFAULT = 6;
+/** Deep confirmation monitor cap — discovery can rank more; only top names are promoted here. */
+export const MONITOR_MAX_SYMBOLS_DEFAULT = 12;
 export const DEFAULT_MONITOR_WATCHLIST: MonitorSymbolConfig[] = [
   { symbol: "TSLA", side: "LONG" },
   { symbol: "MU", side: "LONG" },

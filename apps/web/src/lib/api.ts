@@ -351,6 +351,67 @@ export function fetchRank(tickers: string[]) {
   }>(`/v1/rank?tickers=${qs}`);
 }
 
+export interface OpportunityRow {
+  symbol: string;
+  side: "LONG" | "SHORT";
+  rankScore: number;
+  catalystBoost?: number;
+  catalystHeadline?: string | null;
+  features?: {
+    dayChangePct: number | null;
+    vsSpyPct: number | null;
+    rvolProxy: number | null;
+    gapPct: number | null;
+    sectorEtf?: string;
+  };
+  disclaimer?: string;
+}
+
+export interface OpportunitiesResponse {
+  feed: string;
+  universeSize: number;
+  scanned: number;
+  elapsedMs: number;
+  long: OpportunityRow[];
+  short: OpportunityRow[];
+  confirmed: Array<{
+    symbol: string;
+    side: "LONG" | "SHORT";
+    discoveryRank: number;
+    discoveryScore: number;
+    state: string;
+    statusLabel: string;
+    rewardToRisk: number;
+    qualityScore10: number | null;
+  }>;
+  disclaimer: string;
+  automaticOrders: false;
+}
+
+export function fetchOpportunities(opts: {
+  top?: number;
+  confirm?: number;
+  token?: string | null;
+}) {
+  const top = opts.top ?? 15;
+  const confirm = opts.confirm ?? 0;
+  return getJson<OpportunitiesResponse>(
+    `/v1/opportunities?top=${top}&confirm=${confirm}`,
+    opts.token ? { Authorization: `Bearer ${opts.token}` } : undefined,
+  );
+}
+
+export function promoteToMonitor(
+  symbols: Array<{ symbol: string; side: "LONG" | "SHORT" }>,
+  accessToken: string,
+) {
+  return monitorFetch("/v1/monitor/promote", {
+    method: "POST",
+    body: { symbols },
+    accessToken,
+  });
+}
+
 export interface MonitorSymbolState {
   symbol: string;
   side: "LONG" | "SHORT";

@@ -1445,3 +1445,22 @@ a {
     padding: 0.65rem;
   }
 }
+
+/* Phase 5 opportunities */
+.opp-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+@media (min-width: 960px) {
+  .opp-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.opportunities-page .row.gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

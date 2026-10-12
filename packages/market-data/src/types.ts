@@ -47,3 +47,27 @@ export interface FreshnessResult {
   maxAgeMs: number;
   reason: string;
 }
+
+/**
+ * Lightweight multi-symbol snapshot for Phase 5 discovery (not full confirmation bars).
+ * Sourced from Alpaca /v2/stocks/snapshots — IEX volume is approximate.
+ */
+export interface DiscoverySnapshot {
+  symbol: string;
+  lastPrice: number;
+  /** Prior regular session close when available */
+  prevClose: number | null;
+  /** Session open (daily bar) when available */
+  dayOpen: number | null;
+  dayHigh: number | null;
+  dayLow: number | null;
+  dayVolume: number | null;
+  prevDayVolume: number | null;
+  /** Latest minute bar close */
+  minuteClose: number | null;
+  minuteVolume: number | null;
+  bid: number | null;
+  ask: number | null;
+  marketTimestamp: Date | null;
+  receivedAt: Date;
+}

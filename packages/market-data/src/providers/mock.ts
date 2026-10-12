@@ -1,5 +1,5 @@
 import type { MarketDataProvider } from "../MarketDataProvider.js";
-import type { Bar, MarketSnapshot, Quote } from "../types.js";
+import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "../types.js";
 
 export interface MockMarketScenario {
   symbol: string;
@@ -85,6 +85,33 @@ export class MockMarketDataProvider implements MarketDataProvider {
       receivedAt: now,
       marketTimestamp: quoteTs,
     };
+  }
+
+  async getDiscoverySnapshots(symbols: string[]): Promise<DiscoverySnapshot[]> {
+    const out: DiscoverySnapshot[] = [];
+    for (const raw of symbols) {
+      const snap = await this.getSnapshot(raw);
+      const day = snap.bars5m.filter((b) => b.completed);
+      const first = day[0];
+      const last = day.at(-1);
+      out.push({
+        symbol: snap.symbol,
+        lastPrice: snap.lastPrice,
+        prevClose: first?.open ?? snap.lastPrice * 0.99,
+        dayOpen: first?.open ?? null,
+        dayHigh: last ? Math.max(...day.map((b) => b.high)) : null,
+        dayLow: last ? Math.min(...day.map((b) => b.low)) : null,
+        dayVolume: day.reduce((a, b) => a + b.volume, 0),
+        prevDayVolume: day.reduce((a, b) => a + b.volume, 0) * 0.7,
+        minuteClose: snap.bars1m.at(-1)?.close ?? null,
+        minuteVolume: snap.bars1m.at(-1)?.volume ?? null,
+        bid: snap.quote?.bid ?? null,
+        ask: snap.quote?.ask ?? null,
+        marketTimestamp: snap.marketTimestamp,
+        receivedAt: snap.receivedAt,
+      });
+    }
+    return out;
   }
 }
 

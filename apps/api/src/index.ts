@@ -93,7 +93,7 @@ async function main() {
   /** Prevents every ~40s tick from inserting a near-identical LIVE history row. */
   const livePersistGate = new SignalPersistGate();
   const monitorHub = new MonitorHub(scanner, {
-    maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
+    maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 12),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
     feed: process.env.ALPACA_DATA_FEED ?? "iex",
     alertStore,
@@ -232,7 +232,7 @@ async function main() {
           billing: { stripe: "not_wired", mode: "manual_plan_select" },
           monitor: {
             ...monitorHub.metrics(),
-            maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
+            maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 12),
             intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
             automaticOrders: false,
           },
@@ -947,6 +947,67 @@ async function main() {
         });
       }
 
+      if (url.pathname === "/v1/opportunities" && req.method === "GET") {
+        const topN = Math.min(Number(url.searchParams.get("top") ?? 15), 40);
+        const confirmTop = Math.min(Number(url.searchParams.get("confirm") ?? 0), 8);
+        const universeParam = url.searchParams.get("universe");
+        const universe = universeParam?.trim()
+          ? universeParam.split(",").map((t) => t.trim()).filter(Boolean)
+          : undefined;
+        try {
+          const result = await scanner.discoverOpportunities({
+            universe,
+            topN,
+            confirmTop,
+          });
+          return json(res, 200, result);
+        } catch (err) {
+          return json(res, 502, {
+            error: err instanceof Error ? err.message : String(err),
+            automaticOrders: false,
+          });
+        }
+      }
+
+      if (url.pathname === "/v1/monitor/promote" && req.method === "POST") {
+        try {
+          const sessionId = await resolveMonitorSession(req.headers.authorization, {
+            requireAuth: supabaseReady,
+          });
+          const body = (await readJson(req)) as {
+            symbols?: Array<{ symbol?: string; side?: string }>;
+          };
+          const items = (body.symbols ?? [])
+            .map((s) => ({
+              symbol: String(s.symbol ?? "")
+                .trim()
+                .toUpperCase(),
+              side: (String(s.side ?? "LONG").toUpperCase() === "SHORT"
+                ? "SHORT"
+                : "LONG") as TradeSide,
+            }))
+            .filter((s) => s.symbol.length > 0);
+          if (items.length === 0) {
+            return json(res, 400, { error: "symbols array required" });
+          }
+          let snap = await monitorHub.addSymbol(sessionId, items[0]!.symbol, items[0]!.side);
+          for (const item of items.slice(1)) {
+            snap = await monitorHub.addSymbol(sessionId, item.symbol, item.side);
+          }
+          return json(res, 200, {
+            ...snap,
+            hub: monitorHub.metrics(),
+            note: "Promoted into deep monitor — confirmation gates unchanged. Ranking is not ENTRY permission.",
+            automaticOrders: false,
+          });
+        } catch (err) {
+          if (err instanceof MonitorLimitError) {
+            return json(res, 400, { error: err.message });
+          }
+          return authError(res, err);
+        }
+      }
+
       if (url.pathname === "/v1/morning" && req.method === "GET") {
         const tickersParam = url.searchParams.get("tickers");
         const tickers =
@@ -1112,6 +1173,8 @@ async function main() {
     console.log("  GET /v1/monitor/events");
     console.log("  POST /v1/monitor/defaults");
     console.log("  GET /v1/replay?ticker=NVDA&side=LONG");
+    console.log("  GET /v1/opportunities?top=15&confirm=0");
+    console.log("  POST /v1/monitor/promote");
     console.log("  GET /v1/signal-performance");
     console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");
