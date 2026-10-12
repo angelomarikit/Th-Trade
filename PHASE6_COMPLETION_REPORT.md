@@ -67,12 +67,14 @@ Market was outside RTH for this session window; do not treat AH as RTH sign-off.
 
 ## Deploy note
 
-Ship this commit to Railway (API) + Vercel (web). Smoke:
+- **API:** Railway deploy `35071ab9` from `main` @ `5fc90a6` (+ docs `8630abc`) — Online  
+- **Web:** Vercel CLI not authenticated in this session; if the GitHub→Vercel hook is connected to `main`, the UI (LIVE/REPLAY panels + confirm timings) will follow automatically. Otherwise run `vercel login` then `vercel --prod`.
+
+Smoke verified:
 
 ```text
-GET /health
-GET /v1/measured-performance?source=LIVE
-GET /v1/measured-performance?source=HISTORICAL_REPLAY
+GET /health → automaticOrders=false, maxSymbols=12
+GET /v1/opportunities?confirm=3 → confirmElapsedMs ≈ 9–10s (was ~165s)
+GET /v1/measured-performance?source=LIVE|HISTORICAL_REPLAY
 GET /v1/backtest/compare?ticker=SPY
-GET /v1/opportunities?top=10&confirm=3   → check confirmElapsedMs
 ```
