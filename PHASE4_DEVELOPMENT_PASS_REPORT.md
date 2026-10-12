@@ -2,7 +2,8 @@
 
 **Trading date (ET):** Monday **2026-10-12** (RTH afternoon)  
 **Local note (UTC+8):** that same session falls on **Tuesday 2026-10-13** morning — reports label the **ET trading date**, not the operator’s calendar day.  
-**Production API commit:** `91137ac199a66ece0aa90bb10c69b69a8f9a36d3`  
+**Production API commit (geometry + open-track mirrors):** `91137ac199a66ece0aa90bb10c69b69a8f9a36d3`  
+**Latest tip on `main` (ET watchlist timestamps + this report):** `a86adb3`  
 **UI:** https://web-tawny-iota-56.vercel.app/watchlist  
 **Auto-trading:** **disabled** (`automaticOrders=false`, SIGNALS ONLY)
 
