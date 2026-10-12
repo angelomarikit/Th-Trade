@@ -20,7 +20,12 @@ SQL source: `supabase/migrations/20261012_phase3_signal_history.sql` (already ap
 
 ## Restart test
 
-Performed as part of deploy of outcome-tracking tip: insert marker row → Railway redeploy → confirm marker + table counts still present (see deploy notes in commit message / chat report).
+| Step | Result |
+|------|--------|
+| Marker upsert `persist-check-20261012-0738` | OK (pre-redeploy count ~1553) |
+| Railway redeploy tip `1bc9c43` | SUCCESS |
+| Marker after redeploy | **FOUND** (Supabase row survived API restart) |
+| Conclusion | Signal history is durable in Supabase; not wiped by Railway restart |
 
 ## What still resets on Railway restart
 

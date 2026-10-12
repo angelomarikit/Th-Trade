@@ -45,6 +45,11 @@ import {
   saveMonitorWatchlist,
 } from "./monitor/persistence.js";
 import {
+  closeOpenTrack,
+  loadOpenTracks,
+  upsertOpenTrack,
+} from "./monitor/openTracks.js";
+import {
   getAlertPreferences,
   HybridSignalPerformanceStore,
   saveAlertPreferences,
@@ -105,11 +110,17 @@ async function main() {
             ...card.nearActive.stillWaitingFor.slice(0, 6),
           ],
         });
+        void upsertOpenTrack(track.opened);
+      } else if (track.resolution == null) {
+        // Persist bars_elapsed progress for still-open tracks
+        const open = outcomeTracker.listOpen().find((t) => t.setupId === card.setupId && t.userId === uid);
+        if (open) void upsertOpenTrack(open);
       }
       if (track.resolution) {
         signalPerformanceStore.upsert(
           resolutionToPerformanceRecord(track.resolution, card, "LIVE", uid),
         );
+        void closeOpenTrack(track.resolution.id);
       }
     },
     persistWatchlist: async (userId, symbols) => {
@@ -124,7 +135,26 @@ async function main() {
   const supabaseReady = isSupabaseConfigured();
   const openaiReady = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
 
-  // Resume persisted watchlists after deploy/restart (Railway long-running API process).
+  // Resume persisted watchlists + open tracks + alert dedupe after deploy/restart.
+  try {
+    const dedupeN = await alertStore.seedFromDatabase();
+    console.log(`[alerts] seeded ${dedupeN} durable dedupe key(s)`);
+  } catch (err) {
+    console.warn(
+      "[alerts] dedupe seed skipped:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  try {
+    const openTracks = await loadOpenTracks();
+    const n = outcomeTracker.hydrate(openTracks);
+    if (n > 0) console.log(`[outcomes] restored ${n} open signal track(s)`);
+  } catch (err) {
+    console.warn(
+      "[outcomes] open-track resume skipped:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
   try {
     const rows = await loadAllMonitorWatchlists();
     for (const row of rows) {

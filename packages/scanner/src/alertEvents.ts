@@ -31,6 +31,17 @@ export class MemoryAlertEventStore implements AlertEventStore {
   private readonly byUser = new Map<string, MonitorAlertEvent[]>();
   private readonly seen = new Set<string>();
 
+  /** Seed dedupe keys loaded from durable storage after restart. */
+  seedDedupeKeys(keys: string[]): void {
+    for (const k of keys) {
+      if (k) this.seen.add(k);
+    }
+  }
+
+  hasDedupeKey(key: string): boolean {
+    return this.seen.has(key);
+  }
+
   async record(event: MonitorAlertEvent): Promise<boolean> {
     if (this.seen.has(event.dedupeKey)) return false;
     this.seen.add(event.dedupeKey);

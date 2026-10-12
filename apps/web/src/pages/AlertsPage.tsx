@@ -151,31 +151,31 @@ export function AlertsPage() {
           <div className="panel-h">
             <h3>History ({events.length})</h3>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Symbol</th>
-                <th>Transition</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((a) => (
-                <tr key={a.id}>
-                  <td>{ageLabel(Date.parse(a.eventAt))}</td>
-                  <td>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", padding: "0.55rem 0.75rem" }}>
+            {events.map((a) => (
+              <div
+                key={a.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "0.55rem 0.65rem",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <strong style={{ fontFamily: "var(--mono)" }}>
                     {a.symbol}
                     {a.side ? ` · ${a.side}` : ""}
-                  </td>
-                  <td>
-                    {a.previousStatus} → {a.newStatus}
-                  </td>
-                  <td>{a.reason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </strong>
+                  <span style={{ opacity: 0.75 }}>{ageLabel(Date.parse(a.eventAt))}</span>
+                </div>
+                <div style={{ marginTop: "0.3rem", fontFamily: "var(--mono)" }}>
+                  {a.previousStatus} → <strong>{a.newStatus}</strong>
+                </div>
+                <div style={{ marginTop: "0.25rem", opacity: 0.8 }}>{a.reason}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

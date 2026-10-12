@@ -182,3 +182,32 @@ alter table public.monitor_alert_events
 
 alter table public.monitor_alert_events
   add column if not exists delivered_at timestamptz;
+
+-- Phase 4 — open tracks + alert dedupe (migrations/20261013_phase4_open_tracks.sql)
+create table if not exists public.open_signal_tracks (
+  id text primary key,
+  user_id uuid references public.profiles (id) on delete set null,
+  symbol text not null,
+  side text not null default 'LONG',
+  setup_id text not null,
+  entry_price double precision not null,
+  entry_at timestamptz not null,
+  stop_level double precision not null,
+  target1 double precision not null,
+  target2 double precision not null,
+  target3 double precision,
+  source text not null default 'LIVE',
+  bars_elapsed integer not null default 0,
+  quality_score_10 integer,
+  strategy_type text not null default 'SCANNER',
+  status text not null default 'OPEN',
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.monitor_alert_dedupe (
+  dedupe_key text primary key,
+  user_id uuid references public.profiles (id) on delete cascade,
+  event_id uuid,
+  seen_at timestamptz not null default now()
+);

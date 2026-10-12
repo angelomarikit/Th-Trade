@@ -558,6 +558,7 @@ export interface SignalPerformanceRow {
   falseBreakoutRisk: string | null;
   signalTimestamp: string;
   outcomeStatus: string;
+  outcomeR?: number | null;
 }
 
 export function fetchSignalPerformance(accessToken?: string | null, limit = 50) {
@@ -579,6 +580,29 @@ export function fetchSignalPerformance(accessToken?: string | null, limit = 50) 
     automaticOrders: boolean;
   }>(
     `/v1/signal-performance?limit=${limit}`,
+    accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  );
+}
+
+export function fetchOpenSignalOutcomes(accessToken?: string | null) {
+  return getJson<{
+    open: Array<{
+      id: string;
+      symbol: string;
+      side: string;
+      entryPrice: number;
+      entryAt: string;
+      stop: number;
+      target1: number;
+      target2: number;
+      barsElapsed: number;
+      source: string;
+    }>;
+    count: number;
+    note: string;
+    automaticOrders: boolean;
+  }>(
+    "/v1/signal-outcomes",
     accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
   );
 }

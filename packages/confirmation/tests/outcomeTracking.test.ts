@@ -65,6 +65,32 @@ describe("outcome tracking", () => {
     expect(r?.outcomeR).toBe(-1);
   });
 
+  it("hydrates open tracks after restart", () => {
+    const tracker = new SignalOutcomeTracker();
+    const n = tracker.hydrate([
+      {
+        id: "track:LIVE:u1:TEST:LONG:100",
+        userId: "u1",
+        symbol: "TEST",
+        side: "LONG",
+        setupId: "TEST:LONG:100.0000",
+        entryPrice: 100.2,
+        entryAt: "2026-10-09T14:00:00.000Z",
+        stop: 99,
+        target1: 102,
+        target2: 104,
+        target3: null,
+        source: "LIVE",
+        barsElapsed: 3,
+        qualityScore10: 7,
+        strategyType: "SCANNER",
+      },
+    ]);
+    expect(n).toBe(1);
+    expect(tracker.listOpen()).toHaveLength(1);
+    expect(tracker.listOpen()[0]?.barsElapsed).toBe(3);
+  });
+
   it("opens on ENTRY ACTIVE then resolves on later bar", () => {
     const tracker = new SignalOutcomeTracker();
     const openCard = card({

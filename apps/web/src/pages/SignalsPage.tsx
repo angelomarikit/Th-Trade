@@ -2,16 +2,31 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/common/EmptyState";
 import {
+  fetchOpenSignalOutcomes,
   fetchSignalPerformance,
   fetchSignalReplay,
   type SignalPerformanceRow,
 } from "../lib/api";
-import { ageLabel } from "../lib/format";
+import { ageLabel, fmtPrice } from "../lib/format";
 
 export function SignalsPage() {
   const { session } = useAuth();
   const token = session?.access_token ?? null;
   const [records, setRecords] = useState<SignalPerformanceRow[]>([]);
+  const [openTracks, setOpenTracks] = useState<
+    Array<{
+      id: string;
+      symbol: string;
+      side: string;
+      entryPrice: number;
+      entryAt: string;
+      stop: number;
+      target1: number;
+      target2: number;
+      barsElapsed: number;
+      source: string;
+    }>
+  >([]);
   const [summary, setSummary] = useState<{
     total: number;
     actionable: number;
@@ -32,9 +47,13 @@ export function SignalsPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await fetchSignalPerformance(token, 60);
+      const [data, open] = await Promise.all([
+        fetchSignalPerformance(token, 60),
+        fetchOpenSignalOutcomes(token).catch(() => null),
+      ]);
       setRecords(data.records);
       setSummary(data.summary);
+      if (open) setOpenTracks(open.open);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -107,8 +126,42 @@ export function SignalsPage() {
       ) : null}
       <p className="disclaimer" style={{ marginTop: "-0.35rem" }}>
         *Hypothetical 5m-bar outcomes (replay/live tracking) — not a published win rate. Ambiguous
-        same-bar stop+target cases are excluded from win/loss claims.
+        same-bar stop+target cases are excluded from win/loss claims. RTH live validation is separate.
       </p>
+
+      {openTracks.length > 0 ? (
+        <div className="panel" style={{ marginBottom: "0.75rem" }}>
+          <div className="panel-h">
+            <h3>Open tracked entries ({openTracks.length})</h3>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", padding: "0.55rem 0.75rem" }}>
+            {openTracks.map((t) => (
+              <div
+                key={t.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "0.55rem 0.65rem",
+                  fontFamily: "var(--mono)",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <strong>
+                  {t.symbol} — {t.side}
+                </strong>{" "}
+                <span className="badge amber">OPEN</span>
+                <div style={{ marginTop: "0.35rem", opacity: 0.9 }}>
+                  Entry {fmtPrice(t.entryPrice)} · Stop {fmtPrice(t.stop)} · T1 {fmtPrice(t.target1)} ·
+                  T2 {fmtPrice(t.target2)}
+                </div>
+                <div style={{ opacity: 0.75 }}>
+                  {t.source} · bars {t.barsElapsed} · since {ageLabel(Date.parse(t.entryAt))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <form className="scan-controls" onSubmit={onReplay} style={{ marginBottom: "0.85rem", flexWrap: "wrap" }}>
         <input
@@ -162,37 +215,37 @@ export function SignalsPage() {
           <div className="panel-h">
             <h3>Recent records</h3>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Symbol</th>
-                <th>State</th>
-                <th>Score</th>
-                <th>Source</th>
-                <th>Flags</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r) => (
-                <tr key={r.id}>
-                  <td>{ageLabel(Date.parse(r.signalTimestamp))}</td>
-                  <td>
-                    {r.symbol} · {r.side}
-                  </td>
-                  <td>{r.state}</td>
-                  <td>{r.qualityScore10 != null ? `${r.qualityScore10}/10` : "—"}</td>
-                  <td>{r.source}</td>
-                  <td>
-                    {r.actionable ? "actionable · " : ""}
-                    {r.dataQualityOk ? "fresh · " : "stale · "}
-                    {r.liveValidated ? "RTH validated" : "not RTH-validated"}
-                    {r.falseBreakoutRisk ? ` · fake ${r.falseBreakoutRisk}` : ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", padding: "0.55rem 0.75rem" }}>
+            {records.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "0.55rem 0.65rem",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <strong style={{ fontFamily: "var(--mono)" }}>
+                    {r.symbol} — {r.side}
+                  </strong>
+                  <span className="badge">{r.outcomeStatus}</span>
+                </div>
+                <div style={{ fontFamily: "var(--mono)", marginTop: "0.3rem", opacity: 0.9 }}>
+                  {r.state} · score {r.qualityScore10 != null ? `${r.qualityScore10}/10` : "—"} ·{" "}
+                  {r.source}
+                </div>
+                <div style={{ opacity: 0.75, marginTop: "0.2rem" }}>
+                  {ageLabel(Date.parse(r.signalTimestamp))} ·{" "}
+                  {r.dataQualityOk ? "fresh" : "stale"} ·{" "}
+                  {r.liveValidated ? "RTH validated" : "not RTH-validated"}
+                  {r.falseBreakoutRisk ? ` · fake ${r.falseBreakoutRisk}` : ""}
+                  {r.outcomeR != null ? ` · R ${r.outcomeR.toFixed(2)}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

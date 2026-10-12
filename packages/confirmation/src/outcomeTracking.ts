@@ -160,6 +160,17 @@ export class SignalOutcomeTracker {
     return [...this.open.values()];
   }
 
+  /** Restore durable OPEN tracks after process restart. */
+  hydrate(tracks: OpenTrackedSignal[]): number {
+    let n = 0;
+    for (const t of tracks) {
+      if (!t?.id || this.open.has(t.id)) continue;
+      this.open.set(t.id, { ...t });
+      n += 1;
+    }
+    return n;
+  }
+
   /**
    * Process a card + completed bar extremes.
    * Opens a track on first actionable ENTRY ACTIVE; resolves on later bars.
