@@ -18,4 +18,9 @@ export interface MarketDataProvider {
    * Default implementations may fall back to sequential getSnapshot mapping.
    */
   getDiscoverySnapshots?(symbols: string[]): Promise<DiscoverySnapshot[]>;
+  /**
+   * Full MarketSnapshot for several symbols (batch when provider supports it).
+   * Used by discovery confirmation to avoid N× sequential quote/trade/bars calls.
+   */
+  getSnapshots?(symbols: string[]): Promise<MarketSnapshot[]>;
 }

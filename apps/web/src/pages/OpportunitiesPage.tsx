@@ -85,7 +85,11 @@ export function OpportunitiesPage() {
 
       {data ? (
         <p className="muted" style={{ fontSize: "0.85rem" }}>
-          Universe {data.universeSize} · scanned {data.scanned} · {data.elapsedMs}ms · feed{" "}
+          Universe {data.universeSize} · scanned {data.scanned} · {data.elapsedMs}ms
+          {data.confirmElapsedMs != null && data.confirmElapsedMs > 0
+            ? ` (discover ${data.discoveryElapsedMs ?? "—"}ms · confirm ${data.confirmElapsedMs}ms)`
+            : ""}{" "}
+          · feed{" "}
           {(data.feed ?? "iex").toUpperCase()} · {data.disclaimer}
         </p>
       ) : (

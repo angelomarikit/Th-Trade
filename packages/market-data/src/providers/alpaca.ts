@@ -147,7 +147,12 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     // Sequential on purpose — parallel bursts were a primary source of Alpaca 429s
     // under six-symbol monitoring. The shared gate also spaces requests globally.
     const quote = await this.getQuote(sym);
-    const trade = await this.getLatestTrade(sym);
+    // Skip trade when quote mid is usable — saves one gated call without changing
+    // evaluateSetup inputs (still have quote + full bars).
+    const trade =
+      quote && quote.bid > 0 && quote.ask > 0
+        ? null
+        : await this.getLatestTrade(sym);
     const bars1m = await this.getBars({ symbol: sym, timeframe: "1Min", limit: 120 });
     const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78 });
 
@@ -174,10 +179,161 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     };
   }
 
+  /**
+   * Confirm-path batch: 1 snapshot chunk + multi-symbol 1m/5m bars (≈3 HTTP calls
+   * for a typical confirm set instead of ~24 sequential per-symbol calls).
+   */
+  async getSnapshots(symbols: string[]): Promise<MarketSnapshot[]> {
+    const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+    if (unique.length === 0) return [];
+
+    const quoteBySymbol = new Map<
+      string,
+      { quote: Quote | null; tradePrice: number | null; tradeTs: Date | null; lastPrice: number | null }
+    >();
+    const chunkSize = Math.max(1, Number(process.env.ALPACA_SNAPSHOT_CHUNK ?? 40) || 40);
+    const now = new Date();
+
+    for (let i = 0; i < unique.length; i += chunkSize) {
+      const chunk = unique.slice(i, i + chunkSize);
+      const url =
+        `${this.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(chunk.join(","))}` +
+        `&feed=${this.feed}`;
+      const data = await this.getJson<Record<string, AlpacaStockSnapshot>>(url);
+      for (const sym of chunk) {
+        const snap = data[sym];
+        if (!snap) {
+          quoteBySymbol.set(sym, {
+            quote: null,
+            tradePrice: null,
+            tradeTs: null,
+            lastPrice: null,
+          });
+          continue;
+        }
+        const q = snap.latestQuote;
+        const quote: Quote | null =
+          q?.bp != null &&
+          q?.ap != null &&
+          q.t &&
+          q.bp > 0 &&
+          q.ap > 0 &&
+          q.ap >= q.bp
+            ? {
+                symbol: sym,
+                bid: q.bp,
+                ask: q.ap,
+                bidSize: undefined,
+                askSize: undefined,
+                timestamp: new Date(q.t),
+              }
+            : null;
+        const tradePrice = snap.latestTrade?.p ?? null;
+        const tradeTs = snap.latestTrade?.t ? new Date(snap.latestTrade.t) : null;
+        const mid =
+          quote != null
+            ? (quote.bid + quote.ask) / 2
+            : (tradePrice ?? snap.minuteBar?.c ?? snap.dailyBar?.c ?? null);
+        quoteBySymbol.set(sym, { quote, tradePrice, tradeTs, lastPrice: mid });
+      }
+    }
+
+    const bars1mBy = await this.getMultiBars(unique, "1Min", 120);
+    const bars5mBy = await this.getMultiBars(unique, "5Min", 78);
+
+    const out: MarketSnapshot[] = [];
+    for (const sym of unique) {
+      const meta = quoteBySymbol.get(sym);
+      const bars1m = bars1mBy.get(sym) ?? [];
+      const bars5m = bars5mBy.get(sym) ?? [];
+      const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
+      const lastPrice = meta?.lastPrice ?? lastBar?.close ?? 0;
+      if (!(lastPrice > 0)) continue;
+      out.push({
+        symbol: sym,
+        lastPrice,
+        quote: meta?.quote ?? null,
+        bars1m,
+        bars5m,
+        receivedAt: now,
+        marketTimestamp:
+          meta?.quote?.timestamp ?? meta?.tradeTs ?? lastBar?.timestamp ?? null,
+      });
+    }
+    return out;
+  }
+
+  /** Alpaca multi-symbol bars — one gated HTTP call per timeframe (with page follow). */
+  private async getMultiBars(
+    symbols: string[],
+    timeframe: Bar["timeframe"],
+    limit: number,
+  ): Promise<Map<string, Bar[]>> {
+    const result = new Map<string, Bar[]>();
+    if (symbols.length === 0) return result;
+
+    const tf = mapTimeframe(timeframe);
+    const end = new Date();
+    const start = new Date(end.getTime() - lookbackForTimeframe(timeframe, limit));
+    const tfMs = timeframeMs(timeframe);
+    let pageToken: string | null = null;
+    let pages = 0;
+
+    do {
+      const params = new URLSearchParams({
+        symbols: symbols.join(","),
+        timeframe: tf,
+        limit: String(limit),
+        adjustment: "raw",
+        feed: this.feed,
+        sort: "asc",
+        start: start.toISOString(),
+        end: end.toISOString(),
+      });
+      if (pageToken) params.set("page_token", pageToken);
+      const url = `${this.baseUrl}/v2/stocks/bars?${params}`;
+      const data = await this.getJson<{
+        bars?: Record<string, AlpacaBar[] | null> | null;
+        next_page_token?: string | null;
+      }>(url);
+
+      const now = Date.now();
+      for (const [sym, rawBars] of Object.entries(data.bars ?? {})) {
+        const mapped = (rawBars ?? []).map((b) => {
+          const ts = new Date(b.t);
+          const barEnd = ts.getTime() + tfMs;
+          return {
+            symbol: sym.toUpperCase(),
+            timeframe,
+            timestamp: ts,
+            open: b.o,
+            high: b.h,
+            low: b.l,
+            close: b.c,
+            volume: b.v,
+            vwap: b.vw,
+            completed: barEnd <= now,
+          } satisfies Bar;
+        });
+        const prev = result.get(sym.toUpperCase()) ?? [];
+        result.set(sym.toUpperCase(), prev.concat(mapped));
+      }
+      pageToken = data.next_page_token ?? null;
+      pages += 1;
+    } while (pageToken && pages < 4);
+
+    // Trim to requested limit (keep newest)
+    for (const [sym, bars] of result) {
+      if (bars.length > limit) {
+        result.set(sym, bars.slice(-limit));
+      }
+    }
+    return result;
+  }
 
   /**
    * Batch discovery snapshots — one HTTP call per chunk (default 40 symbols).
-   * Does not pull full 1m/5m history; use getSnapshot for confirmation.
+   * Does not pull full 1m/5m history; use getSnapshot / getSnapshots for confirmation.
    */
   async getDiscoverySnapshots(symbols: string[]): Promise<DiscoverySnapshot[]> {
     const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];

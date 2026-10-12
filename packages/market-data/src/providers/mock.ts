@@ -87,6 +87,14 @@ export class MockMarketDataProvider implements MarketDataProvider {
     };
   }
 
+  async getSnapshots(symbols: string[]): Promise<MarketSnapshot[]> {
+    const out: MarketSnapshot[] = [];
+    for (const raw of symbols) {
+      out.push(await this.getSnapshot(raw));
+    }
+    return out;
+  }
+
   async getDiscoverySnapshots(symbols: string[]): Promise<DiscoverySnapshot[]> {
     const out: DiscoverySnapshot[] = [];
     for (const raw of symbols) {

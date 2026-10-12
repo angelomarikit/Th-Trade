@@ -12,14 +12,67 @@ import { useTerminal } from "../context/TerminalContext";
 import { fmtR } from "../lib/format";
 import { EmptyState } from "../components/common/EmptyState";
 
+function MeasuredPanel({
+  title,
+  badge,
+  measured,
+}: {
+  title: string;
+  badge: string;
+  measured: MeasuredPerformanceResponse | null;
+}) {
+  if (!measured) return null;
+  return (
+    <div className="panel" style={{ flex: "1 1 280px" }}>
+      <div className="panel-h">
+        <h3>{title}</h3>
+        <span className="badge">{badge}</span>
+      </div>
+      <div className="tab-body">
+        <p className="muted" style={{ fontSize: "0.8rem" }}>
+          {measured.overall.note}
+        </p>
+        <div className="metric-grid">
+          <div>
+            <label>Samples</label>
+            <strong>{measured.overall.sampleSize}</strong>
+          </div>
+          <div>
+            <label>Resolved</label>
+            <strong>{measured.overall.resolved}</strong>
+          </div>
+          <div>
+            <label>Win %</label>
+            <strong>
+              {measured.overall.winRatePct != null
+                ? `${measured.overall.winRatePct.toFixed(0)}%`
+                : "—"}
+            </strong>
+          </div>
+          <div>
+            <label>Avg R</label>
+            <strong>{fmtR(measured.overall.avgOutcomeR)}</strong>
+          </div>
+          <div>
+            <label>liveValidated</label>
+            <strong>{measured.overall.liveValidatedCount}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BacktestPage() {
   const { symbol } = useTerminal();
   const [strategies, setStrategies] = useState<Array<{ id: string; name: string }>>([]);
   const [strategyId, setStrategyId] = useState("VWAP_RECLAIM");
   const [edge, setEdge] = useState<EdgeResponse | null>(null);
   const [compare, setCompare] = useState<BacktestCompareResponse | null>(null);
-  const [measured, setMeasured] = useState<MeasuredPerformanceResponse | null>(null);
-  const [source, setSource] = useState<"ALL" | "LIVE" | "HISTORICAL_REPLAY">("ALL");
+  const [measuredLive, setMeasuredLive] = useState<MeasuredPerformanceResponse | null>(null);
+  const [measuredReplay, setMeasuredReplay] = useState<MeasuredPerformanceResponse | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,20 +92,22 @@ export function BacktestPage() {
     setLoading(true);
     setError(null);
     try {
-      const [e, c, m] = await Promise.all([
+      const [e, c, live, replay] = await Promise.all([
         fetchEdge(symbol, strategyId),
         fetchBacktestCompare(symbol),
-        fetchMeasuredPerformance(source),
+        fetchMeasuredPerformance("LIVE"),
+        fetchMeasuredPerformance("HISTORICAL_REPLAY"),
       ]);
       setEdge(e);
       setCompare(c);
-      setMeasured(m);
+      setMeasuredLive(live);
+      setMeasuredReplay(replay);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [symbol, strategyId, source]);
+  }, [symbol, strategyId]);
 
   useEffect(() => {
     void reload();
@@ -65,9 +120,9 @@ export function BacktestPage() {
     <div className="page">
       <h1 className="page-title">Backtesting & measured performance</h1>
       <p className="page-sub">
-        Phase 6 — historical strategy compare for {symbol}, plus durable scanner history stats.
-        Auto-trading disabled. Rates withheld until sample floors are met. Not a published accuracy
-        claim.
+        Phase 6 — historical strategy compare for {symbol}, plus durable scanner history.
+        LIVE and HISTORICAL_REPLAY are shown separately so hypothetical replay never mixes with
+        live outcomes. Auto-trading disabled. Rates withheld until sample floors are met.
       </p>
 
       <div className="row gap" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
@@ -85,17 +140,6 @@ export function BacktestPage() {
             )}
           </select>
         </label>
-        <label className="muted" style={{ fontSize: "0.85rem" }}>
-          History source{" "}
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value as typeof source)}
-          >
-            <option value="ALL">ALL</option>
-            <option value="LIVE">LIVE only</option>
-            <option value="HISTORICAL_REPLAY">REPLAY only</option>
-          </select>
-        </label>
         <button type="button" className="btn" disabled={loading} onClick={() => void reload()}>
           Refresh
         </button>
@@ -103,6 +147,24 @@ export function BacktestPage() {
 
       {loading && <p className="disclaimer">Computing…</p>}
       {error && <EmptyState badge="Error" title="Unavailable" body={error} />}
+
+      {!loading && !error && (
+        <section style={{ marginBottom: "1.25rem" }}>
+          <h2>Measured performance (separated sources)</h2>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Use LIVE for scanner soak outcomes. Use REPLAY only for offline historical simulation.
+            liveValidated counts toward launch confidence; raw LIVE alone is not a published edge.
+          </p>
+          <div className="row gap" style={{ flexWrap: "wrap", marginTop: "0.75rem" }}>
+            <MeasuredPanel title="LIVE scanner history" badge="LIVE" measured={measuredLive} />
+            <MeasuredPanel
+              title="Historical replay"
+              badge="REPLAY"
+              measured={measuredReplay}
+            />
+          </div>
+        </section>
+      )}
 
       {!loading && !error && insufficient && (
         <EmptyState
@@ -148,7 +210,7 @@ export function BacktestPage() {
 
       {compare && compare.strategies.length > 0 ? (
         <section style={{ marginTop: "1.25rem" }}>
-          <h2>Strategy compare</h2>
+          <h2>Strategy compare (walk-forward)</h2>
           <p className="muted" style={{ fontSize: "0.85rem" }}>
             {compare.disclaimer}
           </p>
@@ -176,68 +238,6 @@ export function BacktestPage() {
               </tbody>
             </table>
           </div>
-        </section>
-      ) : null}
-
-      {measured ? (
-        <section style={{ marginTop: "1.25rem" }}>
-          <h2>Measured scanner history</h2>
-          <p className="muted" style={{ fontSize: "0.85rem" }}>
-            {measured.disclaimer} Records considered: {measured.recordsConsidered}.{" "}
-            {measured.overall.note}
-          </p>
-          <div className="metric-grid">
-            <div>
-              <label>Samples</label>
-              <strong>{measured.overall.sampleSize}</strong>
-            </div>
-            <div>
-              <label>Resolved</label>
-              <strong>{measured.overall.resolved}</strong>
-            </div>
-            <div>
-              <label>Win %</label>
-              <strong>
-                {measured.overall.winRatePct != null
-                  ? `${measured.overall.winRatePct.toFixed(0)}%`
-                  : "—"}
-              </strong>
-            </div>
-            <div>
-              <label>Avg R</label>
-              <strong>{fmtR(measured.overall.avgOutcomeR)}</strong>
-            </div>
-            <div>
-              <label>liveValidated</label>
-              <strong>{measured.overall.liveValidatedCount}</strong>
-            </div>
-          </div>
-          {measured.bySymbol.length > 0 ? (
-            <div className="table-wrap" style={{ marginTop: "0.75rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th>n</th>
-                    <th>W/L</th>
-                    <th>Win %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {measured.bySymbol.slice(0, 12).map((b) => (
-                    <tr key={b.key}>
-                      <td>{b.key}</td>
-                      <td>{b.sampleSize}</td>
-                      <td>
-                        {b.wins}/{b.losses}
-                      </td>
-                      <td>{b.winRatePct != null ? `${b.winRatePct.toFixed(0)}%` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
         </section>
       ) : null}
     </div>

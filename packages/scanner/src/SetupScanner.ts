@@ -1,7 +1,14 @@
 import { evaluateSetup, type LiveSetupCard, type OptionsCardInfo } from "@wulu/confirmation";
 import type { TradeSide } from "@wulu/domain";
-import type { MarketDataProvider } from "@wulu/market-data";
-import type { MarketReactionContext, NewsService } from "@wulu/news";
+import type { MarketDataProvider, MarketSnapshot } from "@wulu/market-data";
+import {
+  buildWhyMoving,
+  selectPrimaryCatalystForTicker,
+  type CatalystEvent,
+  type MarketReactionContext,
+  type NewsService,
+  type WhyMovingBlock,
+} from "@wulu/news";
 import {
   buildMorningBrief,
   buildRelativeMomentum,
@@ -23,6 +30,12 @@ export interface ScanSetupRequest {
   marketReaction?: MarketReactionContext;
   /** When false, skip journal write (default true if journal configured) */
   recordJournal?: boolean;
+  /** Reuse a pre-fetched snapshot (discovery confirm batch). */
+  preloadedSnapshot?: MarketSnapshot;
+  /** Reuse catalyst from a batch news fetch (discovery confirm). */
+  preloadedCatalyst?: { why: WhyMovingBlock; event: CatalystEvent | null };
+  /** Skip options engine — confirm path only needs setup state/gates. */
+  skipOptions?: boolean;
 }
 
 export interface ScanSetupResult {
@@ -74,15 +87,19 @@ export class SetupScanner {
 
   async scanWithJournal(request: ScanSetupRequest): Promise<ScanSetupResult> {
     const symbol = request.symbol.toUpperCase();
-    const snapshot = await this.marketData.getSnapshot(symbol);
-
+    const snapshot =
+      request.preloadedSnapshot ?? (await this.marketData.getSnapshot(symbol));
 
     const reaction: MarketReactionContext =
       request.marketReaction ??
       inferReactionFromSnapshot(snapshot.lastPrice, snapshot);
 
+    const catalystPromise = request.preloadedCatalyst
+      ? Promise.resolve(request.preloadedCatalyst)
+      : this.news.getCatalystForTicker(symbol, reaction);
+
     const [{ why, event }, regimeCtx] = await Promise.all([
-      this.news.getCatalystForTicker(symbol, reaction),
+      catalystPromise,
       this.regimeService.getContextForSymbol(symbol, request.side, snapshot),
     ]);
 
@@ -175,7 +192,17 @@ export class SetupScanner {
 
     card = {
       ...card,
-      options: await this.resolveOptions(card),
+      options: request.skipOptions
+        ? {
+            enabled: false,
+            eligible: false,
+            reason: "Options skipped for confirm-path latency",
+            direction: null,
+            bestContract: null,
+            whyThisContract: [],
+            automaticOrders: false,
+          }
+        : await this.resolveOptions(card),
     };
 
     let journalEntry: JournalEntry | null = null;
@@ -250,6 +277,8 @@ export class SetupScanner {
     universeSize: number;
     scanned: number;
     elapsedMs: number;
+    discoveryElapsedMs: number;
+    confirmElapsedMs: number;
     long: ScoredOpportunity[];
     short: ScoredOpportunity[];
     confirmed: Array<{
@@ -279,11 +308,12 @@ export class SetupScanner {
     const snaps = await this.marketData.getDiscoverySnapshots(universe);
 
     const catalystBySymbol: Record<string, { boost: number; headline: string | null }> = {};
+    let discoveryEvents: CatalystEvent[] = [];
     try {
-      const events = await this.news.getCatalystEvents({
+      discoveryEvents = await this.news.getCatalystEvents({
         tickers: snaps.slice(0, 40).map((s) => s.symbol),
       });
-      for (const ev of events.slice(0, 80)) {
+      for (const ev of discoveryEvents.slice(0, 80)) {
         for (const t of ev.tickers ?? []) {
           const sym = String(t).toUpperCase();
           const importance = Number(ev.scores?.catalystImportance?.score ?? 0);
@@ -304,6 +334,7 @@ export class SetupScanner {
     const scored = scoreDiscoveryUniverse({ snaps, catalystBySymbol });
     const long = scored.long.slice(0, topN).map((r, i) => ({ ...r, rank: i + 1 }));
     const short = scored.short.slice(0, topN).map((r, i) => ({ ...r, rank: i + 1 }));
+    const discoveryElapsedMs = Date.now() - started;
 
     const confirmed: Array<{
       symbol: string;
@@ -315,15 +346,44 @@ export class SetupScanner {
       rewardToRisk: number;
       qualityScore10: number | null;
     }> = [];
+    let confirmElapsedMs = 0;
 
     if (confirmTop > 0) {
+      const confirmStarted = Date.now();
       const toConfirm = [
         ...long.slice(0, confirmTop).map((r) => ({ ...r, side: "LONG" as const })),
         ...short.slice(0, confirmTop).map((r) => ({ ...r, side: "SHORT" as const })),
       ];
+      const confirmSymbols = [...new Set(toConfirm.map((r) => r.symbol))];
+
+      const snapBySymbol = new Map<string, MarketSnapshot>();
+      try {
+        if (this.marketData.getSnapshots) {
+          const batch = await this.marketData.getSnapshots(confirmSymbols);
+          for (const s of batch) snapBySymbol.set(s.symbol, s);
+        }
+      } catch {
+        // Fall back to per-symbol getSnapshot inside scan
+      }
+
+      try {
+        await this.regimeService.warmForSymbols(confirmSymbols);
+      } catch {
+        // Per-scan regime fetch still works
+      }
+
       for (const row of toConfirm) {
         try {
-          const card = await this.scan({ symbol: row.symbol, side: row.side, recordJournal: false });
+          const event = selectPrimaryCatalystForTicker(discoveryEvents, row.symbol);
+          const why = buildWhyMoving(event);
+          const card = await this.scan({
+            symbol: row.symbol,
+            side: row.side,
+            recordJournal: false,
+            skipOptions: true,
+            preloadedSnapshot: snapBySymbol.get(row.symbol),
+            preloadedCatalyst: { why, event },
+          });
           confirmed.push({
             symbol: row.symbol,
             side: row.side,
@@ -338,6 +398,7 @@ export class SetupScanner {
           // Skip failed confirmation — never invent ENTRY ACTIVE
         }
       }
+      confirmElapsedMs = Date.now() - confirmStarted;
     }
 
     return {
@@ -345,6 +406,8 @@ export class SetupScanner {
       universeSize: universe.length,
       scanned: snaps.length,
       elapsedMs: Date.now() - started,
+      discoveryElapsedMs,
+      confirmElapsedMs,
       long: long as ScoredOpportunity[],
       short: short as ScoredOpportunity[],
       confirmed,

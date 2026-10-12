@@ -448,6 +448,8 @@ export interface OpportunitiesResponse {
   universeSize: number;
   scanned: number;
   elapsedMs: number;
+  discoveryElapsedMs?: number;
+  confirmElapsedMs?: number;
   long: OpportunityRow[];
   short: OpportunityRow[];
   confirmed: Array<{

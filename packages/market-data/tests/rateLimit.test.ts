@@ -138,6 +138,71 @@ describe("Alpaca request pacing", () => {
     await provider.getSnapshot("NVDA");
     expect(maxInFlight).toBe(1);
   });
+
+  it("getSnapshots batches quotes + multi bars (few HTTP calls)", async () => {
+    resetSharedAlpacaGate({ minIntervalMs: 0, sleep: async () => undefined });
+    const urls: string[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("/snapshots")) {
+        return json({
+          AAA: {
+            latestQuote: { t: new Date().toISOString(), bp: 10, ap: 10.1 },
+            latestTrade: { p: 10.05, t: new Date().toISOString() },
+          },
+          BBB: {
+            latestQuote: { t: new Date().toISOString(), bp: 20, ap: 20.1 },
+            latestTrade: { p: 20.05, t: new Date().toISOString() },
+          },
+        });
+      }
+      if (url.includes("/v2/stocks/bars")) {
+        return json({
+          bars: {
+            AAA: [
+              {
+                t: new Date(Date.now() - 60_000).toISOString(),
+                o: 10,
+                h: 11,
+                l: 9,
+                c: 10.05,
+                v: 1000,
+                vw: 10,
+              },
+            ],
+            BBB: [
+              {
+                t: new Date(Date.now() - 60_000).toISOString(),
+                o: 20,
+                h: 21,
+                l: 19,
+                c: 20.05,
+                v: 2000,
+                vw: 20,
+              },
+            ],
+          },
+        });
+      }
+      return json({});
+    };
+
+    const provider = new AlpacaMarketDataProvider({
+      apiKeyId: "k",
+      apiSecretKey: "s",
+      fetchImpl,
+      requestGate: new AlpacaRequestGate({ minIntervalMs: 0, sleep: async () => undefined }),
+      maxRetries: 0,
+    });
+
+    const snaps = await provider.getSnapshots(["AAA", "BBB"]);
+    expect(snaps).toHaveLength(2);
+    // 1 snapshots + 2 multi-bar timeframes (not 2×4 per-symbol)
+    expect(urls.length).toBeLessThanOrEqual(4);
+    expect(urls.some((u) => u.includes("/snapshots"))).toBe(true);
+    expect(urls.filter((u) => u.includes("/v2/stocks/bars")).length).toBe(2);
+  });
 });
 
 function json(body: unknown): Response {
