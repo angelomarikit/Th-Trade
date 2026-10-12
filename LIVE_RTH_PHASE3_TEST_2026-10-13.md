@@ -1,7 +1,12 @@
-# Live RTH Phase 3 test — 2026-10-13 (Mon session)
+# Live RTH Phase 3 test — US session **Monday 2026-10-12** (~14:04 ET)
 
-**Time of capture:** ~14:04 ET (RTH open)  
-**Production API commit:** `1bc9c43` (pre-persistence tip; follow-up deploy in same day)  
+**Calendar / timezone note:**  
+- UI clock and market session use **America/New_York**.  
+- Capture was **Mon 14:04 ET on 2026-10-12** (RTH).  
+- In UTC+8 that same moment falls on **Tuesday 2026-10-13** morning — hence the date confusion.  
+- Weekday on the TopBar (`formatEtClock`) is correct for ET; reports should always label the **ET trading date**.
+
+**Production API commit at capture:** `1bc9c43` (later tips: `cd48306`+)  
 **UI:** https://web-tawny-iota-56.vercel.app/watchlist  
 **Feed:** Alpaca IEX · badge **RTH** · **FEED OK** · **SIGNALS ONLY** · auto-trading **disabled**
 

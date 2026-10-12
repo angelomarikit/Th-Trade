@@ -24,8 +24,8 @@ describe("audit: levels + indicator helpers", () => {
     const prior = completed.at(-2);
     expect(prior).toBeTruthy();
     expect(levels.trigger).toBe(prior!.high);
-    expect(levels.stop).toBeLessThan(levels.trigger);
-    expect(levels.target1).toBeGreaterThan(levels.trigger);
+    expect(levels.stop).toBeLessThan(levels.entryZoneLow);
+    expect(levels.target1).toBeGreaterThan(levels.entryZoneHigh);
     expect(levels.target2).toBeGreaterThan(levels.target1);
   });
 

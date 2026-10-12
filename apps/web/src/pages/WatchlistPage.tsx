@@ -309,6 +309,7 @@ function MonitorCard({
         <span>
           R:R:{" "}
           {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}:1` : "—"}
+          {row.rewardToRisk != null && row.rewardToRisk < 2 ? " (below 2R — no ENTRY)" : ""}
         </span>
         <span>Dist: {row.distanceLabel ?? "—"}</span>
         <span>
