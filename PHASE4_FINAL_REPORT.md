@@ -2,9 +2,10 @@
 
 **Trading date (ET):** Monday **2026-10-12** (RTH)  
 **Operator local (UTC+8):** Tuesday 2026-10-13 morning — reports use **ET trading date**.  
-**Production tip on `main`:** `da69eda`  
-**API verified live (pre/post redeploy):** geometry + mirrors on `91137ac`; persist-gate tip `da69eda` deploying via Railway/Vercel from `main`  
-**UI:** https://web-tawny-iota-56.vercel.app  
+**Production tip on `main`:** `063d2a4`  
+**Railway:** deployment `e3a7a747` **SUCCESS** (2026-10-13 03:20 +08) — hub cycle ~40s, 6 pairs, 0 failed scans, `automaticOrders=false`  
+**Note:** `railway up` from source may leave `/health.gitCommit` null; code matches tip `063d2a4` on `main`.  
+**UI:** https://web-tawny-iota-56.vercel.app (Vercel from `main`, includes ET timestamps)  
 **Auto-trading:** **disabled**
 
 ## Summary
@@ -38,8 +39,8 @@ Phase 4 durable history, outcome tracking, alert restart safety, R:R geometry, E
 
 | Surface | Commit / note |
 |---------|----------------|
-| GitHub `main` | `da69eda` |
-| Railway API | Redeploy triggered from `main`; confirm `/health.gitCommit` after build finishes |
+| GitHub `main` | `063d2a4` |
+| Railway API | `e3a7a747` SUCCESS · cycle ~40s · auto off |
 | Vercel web | Auto-deploy from `main` (includes ET card timestamps) |
 
 ### 3. Full signal lifecycle (historical)
@@ -86,11 +87,12 @@ Not captured this pass. Discipline held: **no gate lowering**. Continue soaking 
 | `91137ac` | Level geometry (T1 beyond entry) + open-track mirrors |
 | `a86adb3` | Watchlist ET timestamps |
 | `da69eda` | Live history gate + replay openTracks + lifecycle script |
+| `063d2a4` | Persist-gate TypeScript fix (`timestamp`) — Railway build green |
 
 ## Remaining attention
 
 1. **Apply** `20261013_phase4_open_tracks.sql` in Supabase (dedicated tables).
-2. Confirm Railway `/health` shows `da69eda` after deploy completes.
+2. Optionally set Railway GitHub commit metadata so `/health.gitCommit` is non-null.
 3. Capture a **real** live ENTRY ACTIVE → outcome without relaxing rules.
 4. Optional: archive/prune pre-gate LIVE tick spam once comfortable.
 5. Keep auto-trading **off**; do not publish win rates from hypothetical replay.
