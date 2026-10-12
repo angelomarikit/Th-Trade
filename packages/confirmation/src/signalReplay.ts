@@ -5,6 +5,7 @@ import type { LiveSetupCard } from "./liveCard.js";
 import {
   outcomeTags,
   SignalOutcomeTracker,
+  type OpenTrackedSignal,
   type OutcomeResolution,
 } from "./outcomeTracking.js";
 import type { RetestPhase } from "./retest.js";
@@ -29,6 +30,8 @@ export interface SignalReplayResult {
     barIndex: number;
   }>;
   outcomes: OutcomeResolution[];
+  /** Still-open tracked entries at end of replay (not yet stop/target). */
+  openTracks: OpenTrackedSignal[];
   disclaimer: string;
 }
 
@@ -124,6 +127,7 @@ export function runSignalReplay(input: {
     steps,
     transitions,
     outcomes,
+    openTracks: tracker.listOpen(),
     disclaimer:
       "Replay uses completed 5m OHLCV only. No invented ticks. Stops/targets inside the same bar are ambiguous. Hypothetical outcomes are NOT a live win rate. IEX ≠ consolidated volume. NOT LIVE.",
   };

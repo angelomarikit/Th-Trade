@@ -6,6 +6,7 @@ import {
   cardToPerformanceRecord,
   resolutionToPerformanceRecord,
   runSignalReplay,
+  SignalPersistGate,
   SignalOutcomeTracker,
 } from "@wulu/confirmation";
 import {
@@ -89,6 +90,8 @@ async function main() {
   const alertStore = new HybridAlertEventStore();
   const signalPerformanceStore = new HybridSignalPerformanceStore();
   const outcomeTracker = new SignalOutcomeTracker();
+  /** Prevents every ~40s tick from inserting a near-identical LIVE history row. */
+  const livePersistGate = new SignalPersistGate();
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 6),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
@@ -96,8 +99,11 @@ async function main() {
     alertStore,
     onSignalCard: (card, userId) => {
       const uid = userId === "default" ? null : userId;
-      signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE", uid));
       const track = outcomeTracker.onCard(card, uid, "LIVE", card.lastCompletedBar);
+      const forcePersist = Boolean(track.opened || track.resolution);
+      if (forcePersist || livePersistGate.shouldPersist(card, uid)) {
+        signalPerformanceStore.record(cardToPerformanceRecord(card, "LIVE", uid));
+      }
       if (track.opened) {
         signalPerformanceStore.upsert({
           ...cardToPerformanceRecord(card, "LIVE", uid),
@@ -847,7 +853,33 @@ async function main() {
                 null,
               ),
             );
+            void closeOpenTrack(resolution.id);
           }
+        }
+        for (const open of replay.openTracks) {
+          void upsertOpenTrack(open);
+          signalPerformanceStore.upsert({
+            ...cardToPerformanceRecord(
+              replay.steps.find((s) => s.card.setupId === open.setupId)?.card ??
+                replay.steps[replay.steps.length - 1]!.card,
+              "HISTORICAL_REPLAY",
+              null,
+            ),
+            id: open.id,
+            actionable: true,
+            outcomeStatus: "UNKNOWN",
+            confirmationSummary: [
+              "outcomeDetail:OPEN",
+              `entryPrice:${open.entryPrice}`,
+              `stop:${open.stop}`,
+              `target1:${open.target1}`,
+              `target2:${open.target2}`,
+              `target3:${open.target3 ?? ""}`,
+              `barsElapsed:${open.barsElapsed}`,
+              `source:${open.source}`,
+              `setupId:${open.setupId}`,
+            ],
+          });
         }
         return json(res, 200, {
           ...replay,
