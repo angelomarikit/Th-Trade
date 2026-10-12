@@ -39,7 +39,7 @@ Ranking never grants ENTRY ACTIVE.
 - [x] Discovery scorer (LONG/SHORT)  
 - [x] `GET /v1/opportunities` + promote to monitor  
 - [x] Tests + Opportunities UI  
-- [ ] Deploy  
+- [x] Deploy (`e260fa2` — live `/v1/opportunities` ~1.8s for 95 symbols)  
 
 ### Live market
 
