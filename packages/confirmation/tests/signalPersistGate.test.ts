@@ -7,7 +7,7 @@ function card(partial: Partial<LiveSetupCard> & { state: string; setupId: string
     symbol: "SPY",
     side: "LONG",
     evaluatedAt: new Date().toISOString(),
-    lastCompletedBar: { asOf: "2026-10-12T18:00:00Z", open: 1, high: 1, low: 1, close: 1, volume: 1, completed: true },
+    lastCompletedBar: { high: 1, low: 1, close: 1, timestamp: "2026-10-12T18:00:00Z" },
     ...partial,
   } as LiveSetupCard;
 }
@@ -28,13 +28,10 @@ describe("SignalPersistGate", () => {
       state: "WAIT",
       setupId: "QQQ:LONG:200",
       lastCompletedBar: {
-        asOf: "2026-10-12T18:00:00Z",
-        open: 1,
         high: 1,
         low: 1,
         close: 1,
-        volume: 1,
-        completed: true,
+        timestamp: "2026-10-12T18:00:00Z",
       },
     });
     expect(gate.shouldPersist(a, "u1")).toBe(true);
@@ -43,13 +40,10 @@ describe("SignalPersistGate", () => {
         {
           ...a,
           lastCompletedBar: {
-            asOf: "2026-10-12T18:05:00Z",
-            open: 1,
             high: 1,
             low: 1,
             close: 1,
-            volume: 1,
-            completed: true,
+            timestamp: "2026-10-12T18:05:00Z",
           },
         },
         "u1",

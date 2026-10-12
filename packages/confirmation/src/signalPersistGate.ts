@@ -18,7 +18,7 @@ export class SignalPersistGate {
   /** Returns true when this card should be written to durable history. */
   shouldPersist(card: LiveSetupCard, userId: string | null | undefined): boolean {
     const k = this.key(userId, card.setupId);
-    const barAsOf = card.lastCompletedBar?.asOf ?? null;
+    const barAsOf = card.lastCompletedBar?.timestamp ?? null;
     const prev = this.last.get(k);
     this.last.set(k, { state: card.state, barAsOf });
 
