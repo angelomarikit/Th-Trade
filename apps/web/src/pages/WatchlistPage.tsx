@@ -12,7 +12,7 @@ import {
   type MonitorSnapshot,
   type MonitorSymbolState,
 } from "../lib/api";
-import { fmtPct, fmtPrice } from "../lib/format";
+import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
 
 export function WatchlistPage() {
   const { session } = useAuth();
@@ -139,7 +139,7 @@ export function WatchlistPage() {
         >
           {snap?.running ? "RUNNING" : "IDLE"} · hub ticks {snap?.hub?.tickCount ?? snap?.tickCount ?? 0}
           {snap?.hub?.lastCycleMs != null ? ` · cycle ${snap.hub.lastCycleMs}ms` : ""}
-          {snap?.lastTickAt ? ` · last ${new Date(snap.lastTickAt).toLocaleTimeString()}` : ""}
+          {snap?.lastTickAt ? ` · last ${formatEtTime(snap.lastTickAt)}` : ""}
         </span>
         <button type="button" className="scan-btn" disabled={busy} onClick={() => void loadDefaultSix()}>
           Load default six
@@ -235,7 +235,7 @@ export function WatchlistPage() {
             <tbody>
               {events.map((ev) => (
                 <tr key={ev.id}>
-                  <td>{new Date(ev.eventAt).toLocaleTimeString()}</td>
+                  <td>{formatEtTime(ev.eventAt)}</td>
                   <td>{ev.symbol}</td>
                   <td>
                     {ev.previousStatus} → {ev.newStatus}
@@ -329,7 +329,7 @@ function MonitorCard({
         </span>
         <span>
           Data:{" "}
-          {row.marketDataAt ? new Date(row.marketDataAt).toLocaleTimeString() : "—"}
+          {row.marketDataAt ? formatEtTime(row.marketDataAt) : "—"}
         </span>
       </div>
       {row.actionHint ? (

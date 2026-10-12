@@ -38,6 +38,21 @@ export function formatEtClock(d: Date = new Date()): string {
   );
 }
 
+/** Short ET clock for card/hub timestamps (avoids local UTC+8 misreads). */
+export function formatEtTime(d: Date | string | number): string {
+  const date = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(date.getTime())) return "—";
+  return (
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(date) + " ET"
+  );
+}
+
 export function statusTag(status: string): "PASS" | "FAIL" | "WAIT" | "UNKNOWN" {
   const s = status.toUpperCase();
   if (s.includes("PASS")) return "PASS";
