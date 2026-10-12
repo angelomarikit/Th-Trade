@@ -28,7 +28,15 @@
 
 **Timing fields:** response now includes `discoveryElapsedMs` + `confirmElapsedMs` (shown on Opportunities page).
 
-**Target:** confirm batch well under 60s on Basic IEX; re-measure on production after deploy (AH vs RTH will differ).
+**Production re-measure (deploy `35071ab9` / commit `5fc90a6`, AH window):**
+
+| Metric | Before | After |
+|--------|--------|-------|
+| `confirm=3` confirm path | ~165s | **~8.8–12s** (`confirmElapsedMs`) |
+| Full `/v1/opportunities?confirm=3` | ~165s+ | **~12s wall** |
+| Discovery-only | ~5–8s | ~2–3s |
+
+Gates unchanged (full `evaluateSetup`, min 2R, no auto-trade). RTH may differ slightly under load.
 
 ## Phase 5 RTH (parallel — still open)
 
