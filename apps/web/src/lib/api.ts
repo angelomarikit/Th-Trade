@@ -254,12 +254,19 @@ export interface CatalystResponse {
 
 export interface EdgeResponse {
   panel: {
+    strategyId?: string;
     strategyName: string;
     sampleSize: number;
     winRatePct: number | null;
     expectancyR: number | null;
     disclaimer: string;
     collapsedSummary?: string;
+    walkForward?: {
+      trainExpectancyR: number | null;
+      validationExpectancyR: number | null;
+      oosExpectancyR: number | null;
+      expectancyDegradationR: number | null;
+    };
   };
   text: string;
 }
@@ -316,6 +323,75 @@ export function fetchCatalyst(ticker: string) {
 export function fetchEdge(ticker: string, strategy = "VWAP_RECLAIM") {
   return getJson<EdgeResponse>(
     `/v1/edge?ticker=${encodeURIComponent(ticker)}&strategy=${encodeURIComponent(strategy)}`,
+  );
+}
+
+export function fetchStrategies() {
+  return getJson<{
+    strategies: Array<{ id: string; name: string; description?: string }>;
+    note?: string;
+  }>("/v1/strategies");
+}
+
+export interface BacktestCompareResponse {
+  ticker: string;
+  barCount: number;
+  count: number;
+  strategies: Array<{
+    strategyId: string;
+    strategyName: string;
+    sampleSize: number;
+    winRatePct: number | null;
+    expectancyR: number | null;
+    walkForward: {
+      trainExpectancyR: number | null;
+      validationExpectancyR: number | null;
+      oosExpectancyR: number | null;
+      expectancyDegradationR: number | null;
+    } | null;
+    disclaimer: string;
+  }>;
+  disclaimer: string;
+  automaticOrders: false;
+}
+
+export function fetchBacktestCompare(ticker: string) {
+  return getJson<BacktestCompareResponse>(
+    `/v1/backtest/compare?ticker=${encodeURIComponent(ticker)}`,
+  );
+}
+
+export interface MeasuredPerformanceResponse {
+  minSampleForRate: number;
+  sourceFilter: string;
+  overall: {
+    key: string;
+    sampleSize: number;
+    resolved: number;
+    wins: number;
+    losses: number;
+    ambiguous: number;
+    winRatePct: number | null;
+    avgOutcomeR: number | null;
+    liveValidatedCount: number;
+    actionableCount: number;
+    note: string;
+  };
+  bySymbol: Array<{
+    key: string;
+    sampleSize: number;
+    wins: number;
+    losses: number;
+    winRatePct: number | null;
+  }>;
+  disclaimer: string;
+  recordsConsidered: number;
+  automaticOrders: false;
+}
+
+export function fetchMeasuredPerformance(source: "ALL" | "LIVE" | "HISTORICAL_REPLAY" = "ALL") {
+  return getJson<MeasuredPerformanceResponse>(
+    `/v1/measured-performance?source=${encodeURIComponent(source)}`,
   );
 }
 

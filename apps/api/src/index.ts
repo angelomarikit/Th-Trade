@@ -20,6 +20,7 @@ import { createNewsServiceFromEnv } from "@wulu/news";
 import { listStrategies } from "@wulu/strategies";
 import { summarizeJournal } from "@wulu/journal";
 import { formatBestContractCard } from "@wulu/options";
+import { aggregateMeasuredPerformance } from "@wulu/backtest";
 import {
   createMarketDataFromEnv,
   createOptionsEngineFromEnv,
@@ -1058,6 +1059,61 @@ async function main() {
         return json(res, 200, { panel, text });
       }
 
+      // Phase 6: multi-strategy historical compare on the same bars
+      if (url.pathname === "/v1/backtest/compare" && req.method === "GET") {
+        const ticker = (url.searchParams.get("ticker") ?? "SPY").toUpperCase();
+        const strategiesParam = url.searchParams.get("strategies");
+        const strategyIds = strategiesParam?.trim()
+          ? strategiesParam.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined;
+        const snap = await marketData.getSnapshot(ticker);
+        const bars = snap.bars5m.length >= 20 ? snap.bars5m : snap.bars1m;
+        const compared = scanner.edge.compareStrategies({
+          symbol: ticker,
+          bars,
+          strategyIds,
+          regimePrimary: url.searchParams.get("regime") ?? undefined,
+        });
+        return json(res, 200, {
+          ticker,
+          barCount: bars.length,
+          count: compared.length,
+          strategies: compared.map((c) => ({
+            strategyId: c.panel.strategyId,
+            strategyName: c.panel.strategyName,
+            sampleSize: c.panel.sampleSize,
+            winRatePct: c.panel.winRatePct,
+            expectancyR: c.panel.expectancyR,
+            walkForward: c.panel.walkForward ?? null,
+            disclaimer: c.panel.disclaimer,
+          })),
+          disclaimer:
+            "Historical backtest compare — not live performance. Insufficient samples show null rates. Auto-trading disabled.",
+          automaticOrders: false,
+        });
+      }
+
+      // Phase 6: measured performance from durable signal history
+      if (url.pathname === "/v1/measured-performance" && req.method === "GET") {
+        const sourceParam = (url.searchParams.get("source") ?? "ALL").toUpperCase();
+        const source =
+          sourceParam === "LIVE" || sourceParam === "HISTORICAL_REPLAY" ? sourceParam : "ALL";
+        const minSample = Math.min(
+          Math.max(Number(url.searchParams.get("minSample") ?? 20), 5),
+          200,
+        );
+        const records = await signalPerformanceStore.listMerged(500, null);
+        const report = aggregateMeasuredPerformance(records, {
+          source: source as "LIVE" | "HISTORICAL_REPLAY" | "ALL",
+          minSampleForRate: minSample,
+        });
+        return json(res, 200, {
+          ...report,
+          recordsConsidered: records.length,
+          note: "Foundation measured stats from stored rows — not a marketed accuracy claim.",
+        });
+      }
+
       if (url.pathname === "/v1/journal" && req.method === "GET") {
         if (!journal) {
           return json(res, 503, { error: "journal not enabled" });
@@ -1175,6 +1231,8 @@ async function main() {
     console.log("  GET /v1/replay?ticker=NVDA&side=LONG");
     console.log("  GET /v1/opportunities?top=15&confirm=0");
     console.log("  POST /v1/monitor/promote");
+    console.log("  GET /v1/backtest/compare?ticker=NVDA");
+    console.log("  GET /v1/measured-performance?source=ALL");
     console.log("  GET /v1/signal-performance");
     console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");

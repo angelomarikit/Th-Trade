@@ -6,3 +6,4 @@ export * from "./walkForward.js";
 export * from "./edgePanel.js";
 export * from "./fixtures.js";
 export * from "./HistoricalEdgeService.js";
+export * from "./measuredPerformance.js";

@@ -109,4 +109,42 @@ export class HistoricalEdgeService {
   listStrategyIds(): string[] {
     return listStrategies().map((s) => s.id);
   }
+
+  /**
+   * Phase 6: compare all (or selected) strategies on the same bars.
+   * Sorted by OOS expectancy then sample size. Empty samples kept for transparency.
+   */
+  compareStrategies(input: {
+    symbol: string;
+    bars: Bar[];
+    strategyIds?: string[];
+    regimePrimary?: string;
+    hasCatalyst?: boolean;
+  }): Array<{ panel: HistoricalEdgePanel; text: string }> {
+    const ids = input.strategyIds?.length ? input.strategyIds : this.listStrategyIds();
+    const rows: Array<{ panel: HistoricalEdgePanel; text: string }> = [];
+    for (const strategyId of ids) {
+      try {
+        rows.push(
+          this.compute({
+            strategyId,
+            symbol: input.symbol,
+            bars: input.bars,
+            regimePrimary: input.regimePrimary,
+            hasCatalyst: input.hasCatalyst,
+            includeWalkForward: true,
+          }),
+        );
+      } catch {
+        // skip unknown strategy ids
+      }
+    }
+    rows.sort((a, b) => {
+      const ae = a.panel.expectancyR ?? -999;
+      const be = b.panel.expectancyR ?? -999;
+      if (be !== ae) return be - ae;
+      return b.panel.sampleSize - a.panel.sampleSize;
+    });
+    return rows;
+  }
 }
