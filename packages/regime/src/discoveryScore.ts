@@ -147,27 +147,56 @@ function buildFeatures(
   };
 }
 
+/**
+ * Prefer relative strength + unusual volume + liquidity over raw day movers.
+ * A large day% with weak RVOL / no vs-SPY edge is capped (not a quality setup).
+ */
 function scoreSide(side: DiscoverySide, f: DiscoveryFeatures): number {
-  let score = 45;
+  let score = 42;
   const dir = side === "LONG" ? 1 : -1;
+  const rel = f.vsSpyPct != null ? f.vsSpyPct * dir : null;
+  const dayDir = f.dayChangePct != null ? f.dayChangePct * dir : null;
 
-  if (f.vsSpyPct != null) score += clamp(f.vsSpyPct * dir * 10, -22, 22);
-  if (f.vsSectorPct != null) score += clamp(f.vsSectorPct * dir * 6, -12, 12);
-  if (f.dayChangePct != null) score += clamp(f.dayChangePct * dir * 3, -10, 10);
-  if (f.gapPct != null) score += clamp(f.gapPct * dir * 2, -8, 8);
+  // Relative strength / sector — primary edge signals
+  if (rel != null) score += clamp(rel * 12, -24, 24);
+  if (f.vsSectorPct != null) score += clamp(f.vsSectorPct * dir * 7, -14, 14);
 
+  // Raw day move — secondary only (avoid "biggest mover" bias)
+  if (dayDir != null) score += clamp(dayDir * 1.5, -6, 6);
+  if (f.gapPct != null) score += clamp(f.gapPct * dir * 1.5, -5, 5);
+
+  // Unusual volume required for high ranks
   if (f.rvolProxy != null) {
-    if (f.rvolProxy >= 2) score += 12;
-    else if (f.rvolProxy >= 1.5) score += 8;
-    else if (f.rvolProxy < 0.7) score -= 8;
+    if (f.rvolProxy >= 2) score += 14;
+    else if (f.rvolProxy >= 1.5) score += 10;
+    else if (f.rvolProxy >= 1.2) score += 4;
+    else if (f.rvolProxy < 0.9) score -= 10;
+    else if (f.rvolProxy < 1.1) score -= 4;
   } else {
-    score -= 4;
+    score -= 8;
   }
 
+  // Liquidity / spread risk
   if (f.spreadPct != null) {
-    if (f.spreadPct > 0.5) score -= 10;
-    else if (f.spreadPct > 0.25) score -= 4;
+    if (f.spreadPct > 0.5) score -= 14;
+    else if (f.spreadPct > 0.25) score -= 7;
+    else if (f.spreadPct <= 0.15) score += 3;
   }
+
+  // Mover without relative edge or volume → not a top opportunity
+  if (dayDir != null && dayDir > 2) {
+    if (rel == null || rel < 0.35) score -= 12;
+    if (f.rvolProxy == null || f.rvolProxy < 1.2) score -= 12;
+  }
+
+  // Soft ceiling unless both relative strength and volume confirm
+  const qualityOk =
+    rel != null &&
+    rel >= 0.5 &&
+    f.rvolProxy != null &&
+    f.rvolProxy >= 1.3 &&
+    (f.spreadPct == null || f.spreadPct <= 0.35);
+  if (!qualityOk && score > 78) score = 78;
 
   return score;
 }

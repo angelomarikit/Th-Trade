@@ -69,6 +69,38 @@ describe("scoreDiscoveryUniverse", () => {
     expect(slowShort.rankScore).toBeGreaterThan(nvdaShort.rankScore);
   });
 
+  it("does not top-rank a large mover without volume and relative strength", () => {
+    const { long } = scoreDiscoveryUniverse({
+      snaps: [
+        snap({ symbol: "SPY", lastPrice: 100, prevClose: 100, dayVolume: 2e6, prevDayVolume: 2e6 }),
+        // Big green day but flat vs SPY-like market and weak volume
+        snap({
+          symbol: "PUMP",
+          lastPrice: 103.5,
+          prevClose: 100,
+          dayVolume: 4e5,
+          prevDayVolume: 1e6,
+          bid: 103.4,
+          ask: 103.6,
+        }),
+        // Modest outperformance with real volume
+        snap({
+          symbol: "QUAL",
+          lastPrice: 102,
+          prevClose: 100,
+          dayVolume: 2.5e6,
+          prevDayVolume: 1e6,
+          bid: 101.95,
+          ask: 102.05,
+        }),
+      ],
+    });
+    const pump = long.find((r) => r.symbol === "PUMP")!;
+    const qual = long.find((r) => r.symbol === "QUAL")!;
+    expect(qual.rankScore).toBeGreaterThan(pump.rankScore);
+    expect(pump.rankScore).toBeLessThanOrEqual(78);
+  });
+
   it("does not invent day change when prevClose missing", () => {
     const { features } = scoreDiscoveryUniverse({
       snaps: [snap({ symbol: "SPY" }), snap({ symbol: "ZZZ", prevClose: null })],
