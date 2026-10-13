@@ -11,6 +11,7 @@ import {
 import { useTerminal } from "../context/TerminalContext";
 import { fmtR } from "../lib/format";
 import { EmptyState } from "../components/common/EmptyState";
+import { PageHeader } from "../components/ui/PageHeader";
 
 function MeasuredPanel({
   title,
@@ -122,32 +123,31 @@ export function BacktestPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Backtesting & measured performance</h1>
-      <p className="page-sub">
-        Historical strategy compare for {symbol}, plus durable scanner history. LIVE, REPLAY, and
-        VALIDATED are separated. VALIDATED means verified signal outcomes on market data — not
-        executed customer trading profits. Auto-trading disabled. Rates withheld until sample floors.
-      </p>
-
-      <div className="row gap" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
-        <label className="muted" style={{ fontSize: "0.85rem" }}>
-          Strategy{" "}
-          <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
-            {strategies.length === 0 ? (
-              <option value={strategyId}>{strategyId}</option>
-            ) : (
-              strategies.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-        <button type="button" className="btn" disabled={loading} onClick={() => void reload()}>
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Performance"
+        subtitle={`Historical strategy compare for ${symbol}, plus durable scanner history. LIVE, REPLAY, and VALIDATED are separated. VALIDATED = verified signal outcomes on market data — not customer trading profits. Auto-trading disabled.`}
+        actions={
+          <>
+            <label className="muted" style={{ fontSize: "0.85rem" }}>
+              Strategy{" "}
+              <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
+                {strategies.length === 0 ? (
+                  <option value={strategyId}>{strategyId}</option>
+                ) : (
+                  strategies.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <button type="button" className="btn" disabled={loading} onClick={() => void reload()}>
+              Refresh
+            </button>
+          </>
+        }
+      />
 
       {loading && <p className="disclaimer">Computing…</p>}
       {error && <EmptyState badge="Error" title="Unavailable" body={error} />}

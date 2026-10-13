@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/common/EmptyState";
+import { PageHeader } from "../components/ui/PageHeader";
 import {
   fetchOpenSignalOutcomes,
   fetchSignalPerformance,
@@ -96,12 +97,15 @@ export function SignalsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Signals & performance</h1>
-      <p className="page-sub">
-        Recorded monitor evaluations and historical replay samples. Counts are a foundation — not a
-        published win rate. liveValidated stays false until US regular-hours confirmation. Automatic
-        trading remains disabled.
-      </p>
+      <PageHeader
+        title="Signals & performance"
+        subtitle="Recorded monitor evaluations and historical replay samples. Counts are a foundation — not a published win rate. liveValidated stays false until US regular-hours confirmation. Automatic trading remains disabled."
+        actions={
+          <button type="button" className="btn" onClick={() => void refresh()}>
+            Refresh
+          </button>
+        }
+      />
 
       {summary ? (
         <div
