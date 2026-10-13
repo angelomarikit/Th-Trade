@@ -14,6 +14,24 @@ import {
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import type { ChartBar } from "../../lib/api";
+import { formatEtChartTime } from "../../lib/format";
+
+function timeToUtcSec(time: Time): number | null {
+  if (typeof time === "number") return time;
+  if (typeof time === "string") {
+    const ms = Date.parse(time);
+    return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+  }
+  if (typeof time === "object" && time !== null && "year" in time) {
+    return Math.floor(Date.UTC(time.year, time.month - 1, time.day) / 1000);
+  }
+  return null;
+}
+
+function etChartTimeFormatter(time: Time): string {
+  const sec = timeToUtcSec(time);
+  return sec == null ? "" : formatEtChartTime(sec);
+}
 
 export interface LevelOverlay {
   trigger: number;
@@ -69,7 +87,15 @@ export function CandleChart(props: {
         horzLines: { color: "#15202c" },
       },
       rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.08, bottom: 0.22 } },
-      timeScale: { borderColor: "#2a3a4d", timeVisible: true, secondsVisible: false },
+      localization: {
+        timeFormatter: etChartTimeFormatter,
+      },
+      timeScale: {
+        borderColor: "#2a3a4d",
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: (time: Time) => etChartTimeFormatter(time),
+      },
       crosshair: { mode: 1 },
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
@@ -276,6 +302,9 @@ export function CandleChart(props: {
           <span className="leg t1">T1</span>
           <span className="leg t2">T2</span>
         </div>
+        <span className="badge muted-axis" title="Candle times use US Eastern, same as the top bar clock">
+          AXIS · ET
+        </span>
         <span className="badge" title="Setup levels are indicative — not broker orders">
           LEVELS = SETUP (NOT ORDERS)
         </span>

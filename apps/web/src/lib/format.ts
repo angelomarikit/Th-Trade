@@ -38,6 +38,16 @@ export function formatEtClock(d: Date = new Date()): string {
   );
 }
 
+/** Chart axis / crosshair — always US market time (matches TopBar clock). */
+export function formatEtChartTime(utcSeconds: number): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(utcSeconds * 1000));
+}
+
 /** Short ET clock for card/hub timestamps (avoids local UTC+8 misreads). */
 export function formatEtTime(d: Date | string | number): string {
   const date = d instanceof Date ? d : new Date(d);
