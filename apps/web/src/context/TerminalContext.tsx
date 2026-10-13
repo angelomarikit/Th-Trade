@@ -14,6 +14,7 @@ import {
   fetchHealth,
   fetchMonitorEvents,
   fetchSetup,
+  friendlyApiError,
   type BarsResponse,
   type HealthResponse,
   type SetupResponse,
@@ -215,7 +216,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setBars(b);
     } catch (err) {
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
-      setBarsError(err instanceof Error ? err.message : String(err));
+      setBarsError(friendlyApiError(err));
       setBars(null);
     } finally {
       if (!ac.signal.aborted && seq === barsSeqRef.current) {
@@ -316,7 +317,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         // Bars load via the symbol/chartTf effect — avoid double-fetch flicker.
       } catch (err) {
         if (!ac.signal.aborted) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(friendlyApiError(err));
         }
       } finally {
         if (!ac.signal.aborted) setLoading(false);

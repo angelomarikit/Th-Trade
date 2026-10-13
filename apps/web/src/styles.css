@@ -42,7 +42,10 @@ body,
 #root {
   margin: 0;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
+  overflow-x: clip;
 }
 
 button,
@@ -1914,16 +1917,70 @@ a {
 }
 
 @media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+
+  .shell,
+  .main,
+  .page,
+  .scanner-page-v7,
+  .scanner-layout-v7,
+  .scanner-main-v7,
+  .chart-wrap-hero {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--topbar-h);
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem;
+    overflow: hidden;
+  }
+
   .topbar .symbol-search {
     max-width: none;
+    flex: 1 1 100%;
+    min-width: 0;
   }
+
+  .top-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow: hidden;
+    max-width: 100%;
+  }
+
   .symbol-search-btn {
     padding: 0.4rem 0.65rem;
   }
+
   .scanner-instrument h1 {
     font-size: 1.35rem;
   }
+
   .scanner-price-row .last {
     font-size: 1.35rem;
+  }
+
+  /* Keep page width fixed; chart host remains the touch surface for pan/zoom */
+  .chart-wrap-hero .chart-host {
+    touch-action: none;
+    overscroll-behavior: contain;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
