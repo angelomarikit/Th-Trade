@@ -228,11 +228,13 @@ async function main() {
     const existing = barsInflight.get(cacheKey);
     if (existing) return existing;
     const job = (async () => {
+      const started = Date.now();
       const bars = await marketData.getBars({
         symbol: ticker,
         timeframe,
         limit: safeLimit,
       });
+      const alpacaMs = Date.now() - started;
       const payload = {
         symbol: ticker.toUpperCase(),
         timeframe,
@@ -249,6 +251,7 @@ async function main() {
           vwap: b.vwap ?? null,
           completed: b.completed,
         })),
+        timings: { alpacaMs },
       };
       barsResponseCache.set(cacheKey, { at: Date.now(), payload });
       return payload;

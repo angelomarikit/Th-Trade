@@ -231,18 +231,8 @@ export function CandleChart(props: {
       return;
     }
 
-    const aligned = props.bars.map((b, i) => {
-      if (i !== props.bars!.length - 1) return b;
-      const px = props.lastPrice;
-      if (px == null || !Number.isFinite(px) || px <= 0) return b;
-      return {
-        ...b,
-        close: px,
-        high: Math.max(b.high, px),
-        low: Math.min(b.low, px),
-        completed: false,
-      };
-    });
+    // Candles stay exactly as Alpaca returned them. Do not rewrite the last bar to a quote.
+    const aligned = props.bars;
 
     const structureKey = `${props.symbol}|${props.timeframe}|${aligned.length}|${aligned[0]?.time}|${aligned.at(-1)?.time}`;
     const canPatchLast = structureKeyRef.current === structureKey && structureKey.length > 0;
@@ -348,7 +338,7 @@ export function CandleChart(props: {
         ];
       }
     }
-  }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe, goLive]);
+  }, [props.bars, props.levels, props.symbol, props.timeframe, goLive]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time

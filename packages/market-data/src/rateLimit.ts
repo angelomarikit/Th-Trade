@@ -155,8 +155,10 @@ export async function fetchAlpacaWithRetry(
 
   const lane = laneFromStore();
   if (lane === "interactive") touchInteractiveAlpaca();
+  // Chart/setup calls fail once and free the queue. Background monitor keeps full retries.
+  const attempts = lane === "interactive" ? Math.min(maxRetries, 1) : maxRetries;
   let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= attempts; attempt++) {
     const res = await gate.schedule(
       () => dedupedGet(fetchImpl, url, init, Number.isFinite(timeoutMs) ? timeoutMs : 12_000),
       lane,
@@ -170,7 +172,7 @@ export async function fetchAlpacaWithRetry(
       .then((t) => t.slice(0, 120))
       .catch(() => "");
     lastError = new Error(`Alpaca market data HTTP ${res.status}: ${bodyPreview}`);
-    if (attempt >= maxRetries) break;
+    if (attempt >= attempts) break;
 
     const retryAfterHeader = res.headers.get("retry-after");
     const retryAfterMs = parseRetryAfterMs(retryAfterHeader);

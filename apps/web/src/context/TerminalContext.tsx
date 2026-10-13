@@ -312,8 +312,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
+      // Bars first. A parallel setup call uses the same Alpaca queue and delays the chart.
       if (!isPoll && (symbolChanged || opts?.fast === true)) {
-        void loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });
+        await loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });
+        if (ac.signal.aborted || symbolRef.current !== t) return;
       }
       setupInflightRef.current = true;
       try {
@@ -389,27 +391,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });
-        // Refine levels after the chart request has had time to use the Alpaca queue.
-        if (useFastPath && !wantBrief && !isPoll) {
-          const sym = t;
-          window.setTimeout(() => {
-            if (ac.signal.aborted || symbolRef.current !== sym) return;
-            void (async () => {
-              try {
-                const full = await fetchSetup(sym, s, {
-                  brief: false,
-                  fast: false,
-                  accessToken: session?.access_token ?? null,
-                });
-                if (ac.signal.aborted || symbolRef.current !== sym) return;
-                setData(full);
-                setUpdatedAt(Date.now());
-              } catch {
-                /* keep fast setup visible */
-              }
-            })();
-          }, 8_000);
-        }
       } catch (err) {
         if (!ac.signal.aborted) {
           setError(friendlyApiError(err));
@@ -513,12 +494,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [chartTf, symbol, loadBars]);
 
   const displayPrice = useMemo(() => {
-    const setupPx = data?.liveCard.lastPrice ?? data?.card.lastPrice;
-    if (setupPx != null && Number.isFinite(setupPx) && setupPx > 0) return setupPx;
+    // Header price is the active chart's last candle close, not a quote patched onto the bar.
     if (bars?.symbol?.toUpperCase() === symbol.toUpperCase()) {
       const close = bars.bars.at(-1)?.close;
       if (close != null && Number.isFinite(close)) return close;
     }
+    const setupPx = data?.liveCard.lastPrice ?? data?.card.lastPrice;
+    if (setupPx != null && Number.isFinite(setupPx) && setupPx > 0) return setupPx;
     return null;
   }, [bars, data, symbol]);
 
