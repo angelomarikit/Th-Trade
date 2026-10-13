@@ -54,7 +54,9 @@ import {
 import {
   canMarkLiveValidated,
   getAlertPreferences,
+  getSignalPerformanceRecordById,
   HybridSignalPerformanceStore,
+  listValidationAudit,
   markSignalLiveValidated,
   saveAlertPreferences,
 } from "./monitor/signalHistory.js";
@@ -667,8 +669,21 @@ async function main() {
             symbol: (s.symbol ?? "").trim().toUpperCase(),
             side: (s.side === "SHORT" ? "SHORT" : "LONG") as TradeSide,
           }));
+          let planMax = Number(process.env.MONITOR_MAX_SYMBOLS ?? 12);
+          if (sessionId !== "default" && supabaseReady) {
+            const user = await requireUser(req.headers.authorization);
+            const profile = await getOrCreateProfile(user);
+            planMax = Math.min(getPlan(profile.plan_tier).maxWatchlist, planMax);
+          }
+          if (items.filter((i) => i.symbol).length > planMax) {
+            return json(res, 400, {
+              error: `Plan limit: max ${planMax} monitored symbols`,
+              planMax,
+              automaticOrders: false,
+            });
+          }
           const snap = await monitorHub.setWatchlist(sessionId, items);
-          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
+          return json(res, 200, { ...snap, hub: monitorHub.metrics(), planMax });
         } catch (err) {
           if (err instanceof MonitorLimitError) {
             return json(res, 400, { error: err.message });
@@ -993,6 +1008,34 @@ async function main() {
           if (items.length === 0) {
             return json(res, 400, { error: "symbols array required" });
           }
+
+          // Phase 7: enforce plan watchlist cap (in addition to hub MONITOR_MAX_SYMBOLS)
+          let planMax = Number(process.env.MONITOR_MAX_SYMBOLS ?? 12);
+          let planTier = "hub";
+          if (sessionId !== "default" && supabaseReady) {
+            const user = await requireUser(req.headers.authorization);
+            const profile = await getOrCreateProfile(user);
+            const plan = getPlan(profile.plan_tier);
+            planMax = Math.min(plan.maxWatchlist, planMax);
+            planTier = plan.id;
+          }
+          const existing = new Set(
+            monitorHub
+              .get(sessionId)
+              .list()
+              .map((s) => s.symbol),
+          );
+          const toAdd = items.filter((i) => !existing.has(i.symbol));
+          if (existing.size + toAdd.length > planMax) {
+            return json(res, 400, {
+              error: `Plan limit: max ${planMax} monitored symbols (${planTier}). Upgrade or remove symbols first.`,
+              planMax,
+              planTier,
+              current: existing.size,
+              automaticOrders: false,
+            });
+          }
+
           let snap = await monitorHub.addSymbol(sessionId, items[0]!.symbol, items[0]!.side);
           for (const item of items.slice(1)) {
             snap = await monitorHub.addSymbol(sessionId, item.symbol, item.side);
@@ -1000,6 +1043,7 @@ async function main() {
           return json(res, 200, {
             ...snap,
             hub: monitorHub.metrics(),
+            planMax,
             note: "Promoted into deep monitor — confirmation gates unchanged. Ranking is not ENTRY permission.",
             automaticOrders: false,
           });
@@ -1118,12 +1162,14 @@ async function main() {
           recordsConsidered: records.length,
           note:
             source === "LIVE_VALIDATED"
-              ? "Operator-validated LIVE outcomes only — suitable for launch claims once sample floors are met."
-              : "Foundation measured stats from stored rows — not a marketed accuracy claim.",
+              ? "Verified signal outcomes only (market-evidence + audit). Not executed customer trading profits. Auto-trading disabled."
+              : "Foundation measured stats from stored rows — not a marketed accuracy claim. Not customer trading P/L.",
+          outcomeKind: "verified_signal_outcomes",
+          notCustomerTradingProfits: true,
         });
       }
 
-      // Phase 7: operator marks a LIVE resolved outcome as RTH-verified
+      // Phase 7: evidence-backed live validation (note alone is never enough)
       if (
         url.pathname.startsWith("/v1/signals/") &&
         url.pathname.endsWith("/live-validate") &&
@@ -1144,12 +1190,83 @@ async function main() {
           );
           if (!id) return json(res, 400, { error: "signal id required" });
           const body = (await readJson(req).catch(() => ({}))) as { note?: string };
-          const result = await markSignalLiveValidated({ id, note: body.note });
-          if (!result.ok) return json(res, 400, { error: result.error });
+
+          const existing = await getSignalPerformanceRecordById(id);
+          if (!existing) {
+            return json(res, 404, { error: "Signal record not found", leftUnvalidated: true });
+          }
+
+          // Load market bars to re-verify path (entry/stop/targets → outcome)
+          let bars: Array<{ high: number; low: number; close: number; timestamp: string }> = [];
+          try {
+            const snap = await marketData.getSnapshot(existing.symbol);
+            bars = (snap.bars5m.length ? snap.bars5m : snap.bars1m).map((b) => ({
+              high: b.high,
+              low: b.low,
+              close: b.close,
+              timestamp: b.timestamp.toISOString(),
+            }));
+          } catch (err) {
+            return json(res, 400, {
+              error: "Could not load market data for evidence verification",
+              detail: err instanceof Error ? err.message : String(err),
+              leftUnvalidated: true,
+            });
+          }
+
+          const result = await markSignalLiveValidated({
+            id,
+            note: body.note,
+            actorUserId: user.id,
+            actorEmail: user.email ?? null,
+            bars,
+          });
+          if (!result.ok) {
+            return json(res, 422, {
+              error: result.error,
+              errors: result.errors,
+              evidence: result.evidence,
+              leftUnvalidated: true,
+              outcomeKind: "verified_signal_outcomes",
+              notCustomerTradingProfits: true,
+              automaticOrders: false,
+            });
+          }
           return json(res, 200, {
             record: result.record,
+            evidence: result.evidence,
+            validatedBy: result.validatedBy,
+            validatedAt: result.validatedAt,
             automaticOrders: false,
-            note: "liveValidated=true. Use measured-performance?source=LIVE_VALIDATED for launch stats.",
+            outcomeKind: "verified_signal_outcomes",
+            notCustomerTradingProfits: true,
+            note:
+              "Verified signal outcome recorded with market evidence + audit. Not a customer trading profit. Use measured-performance?source=LIVE_VALIDATED.",
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
+      }
+
+      if (
+        url.pathname.startsWith("/v1/signals/") &&
+        url.pathname.endsWith("/validation-audit") &&
+        req.method === "GET"
+      ) {
+        if (!supabaseReady) {
+          return json(res, 503, { error: "Supabase not configured" });
+        }
+        try {
+          await requireUser(req.headers.authorization);
+          const id = decodeURIComponent(
+            url.pathname.slice("/v1/signals/".length, -"/validation-audit".length),
+          );
+          const audit = await listValidationAudit(id);
+          return json(res, 200, {
+            signalId: id,
+            audit,
+            note: "Append-only validation history. Verified signal outcomes ≠ executed trades.",
+            automaticOrders: false,
           });
         } catch (err) {
           return authError(res, err);

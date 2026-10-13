@@ -45,7 +45,7 @@ export interface MeasuredPerformanceReport {
 const DEFAULT_MIN_SAMPLE = 20;
 
 const DISCLAIMER =
-  "Measured performance from stored scanner records. HISTORICAL_REPLAY is hypothetical. LIVE outcomes are not a published edge until liveValidated. LIVE_VALIDATED is the only bucket suitable for launch claims. Auto-trading disabled. Past results ≠ future performance.";
+  "Verified signal outcomes from scanner market-data paths — not executed customer trades or account profits. HISTORICAL_REPLAY is hypothetical. Unvalidated LIVE is soak-only. LIVE_VALIDATED requires evidence + audit. Auto-trading disabled. Past results ≠ future performance.";
 
 export function aggregateMeasuredPerformance(
   rows: MeasuredPerformanceInputRow[],

@@ -57,25 +57,30 @@
 
 ## 2. Workstreams
 
-### A. Verified outcomes (trust) — **start first**
+### A. Verified outcomes (trust) — **in progress / largely done**
 
-**Problem:** Outcomes can resolve from bars while `liveValidated` stays false; we must never show those as published edge.
+**Problem:** Outcomes can resolve from bars while `liveValidated` stays false; we must never show those as published edge.  
+**Labeling:** Always **verified signal outcomes** — never customer trading profits (no order execution).
 
-**Build:**
-1. Operator/admin endpoint: `POST /v1/signals/:id/live-validate` (auth + role/allowlist)
-2. Rules: only `source=LIVE`, only after RTH, require outcome already resolved or attach evidence (entry/stop/T1 timestamps)
-3. Measured performance: add `source=LIVE_VALIDATED` (or filter `liveValidated=true` only) for any user-facing “win rate”
-4. UI: Journal / Backtest — badge **Validated** vs **Unvalidated LIVE** vs **REPLAY**; rates from validated bucket only when claiming edge
-5. Written SOP in repo: when an operator may mark validated (checklist)
+**Build / status:**
+1. [x] `POST /v1/signals/:id/live-validate` (auth + `LIVE_VALIDATE_EMAILS` allowlist)
+2. [x] Evidence required: entry zone, stop, targets, timestamps, outcome — note alone **rejected**
+3. [x] Backend re-fetches market bars and re-resolves path; mismatch → **unvalidated**
+4. [x] Audit: `signal_validation_audit` + `validated_by` / `validated_at` / `validation_evidence`
+5. [x] `GET /v1/signals/:id/validation-audit`
+6. [x] Measured `source=LIVE_VALIDATED` + Backtest VALIDATED panel
+7. [x] SOP: `docs/LIVE_VALIDATE_SOP.md`
+8. [ ] Apply Supabase migration `20261013_phase7_validation_audit.sql` on production
+9. [ ] Operator UI button to validate from Journal (API ready)
 
-**Reuse:** `signal_performance_records.live_validated`, `aggregateMeasuredPerformance`
+**Reuse:** `signal_performance_records`, `resolveOutcomeOnBar`, `aggregateMeasuredPerformance`
 
 ### B. Product / website / mobile
 
-- Walk authenticated flows on desktop + phone widths
-- Onboarding checklist component (first login): set watchlist → enable browser alerts → read risk disclaimer
-- Ensure Backtest / Opportunities / Billing copy never implies auto-trading or guaranteed returns
-- Mobile: confirm Monitor + Alerts reachable; fix any overflow / tap targets found in pass
+- [x] Onboarding checklist on Overview (Discover → Monitor → Alerts → Backtest; signals-only disclaimer)
+- [ ] Full desktop + mobile UX pass (overflow / tap targets)
+- [x] Backtest / measured copy: verified signal outcomes ≠ trading profits
+- [ ] Mobile: Alerts link from More/Settings if not in bottom nav
 
 ### C. Notifications
 
@@ -91,8 +96,10 @@
 
 ### E. Subscription readiness
 
-- **Without Stripe:** keep manual plan select; enforce `maxWatchlist` / credits on API (audit gaps)
-- **With Stripe (approval):** Checkout + webhook → replace `select-plan`; map `stripePriceIdEnv` already on `PLANS`
+- [x] Promote enforces plan `maxWatchlist` (capped by hub max 12)
+- [x] PUT watchlist enforces same plan cap
+- **Without Stripe:** manual plan select remains
+- **With Stripe (approval):** Checkout + webhook → replace `select-plan`
 
 ### F. Phase 5 RTH (parallel — not blocked on Stripe)
 
@@ -145,11 +152,15 @@ Reply with which of the above to enable (and preferred vendors if you have them)
 
 ## 6. Definition of done (Phase 7)
 
-- [ ] Operators can mark outcomes `liveValidated`; public metrics respect that  
-- [ ] Onboarding + mobile review signed off  
-- [ ] Plan limits enforced server-side  
-- [ ] Alert path documented (and browser path reliable)  
+- [x] Evidence + audit required for `liveValidated` (not note-only)  
+- [x] Public copy = verified signal outcomes, not customer profits  
+- [x] `LIVE_VALIDATED` measured bucket + VALIDATED UI panel  
+- [x] Onboarding checklist shipped  
+- [x] Promote plan watchlist cap enforced  
+- [ ] Supabase validation migration applied in production  
+- [ ] Mobile review signed off  
+- [ ] Alert path documented (browser reliable; email/SMS pending approval)  
 - [ ] Phase 5 RTH checklist closed or residual risks listed  
-- [ ] Vercel + Railway both on same release SHA  
+- [ ] Vercel + Railway on same release SHA  
 - [ ] Approval list above resolved (yes/no per vendor)  
-- [ ] Auto-trade still **false** in `/health`  
+- [x] Auto-trade still **false** in `/health`  

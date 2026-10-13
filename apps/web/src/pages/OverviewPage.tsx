@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { OnboardingChecklist } from "../components/common/OnboardingChecklist";
 import { useTerminal } from "../context/TerminalContext";
 import { fetchRank } from "../lib/api";
 import { ageLabel, fmtPct } from "../lib/format";
@@ -46,7 +47,10 @@ export function OverviewPage() {
       <h1 className="page-title">Overview</h1>
       <p className="page-sub">
         Workstation status from live backend health and recent scans — no fabricated KPIs.
+        Signals only; automatic trading disabled.
       </p>
+
+      <OnboardingChecklist />
 
       <div className="kpi-grid">
         <div className="panel kpi">

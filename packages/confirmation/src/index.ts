@@ -20,3 +20,4 @@ export * from "./signalReplay.js";
 export * from "./signalPerformance.js";
 export * from "./signalPersistGate.js";
 export * from "./outcomeTracking.js";
+export * from "./liveValidationEvidence.js";

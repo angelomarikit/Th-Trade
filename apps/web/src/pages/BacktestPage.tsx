@@ -124,9 +124,9 @@ export function BacktestPage() {
     <div className="page">
       <h1 className="page-title">Backtesting & measured performance</h1>
       <p className="page-sub">
-        Phase 6 — historical strategy compare for {symbol}, plus durable scanner history.
-        LIVE and HISTORICAL_REPLAY are shown separately so hypothetical replay never mixes with
-        live outcomes. Auto-trading disabled. Rates withheld until sample floors are met.
+        Historical strategy compare for {symbol}, plus durable scanner history. LIVE, REPLAY, and
+        VALIDATED are separated. VALIDATED means verified signal outcomes on market data — not
+        executed customer trading profits. Auto-trading disabled. Rates withheld until sample floors.
       </p>
 
       <div className="row gap" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
@@ -156,8 +156,8 @@ export function BacktestPage() {
         <section style={{ marginBottom: "1.25rem" }}>
           <h2>Measured performance (separated sources)</h2>
           <p className="muted" style={{ fontSize: "0.85rem" }}>
-            Use LIVE for scanner soak outcomes. Use REPLAY only for offline historical simulation.
-            Use VALIDATED for operator-verified RTH outcomes — the only bucket for launch claims.
+            LIVE = soak. REPLAY = hypothetical. VALIDATED = evidence-backed verified signal
+            outcomes (entry/stop/targets/path audited) — never marketed as user account profits.
           </p>
           <div className="row gap" style={{ flexWrap: "wrap", marginTop: "0.75rem" }}>
             <MeasuredPanel
