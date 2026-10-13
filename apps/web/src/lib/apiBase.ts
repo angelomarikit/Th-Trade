@@ -27,9 +27,11 @@ export function friendlyApiError(err: unknown): string {
     lower.includes("failed to fetch") ||
     lower.includes("networkerror") ||
     lower.includes("load failed") ||
-    lower.includes("network request failed")
+    lower.includes("network request failed") ||
+    lower.includes("aborted") ||
+    lower.includes("timeout")
   ) {
-    return "Cannot reach market data API. Check your connection and try again.";
+    return "Market data is taking too long — the API may be busy. Wait a moment and try again.";
   }
   if (
     lower.includes("did not match the expected pattern") ||

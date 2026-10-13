@@ -65,6 +65,12 @@ export function ScannerPage() {
           {error}
         </p>
       )}
+      {health?.ok && health.supportsFastSetup !== true && (
+        <p className="banner warn" role="status">
+          Market API is on an older deploy — charts may load slowly until Railway redeploys the latest
+          backend (check /health for supportsFastSetup).
+        </p>
+      )}
       {data && (data.liveCard.dataFresh === false || data.card.dataFresh === false) && (
         <p className="banner warn">
           Data not verified / stale — confirmation fail-closed. Session:{" "}

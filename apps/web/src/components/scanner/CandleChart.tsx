@@ -281,11 +281,13 @@ export function CandleChart(props: {
         </span>
       </div>
       <div className="chart-host" ref={hostRef}>
-        {props.loading && (!props.bars || props.bars.length === 0) && (
-          <div className="chart-overlay-msg">Loading {props.symbol}…</div>
+        {props.error && (
+          <div className="chart-overlay-msg chart-overlay-warn" role="alert">
+            {props.error}
+          </div>
         )}
-        {!props.loading && props.error && (
-          <div className="chart-overlay-msg">Chart feed error: {props.error}</div>
+        {props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
+          <div className="chart-overlay-msg">Loading {props.symbol}…</div>
         )}
         {!props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
           <div className="chart-overlay-msg">No bar data for {props.symbol} / {props.timeframe}.</div>

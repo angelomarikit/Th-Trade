@@ -229,7 +229,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }
     setBarsError(null);
     try {
-      const b = await fetchBars(target, tf, limit);
+      const b = await fetchBars(target, tf, limit, { signal: ac.signal });
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
       setBars(b);
@@ -253,7 +253,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       setBarsError(friendlyApiError(err));
-      if (!soft) setBars(null);
+      if (!soft && !readBarsCache(target, tf)) setBars(null);
     } finally {
       if (!ac.signal.aborted && seq === barsSeqRef.current) {
         setBarsLoading(false);
@@ -294,13 +294,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
       // Hard switch on ticker change or first paint so the chart shows a spinner, not "no data".
       const hardBarSwitch = symbolChanged || opts?.fast === true;
-      // Chart first: small bar set paints fast; full history loads right after.
-      void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
+      // Chart first on symbol change / first paint — polls must not re-fetch bars (API queue).
+      if (symbolChanged || opts?.fast === true) {
+        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
+      }
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
           fast: useFastPath,
           accessToken: session?.access_token ?? null,
+          signal: ac.signal,
         });
         if (ac.signal.aborted) return;
         setData(next);
@@ -470,7 +473,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(() => void scan({ brief: false }), POLL_MS);
+    const id = window.setInterval(() => void scan({ brief: false, fast: true }), POLL_MS);
     return () => {
       window.clearInterval(id);
       abortRef.current?.abort();

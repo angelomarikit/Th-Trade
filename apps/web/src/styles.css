@@ -662,6 +662,11 @@ a {
   padding: 1rem;
 }
 
+.chart-overlay-warn {
+  color: #fcd34d;
+  background: rgba(8, 13, 20, 0.82);
+}
+
 .tabs {
   display: flex;
   gap: 0.15rem;

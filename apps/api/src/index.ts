@@ -183,7 +183,13 @@ async function main() {
     }
     if (rows.length > 0) {
       console.log(`[monitor] restored ${rows.length} persisted watchlist(s)`);
-      monitorHub.start();
+      const deferMs = Math.max(0, Number(process.env.MONITOR_START_DELAY_MS ?? 90_000));
+      if (deferMs > 0) {
+        console.log(`[monitor] start deferred ${deferMs}ms so chart/setup requests get headroom`);
+        setTimeout(() => monitorHub.start(), deferMs);
+      } else {
+        monitorHub.start();
+      }
     }
   } catch (err) {
     console.warn(

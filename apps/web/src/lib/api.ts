@@ -195,6 +195,8 @@ export interface HealthResponse {
   newsProvider: string;
   marketDataProvider: string;
   alpacaFeed?: string;
+  supportsFastSetup?: boolean;
+  alpacaInteractivePriority?: boolean;
   alpacaCredentialsPresent: boolean;
   journalEnabled: boolean;
   journalCount: number;
@@ -275,10 +277,24 @@ export interface EdgeResponse {
   text: string;
 }
 
-async function getJson<T>(path: string, headers?: Record<string, string>): Promise<T> {
+const DEFAULT_MARKET_TIMEOUT_MS = 22_000;
+
+async function getJson<T>(
+  path: string,
+  headers?: Record<string, string>,
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
+): Promise<T> {
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_MARKET_TIMEOUT_MS;
+  const ac = new AbortController();
+  const timer = window.setTimeout(() => ac.abort(), timeoutMs);
+  if (opts?.signal) {
+    if (opts.signal.aborted) ac.abort();
+    else opts.signal.addEventListener("abort", () => ac.abort(), { once: true });
+  }
   try {
     const res = await fetch(apiUrl(path), {
       headers: headers && Object.keys(headers).length ? headers : undefined,
+      signal: ac.signal,
     });
     const text = await res.text();
     const looksHtml = /^\s*<(!doctype|html|head|body)/i.test(text);
@@ -295,13 +311,21 @@ async function getJson<T>(path: string, headers?: Record<string, string>): Promi
     }
   } catch (err) {
     throw new Error(friendlyApiError(err));
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
 export function fetchSetup(
   ticker: string,
   side: "LONG" | "SHORT",
-  opts?: { brief?: boolean; fast?: boolean; accessToken?: string | null },
+  opts?: {
+    brief?: boolean;
+    fast?: boolean;
+    accessToken?: string | null;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+  },
 ) {
   const qs = new URLSearchParams({
     ticker,
@@ -313,12 +337,22 @@ export function fetchSetup(
   if (opts?.accessToken) {
     headers.Authorization = `Bearer ${opts.accessToken}`;
   }
-  return getJson<SetupResponse>(`/v1/setup?${qs}`, headers);
+  return getJson<SetupResponse>(`/v1/setup?${qs}`, headers, {
+    timeoutMs: opts?.timeoutMs,
+    signal: opts?.signal,
+  });
 }
 
-export function fetchBars(ticker: string, timeframe: string, limit = 80) {
+export function fetchBars(
+  ticker: string,
+  timeframe: string,
+  limit = 80,
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
+) {
   return getJson<BarsResponse>(
     `/v1/bars?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`,
+    undefined,
+    opts,
   );
 }
 
