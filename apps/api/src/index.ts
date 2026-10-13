@@ -82,6 +82,10 @@ function envFlag(name: string): string {
   return (process.env[name] ?? "").trim() ? "yes" : "NO";
 }
 
+/** Short TTL cache so chart + setup polls do not duplicate Alpaca bar fetches. */
+const barsResponseCache = new Map<string, { at: number; payload: unknown }>();
+const BARS_CACHE_MS = 3_000;
+
 async function main() {
   console.log(
     `[env] ALPACA_API_KEY_ID=${envFlag("ALPACA_API_KEY_ID")} ` +
@@ -437,12 +441,18 @@ async function main() {
           });
         }
         const limit = Math.min(500, Math.max(10, Number(url.searchParams.get("limit") ?? 150)));
+        const safeLimit = Number.isFinite(limit) ? limit : 150;
+        const cacheKey = `${ticker.toUpperCase()}|${timeframe}|${safeLimit}`;
+        const cached = barsResponseCache.get(cacheKey);
+        if (cached && Date.now() - cached.at < BARS_CACHE_MS) {
+          return json(res, 200, cached.payload);
+        }
         const bars = await marketData.getBars({
           symbol: ticker,
           timeframe,
-          limit: Number.isFinite(limit) ? limit : 150,
+          limit: safeLimit,
         });
-        return json(res, 200, {
+        const payload = {
           symbol: ticker.toUpperCase(),
           timeframe,
           provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
@@ -458,7 +468,9 @@ async function main() {
             vwap: b.vwap ?? null,
             completed: b.completed,
           })),
-        });
+        };
+        barsResponseCache.set(cacheKey, { at: Date.now(), payload });
+        return json(res, 200, payload);
       }
 
       if (url.pathname === "/v1/catalyst" && req.method === "GET") {
@@ -500,7 +512,38 @@ async function main() {
           return json(res, 400, { error: "side must be LONG or SHORT" });
         }
         const side = sideParam as TradeSide;
-        const { card, journalEntry } = await scanner.scanWithJournal({ symbol: ticker, side });
+        const useFastSnapshot =
+          url.searchParams.get("fast") === "1" || url.searchParams.get("fast") === "true";
+        let card: Awaited<ReturnType<typeof scanner.scanWithJournal>>["card"];
+        let journalEntry: Awaited<ReturnType<typeof scanner.scanWithJournal>>["journalEntry"];
+        if (useFastSnapshot) {
+          const sym = ticker.toUpperCase();
+          const [bars5m, quote] = await Promise.all([
+            marketData.getBars({ symbol: sym, timeframe: "5Min", limit: 45 }),
+            marketData.getQuote(sym),
+          ]);
+          const lastBar = bars5m.at(-1);
+          const lastPrice =
+            quote && quote.bid > 0 && quote.ask > 0
+              ? (quote.bid + quote.ask) / 2
+              : (lastBar?.close ?? 0);
+          const snapshot = {
+            symbol: sym,
+            lastPrice,
+            quote,
+            bars1m: bars5m.length >= 20 ? bars5m.slice(-30) : bars5m,
+            bars5m,
+            receivedAt: new Date(),
+            marketTimestamp: quote?.timestamp ?? lastBar?.timestamp ?? null,
+          };
+          ({ card, journalEntry } = await scanner.scanWithJournal({
+            symbol: sym,
+            side,
+            preloadedSnapshot: snapshot,
+          }));
+        } else {
+          ({ card, journalEntry } = await scanner.scanWithJournal({ symbol: ticker, side }));
+        }
 
         const verifiedRaw = process.env.VERIFIED_ACCOUNT_VALUE;
         const verifiedAccountValue =

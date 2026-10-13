@@ -202,7 +202,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const barsAbortRef = useRef<AbortController | null>(null);
   const barsSeqRef = useRef(0);
 
-  const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean }) => {
+  const FAST_BAR_LIMIT = 36;
+  const FULL_BAR_LIMIT = 80;
+
+  const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean; limit?: number }) => {
     const target = sym.trim().toUpperCase();
     if (!target) return;
     barsAbortRef.current?.abort();
@@ -210,6 +213,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     barsAbortRef.current = ac;
     const seq = ++barsSeqRef.current;
     const soft = opts?.soft === true;
+    const limit = opts?.limit ?? FULL_BAR_LIMIT;
     // Hard switch: clear so prior symbol candles never linger.
     // Soft refresh (setup poll): keep candles until the new series arrives.
     if (!soft) {
@@ -218,10 +222,25 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }
     setBarsError(null);
     try {
-      const b = await fetchBars(target, tf);
+      const b = await fetchBars(target, tf, limit);
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
       setBars(b);
+      if (limit < FULL_BAR_LIMIT && !ac.signal.aborted && seq === barsSeqRef.current) {
+        const refineSeq = seq;
+        window.setTimeout(() => {
+          if (refineSeq !== barsSeqRef.current) return;
+          void (async () => {
+            try {
+              const full = await fetchBars(target, tf, FULL_BAR_LIMIT);
+              if (refineSeq !== barsSeqRef.current) return;
+              setBars(full);
+            } catch {
+              /* keep fast candles visible */
+            }
+          })();
+        }, 50);
+      }
     } catch (err) {
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       setBarsError(friendlyApiError(err));
@@ -234,7 +253,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const scan = useCallback(
-    async (opts?: { ticker?: string; side?: "LONG" | "SHORT"; brief?: boolean }) => {
+    async (opts?: {
+      ticker?: string;
+      side?: "LONG" | "SHORT";
+      brief?: boolean;
+      /** Lighter Alpaca snapshot (quote + 5m bars) for faster first paint. */
+      fast?: boolean;
+    }) => {
       // Prefer explicit ticker/side; otherwise always read latest via refs so the
       // mount-time poll interval never snaps back to the initial NVDA default.
       const t = (opts?.ticker ?? symbolRef.current).trim().toUpperCase();
@@ -245,7 +270,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       abortRef.current?.abort();
       const ac = new AbortController();
       abortRef.current = ac;
-      setLoading(true);
+      if (symbolChanged) setLoading(true);
       setError(null);
       setSymbol(t);
       setSymbolDraft(t);
@@ -256,11 +281,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setData(null);
         setBars(null);
       }
-      // Chart + setup in parallel — do not block candles on heavy /v1/setup (Alpaca snapshot + rules).
-      void loadBars(t, chartTfRef.current, { soft: !symbolChanged });
+      const useFastPath = symbolChanged || opts?.fast === true;
+      const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
+      // Hard switch on ticker change or first paint so the chart shows a spinner, not "no data".
+      const hardBarSwitch = symbolChanged || opts?.fast === true;
+      // Chart first: small bar set paints fast; full history loads right after.
+      void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
+          fast: useFastPath,
           accessToken: session?.access_token ?? null,
         });
         if (ac.signal.aborted) return;
@@ -329,6 +359,24 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });
+        // Full Alpaca snapshot after fast paint — no loading flash, same bars on chart.
+        if (useFastPath && !wantBrief) {
+          const sym = t;
+          void (async () => {
+            try {
+              const full = await fetchSetup(sym, s, {
+                brief: false,
+                fast: false,
+                accessToken: session?.access_token ?? null,
+              });
+              if (ac.signal.aborted || symbolRef.current !== sym) return;
+              setData(full);
+              setUpdatedAt(Date.now());
+            } catch {
+              /* keep fast setup visible */
+            }
+          })();
+        }
       } catch (err) {
         if (!ac.signal.aborted) {
           setError(friendlyApiError(err));
@@ -411,8 +459,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [session?.access_token, pushAlert]);
 
   useEffect(() => {
-    // Rules-only setup on first paint — brief=1 triggers optional OpenAI and slows first load.
-    void scan({ brief: false });
+    // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
+    void scan({ brief: false, fast: true });
     const id = window.setInterval(() => void scan({ brief: false }), POLL_MS);
     return () => {
       window.clearInterval(id);

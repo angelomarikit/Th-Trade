@@ -301,13 +301,14 @@ async function getJson<T>(path: string, headers?: Record<string, string>): Promi
 export function fetchSetup(
   ticker: string,
   side: "LONG" | "SHORT",
-  opts?: { brief?: boolean; accessToken?: string | null },
+  opts?: { brief?: boolean; fast?: boolean; accessToken?: string | null },
 ) {
   const qs = new URLSearchParams({
     ticker,
     side,
   });
   if (opts?.brief) qs.set("brief", "1");
+  if (opts?.fast) qs.set("fast", "1");
   const headers: Record<string, string> = {};
   if (opts?.accessToken) {
     headers.Authorization = `Bearer ${opts.accessToken}`;
