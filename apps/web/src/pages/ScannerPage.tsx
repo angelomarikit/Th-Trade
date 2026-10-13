@@ -25,6 +25,7 @@ export function ScannerPage() {
     displayPrice,
     dayChangePct,
     health,
+    scan,
   } = useTerminal();
 
   // One signal rail on phone/tablet — inspector duplicates recommendation UI.
@@ -136,6 +137,7 @@ export function ScannerPage() {
             levels={levels}
             symbol={symbol}
             lastPrice={last}
+            onRetry={() => void scan({ ticker: symbol, fast: true })}
           />
         </div>
 

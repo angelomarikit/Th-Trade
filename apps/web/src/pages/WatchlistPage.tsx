@@ -119,13 +119,10 @@ export function WatchlistPage() {
     <div className="page">
       <PageHeader
         title="Watchlist"
-        subtitle={`Server-side multi-stock monitor · up to ${snap?.maxSymbols ?? 6} symbols · feed ${(snap?.feed ?? "iex").toUpperCase()} · auto-trading disabled. Statuses are not live-validated until RTH testing.`}
+        subtitle="Stocks you are watching. Open a symbol to see its chart, entry, stop, and targets. Alerts are signals only — nothing is sent to a broker."
         actions={
           <>
-            <span className="badge">
-              {snap?.running ? "RUNNING" : "IDLE"} · ticks {snap?.hub?.tickCount ?? snap?.tickCount ?? 0}
-              {snap?.lastTickAt ? ` · ${formatEtTime(snap.lastTickAt)}` : ""}
-            </span>
+            <span className="badge">{snap?.running ? "Watching" : "Paused"}</span>
             <button type="button" className="btn" disabled={busy} onClick={() => void loadDefaultSix()}>
               Load default six
             </button>
@@ -180,8 +177,8 @@ export function WatchlistPage() {
         </h2>
         {ordered.length === 0 ? (
           <p className="page-sub" style={{ margin: 0 }}>
-            No symbols monitored. Load the default six (TSLA, MU, NVDA, AMD, SPY, QQQ) or add tickers.
-            Sign in to persist your watchlist across restarts.
+            No symbols yet. Add a ticker, or load the starter list (TSLA, MU, NVDA, AMD, SPY, QQQ).
+            Sign in to keep this list on your account.
           </p>
         ) : (
           <div style={{ display: "grid", gap: "0.65rem" }}>
@@ -201,7 +198,7 @@ export function WatchlistPage() {
       {events.length > 0 ? (
         <div className="panel">
           <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
-            Status events (recorded — no push/SMS yet)
+            Recent changes
           </h2>
           <table className="wulu-data-table">
             <thead>
@@ -274,34 +271,14 @@ function MonitorCard({
             : "—"}
         </span>
         <span>Stop: {fmtPrice(row.stop)}</span>
-        <span>T1: {fmtPrice(row.t1)}</span>
-        <span>T2: {fmtPrice(row.t2)}</span>
-        <span>T3: {fmtPrice(row.target3)}</span>
+        <span>Target 1: {fmtPrice(row.t1)}</span>
+        <span>Target 2: {fmtPrice(row.t2)}</span>
         <span>
-          R:R:{" "}
-          {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}:1` : "—"}
-          {row.rewardToRisk != null && row.rewardToRisk < 2 ? " (below 2R — no ENTRY)" : ""}
+          Reward / risk:{" "}
+          {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
         </span>
-        <span>Dist: {row.distanceLabel ?? "—"}</span>
-        <span>
-          VWAP: {row.vwapStatus ?? "—"}
-          {row.vwapLocation ? ` (${row.vwapLocation})` : ""}
-        </span>
-        <span>RVOL: {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}</span>
-        <span>5m: {row.fiveMinStatus ?? "—"}</span>
-        <span>Score: {row.qualityScore10 != null ? `${row.qualityScore10}/10` : "—"} (not win %)</span>
-        <span>Setup: {row.setupScore != null ? `${row.setupScore}/100` : "—"}</span>
-        <span>Invalidation: {fmtPrice(row.invalidation)}</span>
-        <span>Fake-break risk: {row.falseBreakoutRisk ?? "NONE"}</span>
-        <span>
-          Retest: {row.retestPhase ?? "—"}
-          {row.retestRequired ? " (required)" : ""}
-        </span>
-        <span>
-          Feed: {(row.feed ?? "iex").toUpperCase()}
-          {!row.dataFresh ? " · NOT VERIFIED" : ""}
-        </span>
-        <span>Data: {row.marketDataAt ? formatEtTime(row.marketDataAt) : "—"}</span>
+        <span>Volume: {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}</span>
+        {!row.dataFresh ? <span>Price check: not verified</span> : null}
       </div>
       {row.actionHint ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.82rem", fontWeight: 600 }}>
@@ -310,7 +287,7 @@ function MonitorCard({
       ) : null}
       {!row.dataFresh ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
-          DATA NOT VERIFIED — NO ACTIONABLE SIGNAL
+          DATA NOT VERIFIED — no trade from this row until the price check passes.
         </p>
       ) : null}
       {row.waitingFor.length > 0 ? (

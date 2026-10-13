@@ -64,6 +64,7 @@ interface TerminalContextValue {
     side?: "LONG" | "SHORT";
     /** Request ChatGPT brief (credits). Default false for polls. */
     brief?: boolean;
+    fast?: boolean;
   }) => Promise<void>;
   data: SetupResponse | null;
   bars: BarsResponse | null;
@@ -138,6 +139,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   );
 
   const abortRef = useRef<AbortController | null>(null);
+  const setupInflightRef = useRef(false);
   const prevStatus = useRef<string | null>(null);
   const prevFresh = useRef<boolean | null>(null);
   const symbolRef = useRef(symbol);
@@ -257,14 +259,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         }, 50);
       }
     } catch (err) {
-      if (ac.signal.aborted || seq !== barsSeqRef.current) return;
+      if (seq !== barsSeqRef.current) return;
+      if (ac.signal.aborted) {
+        setBarsError("Chart request was interrupted. Tap Retry.");
+        return;
+      }
       setBarsError(friendlyApiError(err));
       if (!soft && !readBarsCache(target, tf)) setBars(null);
     } finally {
       if (barsInflightKeyRef.current === key) barsInflightKeyRef.current = "";
-      if (!ac.signal.aborted && seq === barsSeqRef.current) {
-        setBarsLoading(false);
-      }
+      if (seq === barsSeqRef.current) setBarsLoading(false);
     }
   }, []);
 
@@ -277,6 +281,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       fast?: boolean;
       /** Soft bar refresh (poll) — keeps chart candles current without clearing. */
       refreshBars?: boolean;
+      /** Background refresh. Must not cancel an in-flight symbol switch. */
+      poll?: boolean;
     }) => {
       // Prefer explicit ticker/side; otherwise always read latest via refs so the
       // mount-time poll interval never snaps back to the initial NVDA default.
@@ -285,29 +291,31 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const wantBrief = opts?.brief === true;
       if (!t) return;
       const symbolChanged = t !== symbolRef.current;
-      abortRef.current?.abort();
+      const isPoll = opts?.poll === true;
+      // Polls must not cancel a symbol switch that is still waiting on Alpaca.
+      // That abort loop is what left the chart on "Loading MU…" with no price.
+      if (isPoll) {
+        if (setupInflightRef.current) return;
+      } else {
+        abortRef.current?.abort();
+      }
       const ac = new AbortController();
       abortRef.current = ac;
       if (symbolChanged) setLoading(true);
-      setError(null);
+      if (!isPoll) setError(null);
       setSymbol(t);
       setSymbolDraft(t);
       setSide(s);
-      // Only clear when the ticker changes — same-symbol polls keep the prior card
-      // so header/chart do not fall back onto stale or wrong-symbol bars.
       if (symbolChanged) {
         setData(null);
         setBars(null);
       }
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
-      // Hard switch on ticker change or first paint so the chart shows a spinner, not "no data".
-      const hardBarSwitch =
-        symbolChanged || (opts?.fast === true && opts?.refreshBars !== true);
-      const shouldLoadBars = symbolChanged || (opts?.fast === true && opts?.refreshBars !== true);
-      if (shouldLoadBars) {
-        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
+      if (!isPoll && (symbolChanged || opts?.fast === true)) {
+        void loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });
       }
+      setupInflightRef.current = true;
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
@@ -381,29 +389,33 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });
-        // Full Alpaca snapshot after fast paint — no loading flash, same bars on chart.
-        if (useFastPath && !wantBrief) {
+        // Refine levels after the chart request has had time to use the Alpaca queue.
+        if (useFastPath && !wantBrief && !isPoll) {
           const sym = t;
-          void (async () => {
-            try {
-              const full = await fetchSetup(sym, s, {
-                brief: false,
-                fast: false,
-                accessToken: session?.access_token ?? null,
-              });
-              if (ac.signal.aborted || symbolRef.current !== sym) return;
-              setData(full);
-              setUpdatedAt(Date.now());
-            } catch {
-              /* keep fast setup visible */
-            }
-          })();
+          window.setTimeout(() => {
+            if (ac.signal.aborted || symbolRef.current !== sym) return;
+            void (async () => {
+              try {
+                const full = await fetchSetup(sym, s, {
+                  brief: false,
+                  fast: false,
+                  accessToken: session?.access_token ?? null,
+                });
+                if (ac.signal.aborted || symbolRef.current !== sym) return;
+                setData(full);
+                setUpdatedAt(Date.now());
+              } catch {
+                /* keep fast setup visible */
+              }
+            })();
+          }, 8_000);
         }
       } catch (err) {
         if (!ac.signal.aborted) {
           setError(friendlyApiError(err));
         }
       } finally {
+        setupInflightRef.current = false;
         if (!ac.signal.aborted) setLoading(false);
       }
     },
@@ -483,7 +495,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(() => void scan({ brief: false, fast: true }), POLL_MS);
+    const id = window.setInterval(() => void scan({ brief: false, fast: true, poll: true }), POLL_MS);
     return () => {
       window.clearInterval(id);
       abortRef.current?.abort();

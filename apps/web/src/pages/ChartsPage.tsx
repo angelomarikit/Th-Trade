@@ -3,7 +3,7 @@ import { CandleChart } from "../components/scanner/CandleChart";
 import { useTerminal } from "../context/TerminalContext";
 
 export function ChartsPage() {
-  const { bars, barsLoading, barsError, chartTf, setChartTf, symbol, data } = useTerminal();
+  const { bars, barsLoading, barsError, chartTf, setChartTf, symbol, data, scan } = useTerminal();
   const lc = data?.liveCard;
   const levels = lc
     ? {
@@ -33,6 +33,7 @@ export function ChartsPage() {
         onTimeframe={setChartTf}
         levels={levels}
         symbol={symbol}
+        onRetry={() => void scan({ ticker: symbol, fast: true })}
       />
     </div>
   );

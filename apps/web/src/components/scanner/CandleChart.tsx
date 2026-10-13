@@ -53,6 +53,7 @@ export function CandleChart(props: {
   symbol: string;
   /** Live setup quote — patches the last candle so chart matches header price. */
   lastPrice?: number | null;
+  onRetry?: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -411,7 +412,14 @@ export function CandleChart(props: {
       <div className="chart-host" ref={hostRef}>
         {props.error && (
           <div className="chart-overlay-msg chart-overlay-warn" role="alert">
-            {props.error}
+            <div>
+              <p style={{ margin: "0 0 0.6rem" }}>{props.error}</p>
+              {props.onRetry && (
+                <button type="button" className="chart-action-btn" onClick={props.onRetry}>
+                  Retry
+                </button>
+              )}
+            </div>
           </div>
         )}
         {props.loading && !props.error && (!props.bars || props.bars.length === 0) && (

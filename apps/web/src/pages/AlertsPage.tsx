@@ -111,7 +111,7 @@ export function AlertsPage() {
     <div className="page">
       <PageHeader
         title="Alerts"
-        subtitle="Server-recorded monitor status changes. Browser notifications optional. Email / SMS / push not wired. Alert ≠ entry permission. Auto-trading disabled."
+        subtitle="Status changes for symbols you watch. A notification is not permission to enter a trade."
         actions={
           <>
             <span className={`badge ${prefs?.browserEnabled ? "green" : ""}`}>
@@ -131,7 +131,7 @@ export function AlertsPage() {
       />
 
       <p className="page-sub" style={{ marginTop: 0 }}>
-        In-app: {prefs?.inAppEnabled === false ? "off" : "on"} · Email/SMS/push: not wired · Recorded events ≠ delivered notifications until push is wired
+        Browser notifications: {prefs?.browserEnabled ? "on" : "off"}. These updates stay inside WULU unless you turn browser alerts on.
       </p>
 
       {error ? <p className="error-banner">{error}</p> : null}
@@ -139,9 +139,9 @@ export function AlertsPage() {
 
       {events.length === 0 ? (
         <EmptyState
-          badge="Server log"
-          title="No alert events yet"
-          body="When monitor status changes (NEAR ACTIVE, CONFIRMATION, ENTRY ACTIVE, MISSED, INVALIDATED, DATA NOT VERIFIED), events appear here and can trigger browser notifications if enabled."
+          badge="Alerts"
+          title="No alerts yet"
+          body="When a watched symbol changes status, it will show up here. You can also turn on browser notifications."
         />
       ) : (
         <div className="panel">
