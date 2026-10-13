@@ -118,7 +118,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     readJson(STORAGE_KEYS.sidebarCollapsed, false),
   );
   const [inspectorOpen, setInspectorOpenState] = useState(() =>
-    readJson(STORAGE_KEYS.inspectorOpen, true),
+    readJson(STORAGE_KEYS.inspectorOpen, false),
   );
   const [bottomDockOpen, setBottomDockOpenState] = useState(() =>
     readJson(STORAGE_KEYS.bottomDockOpen, false),

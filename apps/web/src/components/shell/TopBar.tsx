@@ -75,7 +75,7 @@ export function TopBar() {
           {provider.toUpperCase()} · {feed.toUpperCase()}
         </span>
 
-        <span className="badge amber" title="Execution environment">
+        <span className="badge amber hide-sm" title="Execution environment">
           {env}
         </span>
 

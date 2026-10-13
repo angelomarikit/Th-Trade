@@ -1,7 +1,7 @@
+import { useEffect } from "react";
 import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
-import { SymbolSearch } from "../components/search/SymbolSearch";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
 import { ageLabel, fmtPct, fmtPrice } from "../lib/format";
@@ -18,6 +18,7 @@ export function ScannerPage() {
     symbol,
     error,
     inspectorOpen,
+    setInspectorOpen,
     recentScans,
     loading,
     updatedAt,
@@ -25,6 +26,17 @@ export function ScannerPage() {
     dayChangePct,
     health,
   } = useTerminal();
+
+  // One signal rail on phone/tablet — inspector duplicates recommendation UI.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1100px)");
+    const apply = () => {
+      if (mq.matches) setInspectorOpen(false);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [setInspectorOpen]);
 
   const lc = data?.liveCard;
   // data is cleared on symbol switch; when present it belongs to current scan.
@@ -60,14 +72,7 @@ export function ScannerPage() {
         </p>
       )}
 
-      <div className="scanner-search-hero">
-        <SymbolSearch
-          initial={symbol}
-          size="hero"
-          onSelect={(s) => openSymbol(s, { brief: false })}
-        />
-      </div>
-
+      {/* Single global search lives in TopBar — no second hero search on Scanner. */}
       <div className={`scanner-layout-v7 ${inspectorOpen ? "with-inspector" : ""}`}>
         <aside className="scanner-recents panel" aria-label="Recent symbols">
           <h3>Recent</h3>

@@ -102,6 +102,8 @@ a {
   border-bottom: 1px solid var(--border);
   z-index: 15;
   min-width: 0;
+  max-width: 100%;
+  overflow: visible;
 }
 
 .workspace {
@@ -1566,14 +1568,9 @@ a {
 /* ——— Phase 7 design system: search + scanner ——— */
 .symbol-search {
   position: relative;
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
-  max-width: 420px;
-}
-
-.symbol-search-hero {
-  max-width: none;
-  width: 100%;
+  max-width: min(520px, 100%);
 }
 
 .symbol-search-form {
@@ -1584,11 +1581,8 @@ a {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.35rem 0.45rem 0.35rem 0.75rem;
-}
-
-.symbol-search-hero .symbol-search-form {
-  padding: 0.55rem 0.55rem 0.55rem 1rem;
-  border-color: rgba(45, 212, 191, 0.35);
+  width: 100%;
+  max-width: 100%;
 }
 
 .symbol-search-form input {
@@ -1665,7 +1659,7 @@ a {
 }
 
 .topbar .symbol-search {
-  flex: 1.2;
+  flex: 1 1 320px;
 }
 
 .scanner-page-v7 {
@@ -1675,11 +1669,9 @@ a {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  overflow-x: clip;
   padding-bottom: 0.35rem;
-}
-
-.scanner-search-hero {
-  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .scanner-layout-v7 {
@@ -1939,27 +1931,39 @@ a {
     flex-wrap: wrap;
     height: auto;
     min-height: var(--topbar-h);
-    gap: 0.35rem;
-    padding: 0.4rem 0.55rem;
-    overflow: hidden;
+    gap: 0.45rem;
+    padding: 0.5rem 0.65rem;
+    overflow: visible;
   }
 
   .topbar .symbol-search {
     max-width: none;
     flex: 1 1 100%;
     min-width: 0;
+    order: -1;
+  }
+
+  .topbar .symbol-search-form {
+    min-height: 44px;
+    padding: 0.4rem 0.5rem 0.4rem 0.85rem;
+  }
+
+  .topbar .symbol-search-form input {
+    font-size: 1rem;
   }
 
   .top-meta {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
     flex-wrap: wrap;
     overflow: hidden;
     max-width: 100%;
+    gap: 0.35rem;
   }
 
   .symbol-search-btn {
-    padding: 0.4rem 0.65rem;
+    padding: 0.55rem 1rem;
+    min-height: 40px;
   }
 
   .scanner-instrument h1 {
