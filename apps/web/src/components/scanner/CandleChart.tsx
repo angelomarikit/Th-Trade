@@ -11,28 +11,16 @@ import {
   type HistogramData,
   type LineData,
   type Time,
+  type TickMarkType,
 } from "lightweight-charts";
 import { Maximize2, Minimize2, Radio } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartBar } from "../../lib/api";
-import { formatEtChartTime } from "../../lib/format";
-
-function timeToUtcSec(time: Time): number | null {
-  if (typeof time === "number") return time;
-  if (typeof time === "string") {
-    const ms = Date.parse(time);
-    return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
-  }
-  if (typeof time === "object" && time !== null && "year" in time) {
-    return Math.floor(Date.UTC(time.year, time.month - 1, time.day) / 1000);
-  }
-  return null;
-}
-
-function etChartTimeFormatter(time: Time): string {
-  const sec = timeToUtcSec(time);
-  return sec == null ? "" : formatEtChartTime(sec);
-}
+import {
+  chartEtLocalization,
+  formatEtChartTick,
+  formatLastBarEtLabel,
+} from "../../lib/chartEtTime";
 
 export interface LevelOverlay {
   trigger: number;
@@ -133,14 +121,13 @@ export function CandleChart(props: {
         horzLines: { color: "#15202c" },
       },
       rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.08, bottom: 0.22 } },
-      localization: {
-        timeFormatter: etChartTimeFormatter,
-      },
+      localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (time: Time) => etChartTimeFormatter(time),
+        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
+          formatEtChartTick(time, tickMarkType),
         rightOffset: DEFAULT_RIGHT_OFFSET,
         fixRightEdge: false,
         fixLeftEdge: false,
@@ -301,6 +288,14 @@ export function CandleChart(props: {
         .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
       vwap.setData(vwapPts);
 
+      chartRef.current?.applyOptions({
+        localization: chartEtLocalization,
+        timeScale: {
+          tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
+          formatEtChartTick(time, tickMarkType),
+        },
+      });
+
       const fitKey = `${props.symbol}|${props.timeframe}|${aligned[0]?.time}|${aligned.at(-1)?.time}|${aligned.length}`;
       if (fitKeyRef.current !== fitKey) {
         fitKeyRef.current = fitKey;
@@ -354,6 +349,11 @@ export function CandleChart(props: {
     }
   }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe, goLive]);
 
+  const lastBarEt =
+    props.bars?.length && props.bars.at(-1)?.time
+      ? formatLastBarEtLabel(props.bars.at(-1)!.time)
+      : null;
+
   return (
     <div
       ref={wrapRef}
@@ -401,7 +401,7 @@ export function CandleChart(props: {
             </button>
           </div>
           <span className="badge muted-axis" title="Candle times use US Eastern, same as the top bar clock">
-            AXIS · ET
+            AXIS · ET{lastBarEt ? ` · last ${lastBarEt}` : ""}
           </span>
           <span className="badge hide-sm" title="Setup levels are indicative — not broker orders">
             LEVELS = SETUP (NOT ORDERS)

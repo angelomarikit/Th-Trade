@@ -268,6 +268,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       brief?: boolean;
       /** Lighter Alpaca snapshot (quote + 5m bars) for faster first paint. */
       fast?: boolean;
+      /** Soft bar refresh (poll) — keeps chart candles current without clearing. */
+      refreshBars?: boolean;
     }) => {
       // Prefer explicit ticker/side; otherwise always read latest via refs so the
       // mount-time poll interval never snaps back to the initial NVDA default.
@@ -293,10 +295,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
       // Hard switch on ticker change or first paint so the chart shows a spinner, not "no data".
-      const hardBarSwitch = symbolChanged || opts?.fast === true;
-      // Chart first on symbol change / first paint — polls must not re-fetch bars (API queue).
-      if (symbolChanged || opts?.fast === true) {
-        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
+      const hardBarSwitch =
+        symbolChanged || (opts?.fast === true && opts?.refreshBars !== true);
+      const shouldLoadBars = symbolChanged || opts?.fast === true || opts?.refreshBars === true;
+      if (shouldLoadBars) {
+        const pollLimit = opts?.refreshBars === true ? FULL_BAR_LIMIT : barLimit;
+        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: pollLimit });
       }
       try {
         const next = await fetchSetup(t, s, {
@@ -473,7 +477,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(() => void scan({ brief: false, fast: true }), POLL_MS);
+    const id = window.setInterval(
+      () => void scan({ brief: false, fast: true, refreshBars: true }),
+      POLL_MS,
+    );
     return () => {
       window.clearInterval(id);
       abortRef.current?.abort();
