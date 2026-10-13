@@ -17,9 +17,15 @@ export function SymbolSearch(props: {
   const [busy, setBusy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | null>(null);
+  /** True only after the user edits the field — blocks passive dropdown on symbol sync. */
+  const userQueryRef = useRef(false);
 
   useEffect(() => {
+    userQueryRef.current = false;
     setQ(props.initial ?? "");
+    setHits([]);
+    setOpen(false);
+    setActive(0);
   }, [props.initial]);
 
   useEffect(() => {
@@ -32,18 +38,26 @@ export function SymbolSearch(props: {
 
   useEffect(() => {
     if (timer.current) window.clearTimeout(timer.current);
+    if (!userQueryRef.current) {
+      setHits([]);
+      setOpen(false);
+      setBusy(false);
+      return;
+    }
     const query = q.trim();
     if (query.length < 1) {
       setHits([]);
+      setOpen(false);
       return;
     }
     timer.current = window.setTimeout(() => {
       setBusy(true);
       void searchSymbolsApi(query)
         .then((r) => {
+          if (!userQueryRef.current) return;
           setHits(r.results);
           setActive(0);
-          setOpen(true);
+          setOpen(r.results.length > 0);
         })
         .catch(() => setHits([]))
         .finally(() => setBusy(false));
@@ -56,14 +70,16 @@ export function SymbolSearch(props: {
   function commit(symbol: string) {
     const s = symbol.trim().toUpperCase();
     if (!s) return;
+    userQueryRef.current = false;
     setQ(s);
     setOpen(false);
+    setHits([]);
     props.onSelect(s);
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const pick = hits[active]?.symbol ?? q;
+    const pick = open && hits[active]?.symbol ? hits[active].symbol : q;
     commit(pick);
   }
 
@@ -88,8 +104,10 @@ export function SymbolSearch(props: {
         <Search size={size === "hero" ? 18 : 16} aria-hidden="true" />
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => hits.length > 0 && setOpen(true)}
+          onChange={(e) => {
+            userQueryRef.current = true;
+            setQ(e.target.value);
+          }}
           onKeyDown={onKeyDown}
           placeholder={props.placeholder ?? "Search ticker or company name…"}
           aria-label="Stock search"
@@ -121,7 +139,7 @@ export function SymbolSearch(props: {
           ))}
         </ul>
       )}
-      {busy && open && hits.length === 0 ? (
+      {busy && userQueryRef.current && open && hits.length === 0 ? (
         <div className="symbol-search-hint">Searching…</div>
       ) : null}
     </div>
