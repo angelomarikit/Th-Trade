@@ -31,6 +31,19 @@
 - Full mobile polish + journey QA on device  
 - Screenshot pack after preview is live  
 
-## Preview
-Open a **Vercel preview** for `phase7/frontend-redesign` (or local `npm run dev:web` against Railway API).  
+## Preview (production stays on `main`)
+
+**Branch:** `phase7/frontend-redesign` @ `abfca3d`  
+
+1. Open compare/PR: https://github.com/angelomarikit/Th-Trade/compare/main...phase7/frontend-redesign?expand=1  
+2. After the PR exists, Vercel’s GitHub integration should post a **Preview** URL on the PR (same pattern as production `web-tawny-iota-56.vercel.app`, but for this branch).  
+3. Local fallback:
+   ```text
+   git checkout phase7/frontend-redesign
+   npm run dev:web
+   ```
+   Point `VITE_API_BASE` at Railway if needed.
+
+CLI deploy from this machine is blocked (Vercel logged out). Please claim the GitHub PR preview or run `vercel login` once.
+
 Do **not** merge to `main` until you sign off the interactive preview.
