@@ -315,7 +315,7 @@ export function fetchSetup(
   return getJson<SetupResponse>(`/v1/setup?${qs}`, headers);
 }
 
-export function fetchBars(ticker: string, timeframe: string, limit = 150) {
+export function fetchBars(ticker: string, timeframe: string, limit = 80) {
   return getJson<BarsResponse>(
     `/v1/bars?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`,
   );

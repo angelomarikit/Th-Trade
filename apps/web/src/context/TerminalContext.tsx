@@ -256,6 +256,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setData(null);
         setBars(null);
       }
+      // Chart + setup in parallel — do not block candles on heavy /v1/setup (Alpaca snapshot + rules).
+      void loadBars(t, chartTfRef.current, { soft: !symbolChanged });
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
@@ -264,8 +266,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (ac.signal.aborted) return;
         setData(next);
         setUpdatedAt(Date.now());
-        // Refresh candles with setup quotes so the chart is not stuck on first load.
-        void loadBars(t, chartTfRef.current, { soft: !symbolChanged });
         const charged = next.signalRecommendation?.creditsCharged ?? 0;
         const remaining = next.signalRecommendation?.creditsRemaining;
         if (charged > 0 && remaining != null) {
@@ -411,7 +411,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [session?.access_token, pushAlert]);
 
   useEffect(() => {
-    void scan({ brief: true });
+    // Rules-only setup on first paint — brief=1 triggers optional OpenAI and slows first load.
+    void scan({ brief: false });
     const id = window.setInterval(() => void scan({ brief: false }), POLL_MS);
     return () => {
       window.clearInterval(id);
@@ -421,11 +422,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const chartTfRefInit = useRef(chartTf);
   useEffect(() => {
-    // Timeframe-only refresh. Symbol switches refresh bars inside scan() with setup.
+    // Only when user changes timeframe — scan() already loads bars on symbol/setup refresh.
+    if (chartTfRefInit.current === chartTf) return;
+    chartTfRefInit.current = chartTf;
     if (symbol) void loadBars(symbol, chartTf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- symbol handled in scan
-  }, [chartTf, loadBars]);
+  }, [chartTf, symbol, loadBars]);
 
   const displayPrice = useMemo(() => {
     const setupPx = data?.liveCard.lastPrice ?? data?.card.lastPrice;
