@@ -88,9 +88,11 @@ function envFlag(name: string): string {
   return (process.env[name] ?? "").trim() ? "yes" : "NO";
 }
 
-/** Short TTL cache so chart + setup polls do not duplicate Alpaca bar fetches. */
+/** Fresh hits skip Alpaca. Stale hits return immediately so the chart is not blocked. */
 const barsResponseCache = new Map<string, { at: number; payload: unknown }>();
+const barsInflight = new Map<string, Promise<unknown>>();
 const BARS_CACHE_MS = 15_000;
+const BARS_STALE_MS = 5 * 60_000;
 
 async function main() {
   console.log(
@@ -215,6 +217,46 @@ async function main() {
       throw new AuthError(401, "Sign in required to manage a persistent watchlist");
     }
     return "default";
+  }
+
+  async function refreshBarsCache(
+    cacheKey: string,
+    ticker: string,
+    timeframe: "1Min" | "5Min" | "15Min" | "1Day",
+    safeLimit: number,
+  ): Promise<unknown> {
+    const existing = barsInflight.get(cacheKey);
+    if (existing) return existing;
+    const job = (async () => {
+      const bars = await marketData.getBars({
+        symbol: ticker,
+        timeframe,
+        limit: safeLimit,
+      });
+      const payload = {
+        symbol: ticker.toUpperCase(),
+        timeframe,
+        provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
+        feed: process.env.ALPACA_DATA_FEED ?? "iex",
+        count: bars.length,
+        bars: bars.map((b) => ({
+          time: Math.floor(b.timestamp.getTime() / 1000),
+          open: b.open,
+          high: b.high,
+          low: b.low,
+          close: b.close,
+          volume: b.volume,
+          vwap: b.vwap ?? null,
+          completed: b.completed,
+        })),
+      };
+      barsResponseCache.set(cacheKey, { at: Date.now(), payload });
+      return payload;
+    })().finally(() => {
+      barsInflight.delete(cacheKey);
+    });
+    barsInflight.set(cacheKey, job);
+    return job;
   }
 
   const server = createServer(async (req, res) => {
@@ -460,32 +502,16 @@ async function main() {
         const safeLimit = Number.isFinite(limit) ? limit : 150;
         const cacheKey = `${ticker.toUpperCase()}|${timeframe}|${safeLimit}`;
         const cached = barsResponseCache.get(cacheKey);
-        if (cached && Date.now() - cached.at < BARS_CACHE_MS) {
+        const age = cached ? Date.now() - cached.at : Infinity;
+        if (cached && age < BARS_CACHE_MS) {
           return json(res, 200, cached.payload);
         }
-        const bars = await marketData.getBars({
-          symbol: ticker,
-          timeframe,
-          limit: safeLimit,
-        });
-        const payload = {
-          symbol: ticker.toUpperCase(),
-          timeframe,
-          provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
-          feed: process.env.ALPACA_DATA_FEED ?? "iex",
-          count: bars.length,
-          bars: bars.map((b) => ({
-            time: Math.floor(b.timestamp.getTime() / 1000),
-            open: b.open,
-            high: b.high,
-            low: b.low,
-            close: b.close,
-            volume: b.volume,
-            vwap: b.vwap ?? null,
-            completed: b.completed,
-          })),
-        };
-        barsResponseCache.set(cacheKey, { at: Date.now(), payload });
+        if (cached && age < BARS_STALE_MS) {
+          void refreshBarsCache(cacheKey, ticker, timeframe, safeLimit);
+          return json(res, 200, cached.payload);
+        }
+        const pending = barsInflight.get(cacheKey) ?? refreshBarsCache(cacheKey, ticker, timeframe, safeLimit);
+        const payload = await pending;
         return json(res, 200, payload);
         });
       }

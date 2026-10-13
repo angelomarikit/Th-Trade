@@ -9,6 +9,17 @@ export type AlpacaRequestLane = "interactive" | "background";
 
 const alpacaLaneStore = new AsyncLocalStorage<AlpacaRequestLane>();
 
+let lastInteractiveAt = 0;
+
+export function touchInteractiveAlpaca(): void {
+  lastInteractiveAt = Date.now();
+}
+
+/** True while a user chart/setup request recently used Alpaca — monitor should yield. */
+export function backgroundAlpacaShouldWait(windowMs = 20_000): boolean {
+  return Date.now() - lastInteractiveAt < windowMs;
+}
+
 /** User-facing API routes (charts, setup) — scheduled ahead of background monitor work. */
 export function withAlpacaPriority<T>(
   lane: AlpacaRequestLane,
@@ -143,6 +154,7 @@ export async function fetchAlpacaWithRetry(
   const timeoutMs = opts?.timeoutMs ?? Number(process.env.ALPACA_REQUEST_TIMEOUT_MS ?? 12_000);
 
   const lane = laneFromStore();
+  if (lane === "interactive") touchInteractiveAlpaca();
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await gate.schedule(

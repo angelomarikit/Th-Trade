@@ -202,6 +202,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const barsAbortRef = useRef<AbortController | null>(null);
   const barsSeqRef = useRef(0);
+  const barsInflightKeyRef = useRef("");
 
   const FAST_BAR_LIMIT = 36;
   const FULL_BAR_LIMIT = 80;
@@ -209,9 +210,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean; limit?: number }) => {
     const target = sym.trim().toUpperCase();
     if (!target) return;
+    const key = `${target}|${tf}`;
+    if (barsAbortRef.current && barsInflightKeyRef.current === key) {
+      return;
+    }
     barsAbortRef.current?.abort();
     const ac = new AbortController();
     barsAbortRef.current = ac;
+    barsInflightKeyRef.current = key;
     const seq = ++barsSeqRef.current;
     const soft = opts?.soft === true;
     const limit = opts?.limit ?? FULL_BAR_LIMIT;
@@ -221,7 +227,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const cached = readBarsCache(target, tf);
       if (cached) {
         setBars(cached);
-        setBarsLoading(true);
+        setBarsLoading(false);
       } else {
         setBars(null);
         setBarsLoading(true);
@@ -255,6 +261,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setBarsError(friendlyApiError(err));
       if (!soft && !readBarsCache(target, tf)) setBars(null);
     } finally {
+      if (barsInflightKeyRef.current === key) barsInflightKeyRef.current = "";
       if (!ac.signal.aborted && seq === barsSeqRef.current) {
         setBarsLoading(false);
       }
@@ -297,10 +304,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       // Hard switch on ticker change or first paint so the chart shows a spinner, not "no data".
       const hardBarSwitch =
         symbolChanged || (opts?.fast === true && opts?.refreshBars !== true);
-      const shouldLoadBars = symbolChanged || opts?.fast === true || opts?.refreshBars === true;
+      const shouldLoadBars = symbolChanged || (opts?.fast === true && opts?.refreshBars !== true);
       if (shouldLoadBars) {
-        const pollLimit = opts?.refreshBars === true ? FULL_BAR_LIMIT : barLimit;
-        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: pollLimit });
+        void loadBars(t, chartTfRef.current, { soft: !hardBarSwitch, limit: barLimit });
       }
       try {
         const next = await fetchSetup(t, s, {
@@ -477,10 +483,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(
-      () => void scan({ brief: false, fast: true, refreshBars: true }),
-      POLL_MS,
-    );
+    const id = window.setInterval(() => void scan({ brief: false, fast: true }), POLL_MS);
     return () => {
       window.clearInterval(id);
       abortRef.current?.abort();

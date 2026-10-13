@@ -1,5 +1,5 @@
 import type { LiveSetupCard } from "@wulu/confirmation";
-import { withAlpacaPriority } from "@wulu/market-data";
+import { backgroundAlpacaShouldWait, withAlpacaPriority } from "@wulu/market-data";
 import type { TradeSide } from "@wulu/domain";
 import {
   buildAlertEvent,
@@ -524,6 +524,7 @@ export class MonitorHub {
 
   async tick(): Promise<void> {
     if (this.ticking) return;
+    if (backgroundAlpacaShouldWait()) return;
     this.ticking = true;
     const started = Date.now();
     let failed = 0;
