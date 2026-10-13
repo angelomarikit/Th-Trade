@@ -98,12 +98,15 @@ export function ScannerPage() {
             <div>
               <div className="scanner-instrument-title">
                 <h1>{symbol}</h1>
-                {loading && <span className="badge">Updating…</span>}
-                {sessionLabel && <span className="badge amber">{sessionLabel}</span>}
-                <span className="badge blue" title="Market data feed">
-                  {feedLabel}
-                </span>
-                {lc?.marketRegime && <span className="badge">{lc.marketRegime}</span>}
+                {/* Status chips: TopBar on mobile; desktop duplicates session/feed here */}
+                <div className="scanner-instrument-meta hide-mobile">
+                  {loading && <span className="badge">Updating…</span>}
+                  {sessionLabel && <span className="badge amber">{sessionLabel}</span>}
+                  <span className="badge blue" title="Market data feed">
+                    {feedLabel}
+                  </span>
+                  {lc?.marketRegime && <span className="badge">{lc.marketRegime}</span>}
+                </div>
               </div>
               <div className="scanner-price-row">
                 <span className="last">{last != null ? fmtPrice(last) : "—"}</span>

@@ -59,7 +59,7 @@ export function TopBar() {
           </span>
         ) : loading ? (
           <span className="badge amber" title="Loading market session">
-            UPDATING…
+            Sync…
           </span>
         ) : (
           <span className="badge">SESSION —</span>
@@ -68,7 +68,11 @@ export function TopBar() {
         <span className={`badge ${feedConnected ? "teal" : "red"}`} title="Market data API connectivity">
           {feedConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
           <span className="dot" />
-          FEED {feedConnected ? "OK" : "DOWN"}
+          <span className="feed-label">FEED {feedConnected ? "OK" : "DOWN"}</span>
+        </span>
+
+        <span className="badge blue show-mobile-only" title="Data feed">
+          {(feed ?? "iex").toUpperCase()}
         </span>
 
         <span className="badge blue hide-sm" title="Data source">
