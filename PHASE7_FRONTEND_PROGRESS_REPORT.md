@@ -2,15 +2,15 @@
 
 **Date:** 2026-10-13 (UTC+8)  
 **Prepared for:** WULU / Angelo  
-**Branch:** `phase7/frontend-redesign` → merged to `main`  
-**PR:** https://github.com/angelomarikit/Th-Trade/pull/1  
+**Branch:** `phase7/frontend-redesign` → **MERGED** to `main` (`0d62323`)  
+**PR:** https://github.com/angelomarikit/Th-Trade/pull/1 (**MERGED** 2026-10-13)  
 **Safety:** `automaticOrders=false` · min ~2R unchanged · no fabricated win rates  
 
 ---
 
 ## Executive summary
 
-Phase 7 Waves 1–2 (Scanner redesign + design-system polish) are **merged to production `main`**.
+Phase 7 Waves 1–2 (Scanner redesign + design-system polish) are **merged to production `main`** (merge commit `0d62323`).
 
 An earlier Vercel Preview build looked broken on iPhone (SESSION UNKNOWN, FEED DOWN, “string did not match the expected pattern,” dead chart). That was a **shared Preview API-connection bug**, not separate page failures. It is fixed and included in this merge.
 
