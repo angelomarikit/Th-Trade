@@ -3,6 +3,8 @@
  * OpenAI may only narrate — never upgrade past fail-closed states.
  */
 
+import { readOpenAiApiKey, readOpenAiModel } from "./openaiEnv.js";
+
 export type Recommendation =
   | "NO_TRADE"
   | "WATCH"
@@ -146,7 +148,7 @@ export async function narrateRecommendation(input: {
   setupSummary: Record<string, unknown>;
   deep?: boolean;
 }): Promise<string> {
-  const apiKey = (process.env.OPENAI_API_KEY ?? "").trim();
+  const apiKey = readOpenAiApiKey();
   const fallback = buildFallbackBrief(
     input.symbol,
     input.side,
@@ -158,7 +160,7 @@ export async function narrateRecommendation(input: {
     return fallback;
   }
 
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = readOpenAiModel();
   const system = `You write automatic Signal Recommendation briefs for WULU Scanner.
 The trade action (BUY / SELL / WAIT) and internal status are already decided from live scanner data.
 Rules:

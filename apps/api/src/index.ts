@@ -67,6 +67,7 @@ import {
   saveAlertPreferences,
 } from "./monitor/signalHistory.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
+import { openAiConfigured } from "./recommend/openaiEnv.js";
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -154,7 +155,7 @@ async function main() {
   const alpaca = loadAlpacaCredentials();
   const journal = scanner.signalJournal;
   const supabaseReady = isSupabaseConfigured();
-  const openaiReady = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
+  const openaiReady = openAiConfigured();
 
   // Resume persisted watchlists + open tracks + alert dedupe after deploy/restart.
   try {
@@ -329,7 +330,7 @@ async function main() {
           const side = sideParam as TradeSide;
 
           const { card, journalEntry } = await scanner.scanWithJournal({ symbol, side });
-          let withModel = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
+          let withModel = openAiConfigured();
           let creditsCharged = 0;
           let creditsRemaining: number | null = null;
           let planId: string | null = null;
@@ -578,7 +579,7 @@ async function main() {
         const wantBrief =
           url.searchParams.get("brief") === "1" ||
           url.searchParams.get("brief") === "true";
-        const openaiReady = Boolean((process.env.OPENAI_API_KEY ?? "").trim());
+        const openaiReady = openAiConfigured();
         let withModel = wantBrief && openaiReady;
         let creditsCharged = 0;
         let creditsRemaining: number | null = null;

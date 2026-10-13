@@ -8,6 +8,7 @@ import {
   type DeterministicRecommendation,
   type TradeAction,
 } from "./engine.js";
+import { openAiConfigured } from "./openaiEnv.js";
 
 export interface SignalRecommendationPayload {
   action: TradeAction;
@@ -115,7 +116,7 @@ export async function buildAutomaticSignal(input: {
     reasons: deterministic.reasons,
     blockers: deterministic.blockers,
     brief,
-    briefSource: (process.env.OPENAI_API_KEY ?? "").trim() ? "model" : "rules",
+    briefSource: openAiConfigured() ? "model" : "rules",
     automatic: true,
   };
 }
