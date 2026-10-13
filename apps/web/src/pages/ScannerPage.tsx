@@ -21,6 +21,9 @@ export function ScannerPage() {
     recentScans,
     loading,
     updatedAt,
+    displayPrice,
+    dayChangePct,
+    health,
   } = useTerminal();
 
   const lc = data?.liveCard;
@@ -37,14 +40,11 @@ export function ScannerPage() {
       }
     : null;
 
-  const last = lc?.lastPrice ?? bars?.bars.at(-1)?.close;
-  const first = bars?.bars[0]?.close;
-  const lastBar = bars?.bars.at(-1)?.close;
-  const chg =
-    first != null && lastBar != null && first !== 0
-      ? ((lastBar - first) / first) * 100
-      : null;
+  const last = displayPrice;
+  const chg = dayChangePct;
   const rvol = lc?.relativeMomentum?.rvol;
+  const feedLabel = (health?.alpacaFeed ?? bars?.feed ?? "iex").toUpperCase();
+  const sessionLabel = lc?.session?.session ?? data?.card.session?.session;
 
   return (
     <div className="page scanner-page-v7">
@@ -94,13 +94,18 @@ export function ScannerPage() {
               <div className="scanner-instrument-title">
                 <h1>{symbol}</h1>
                 {loading && <span className="badge">Updating…</span>}
-                {lc?.market && <span className="badge">{lc.market}</span>}
-                {lc?.marketRegime && <span className="badge blue">{lc.marketRegime}</span>}
+                {sessionLabel && <span className="badge amber">{sessionLabel}</span>}
+                <span className="badge blue" title="Market data feed">
+                  {feedLabel}
+                </span>
+                {lc?.marketRegime && <span className="badge">{lc.marketRegime}</span>}
               </div>
               <div className="scanner-price-row">
                 <span className="last">{last != null ? fmtPrice(last) : "—"}</span>
                 {chg != null && (
-                  <span className={`chg ${chg >= 0 ? "up" : "down"}`}>{fmtPct(chg)}</span>
+                  <span className={`chg ${chg >= 0 ? "up" : "down"}`} title="Session change from setup">
+                    {fmtPct(chg)}
+                  </span>
                 )}
                 <span className="muted">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
                 <span className="muted">UPD {ageLabel(updatedAt)}</span>
@@ -116,6 +121,7 @@ export function ScannerPage() {
             onTimeframe={setChartTf}
             levels={levels}
             symbol={symbol}
+            lastPrice={last}
           />
         </div>
 

@@ -41,6 +41,8 @@ export function CandleChart(props: {
   onTimeframe: (tf: string) => void;
   levels: LevelOverlay | null;
   symbol: string;
+  /** Live setup quote — patches the last candle so chart matches header price. */
+  lastPrice?: number | null;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -137,7 +139,21 @@ export function CandleChart(props: {
       return;
     }
 
-    const candles: CandlestickData<Time>[] = props.bars.map((b) => ({
+    const aligned = props.bars.map((b, i) => {
+      if (i !== props.bars!.length - 1) return b;
+      const px = props.lastPrice;
+      if (px == null || !Number.isFinite(px) || px <= 0) return b;
+      // Keep chart last close in sync with setup quote (same symbol source).
+      return {
+        ...b,
+        close: px,
+        high: Math.max(b.high, px),
+        low: Math.min(b.low, px),
+        completed: false,
+      };
+    });
+
+    const candles: CandlestickData<Time>[] = aligned.map((b) => ({
       time: b.time as Time,
       open: b.open,
       high: b.high,
@@ -146,19 +162,19 @@ export function CandleChart(props: {
     }));
     series.setData(candles);
 
-    const vols: HistogramData<Time>[] = props.bars.map((b) => ({
+    const vols: HistogramData<Time>[] = aligned.map((b) => ({
       time: b.time as Time,
       value: b.volume ?? 0,
       color: b.close >= b.open ? "rgba(53,200,154,0.35)" : "rgba(248,113,113,0.35)",
     }));
     volume.setData(vols);
 
-    const vwapPts: LineData<Time>[] = props.bars
+    const vwapPts: LineData<Time>[] = aligned
       .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
       .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
     vwap.setData(vwapPts);
 
-    const fitKey = `${props.symbol}|${props.timeframe}|${props.bars[0]?.time}|${props.bars.at(-1)?.time}|${props.bars.length}`;
+    const fitKey = `${props.symbol}|${props.timeframe}|${aligned[0]?.time}|${aligned.at(-1)?.time}|${aligned.length}`;
     if (fitKeyRef.current !== fitKey) {
       chartRef.current?.timeScale().fitContent();
       fitKeyRef.current = fitKey;
@@ -190,7 +206,7 @@ export function CandleChart(props: {
         mk(L.t2, "#A78BFA", "T2"),
       ];
     }
-  }, [props.bars, props.levels, props.symbol, props.timeframe]);
+  }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe]);
 
   return (
     <div className="panel chart-wrap chart-wrap-hero">

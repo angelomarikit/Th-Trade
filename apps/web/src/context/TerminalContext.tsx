@@ -66,6 +66,10 @@ interface TerminalContextValue {
   }) => Promise<void>;
   data: SetupResponse | null;
   bars: BarsResponse | null;
+  /** Authoritative last for header/levels — setup quote when present, else matching bars. */
+  displayPrice: number | null;
+  /** Session/day % from setup relativeMomentum when available. */
+  dayChangePct: number | null;
   chartTf: string;
   setChartTf: (tf: string) => void;
   loading: boolean;
@@ -198,16 +202,20 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const barsAbortRef = useRef<AbortController | null>(null);
   const barsSeqRef = useRef(0);
 
-  const loadBars = useCallback(async (sym: string, tf: string) => {
+  const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean }) => {
     const target = sym.trim().toUpperCase();
     if (!target) return;
     barsAbortRef.current?.abort();
     const ac = new AbortController();
     barsAbortRef.current = ac;
     const seq = ++barsSeqRef.current;
-    // Clear immediately so prior symbol candles/levels never linger on screen.
-    setBars(null);
-    setBarsLoading(true);
+    const soft = opts?.soft === true;
+    // Hard switch: clear so prior symbol candles never linger.
+    // Soft refresh (setup poll): keep candles until the new series arrives.
+    if (!soft) {
+      setBars(null);
+      setBarsLoading(true);
+    }
     setBarsError(null);
     try {
       const b = await fetchBars(target, tf);
@@ -217,7 +225,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       setBarsError(friendlyApiError(err));
-      setBars(null);
+      if (!soft) setBars(null);
     } finally {
       if (!ac.signal.aborted && seq === barsSeqRef.current) {
         setBarsLoading(false);
@@ -233,6 +241,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const s = opts?.side ?? sideRef.current;
       const wantBrief = opts?.brief === true;
       if (!t) return;
+      const symbolChanged = t !== symbolRef.current;
       abortRef.current?.abort();
       const ac = new AbortController();
       abortRef.current = ac;
@@ -241,8 +250,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setSymbol(t);
       setSymbolDraft(t);
       setSide(s);
-      // Drop prior card so chart levels cannot show the previous ticker mid-switch.
-      setData(null);
+      // Only clear when the ticker changes — same-symbol polls keep the prior card
+      // so header/chart do not fall back onto stale or wrong-symbol bars.
+      if (symbolChanged) {
+        setData(null);
+        setBars(null);
+      }
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
@@ -251,6 +264,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (ac.signal.aborted) return;
         setData(next);
         setUpdatedAt(Date.now());
+        // Refresh candles with setup quotes so the chart is not stuck on first load.
+        void loadBars(t, chartTfRef.current, { soft: !symbolChanged });
         const charged = next.signalRecommendation?.creditsCharged ?? 0;
         const remaining = next.signalRecommendation?.creditsRemaining;
         if (charged > 0 && remaining != null) {
@@ -314,7 +329,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });
-        // Bars load via the symbol/chartTf effect — avoid double-fetch flicker.
       } catch (err) {
         if (!ac.signal.aborted) {
           setError(friendlyApiError(err));
@@ -323,7 +337,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (!ac.signal.aborted) setLoading(false);
       }
     },
-    [pushAlert, session?.access_token, setCreditsLocal],
+    [loadBars, pushAlert, session?.access_token, setCreditsLocal],
   );
 
   const selectSymbol = useCallback(
@@ -408,8 +422,25 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Timeframe-only refresh. Symbol switches refresh bars inside scan() with setup.
     if (symbol) void loadBars(symbol, chartTf);
-  }, [chartTf, symbol, loadBars]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- symbol handled in scan
+  }, [chartTf, loadBars]);
+
+  const displayPrice = useMemo(() => {
+    const setupPx = data?.liveCard.lastPrice ?? data?.card.lastPrice;
+    if (setupPx != null && Number.isFinite(setupPx) && setupPx > 0) return setupPx;
+    if (bars?.symbol?.toUpperCase() === symbol.toUpperCase()) {
+      const close = bars.bars.at(-1)?.close;
+      if (close != null && Number.isFinite(close)) return close;
+    }
+    return null;
+  }, [bars, data, symbol]);
+
+  const dayChangePct = useMemo(() => {
+    const pct = data?.liveCard.relativeMomentum?.symbolIntradayPct;
+    return pct != null && Number.isFinite(pct) ? pct : null;
+  }, [data]);
 
   const value = useMemo<TerminalContextValue>(
     () => ({
@@ -421,6 +452,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       scan,
       data,
       bars,
+      displayPrice,
+      dayChangePct,
       chartTf,
       setChartTf,
       loading,
@@ -453,6 +486,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       scan,
       data,
       bars,
+      displayPrice,
+      dayChangePct,
       chartTf,
       loading,
       barsLoading,
