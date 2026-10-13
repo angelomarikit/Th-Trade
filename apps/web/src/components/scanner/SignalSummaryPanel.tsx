@@ -11,7 +11,19 @@ export function SignalSummaryPanel() {
   const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist } = useTerminal();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const lc = data?.liveCard;
+  const rec = data?.signalRecommendation;
   const starred = watchlist.includes(symbol);
+  const tradeAction = rec?.action ?? "WAIT";
+  const actionClass =
+    tradeAction === "BUY" ? "buy" : tradeAction === "SELL" ? "sell" : "wait";
+  const actionLabel =
+    tradeAction === "BUY"
+      ? side === "SHORT"
+        ? "SELL"
+        : "LONG"
+      : tradeAction === "SELL"
+        ? "SHORT"
+        : "WAIT";
 
   if (!lc) {
     return (
@@ -50,6 +62,16 @@ export function SignalSummaryPanel() {
         </span>
       </div>
 
+      <div className={`signal-action-hero ${actionClass}`}>
+        <p className="action-label">Signal recommendation</p>
+        <p className="action-value">{actionLabel}</p>
+        {rr != null && Number.isFinite(rr) && (
+          <p className="action-label" style={{ marginTop: "0.15rem" }}>
+            Reward : risk {rr.toFixed(2)}R · score {score}/100
+          </p>
+        )}
+      </div>
+
       <div className="signal-panel-dir">
         <div className="side-toggle" role="group" aria-label="Direction">
           <button
@@ -77,32 +99,31 @@ export function SignalSummaryPanel() {
       </div>
 
       <dl className="signal-levels">
+        <div className="signal-entry-zone">
+          <dt>Entry zone</dt>
+          <dd>
+            {fmtPrice(lc.entryZone.low)} – {fmtPrice(lc.entryZone.high)}
+          </dd>
+        </div>
         <div>
-          <dt>Entry trigger</dt>
+          <dt>Trigger</dt>
           <dd>{fmtPrice(lc.alertAt)}</dd>
         </div>
         <div>
-          <dt>Stop</dt>
-          <dd>{fmtPrice(lc.stop)}</dd>
+          <dt>Stop loss</dt>
+          <dd className="level-stop">{fmtPrice(lc.stop)}</dd>
         </div>
         <div>
           <dt>Target 1</dt>
-          <dd>{fmtPrice(lc.t1)}</dd>
+          <dd className="level-t1">{fmtPrice(lc.t1)}</dd>
         </div>
         <div>
           <dt>Target 2</dt>
-          <dd>{fmtPrice(lc.t2)}</dd>
+          <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
         </div>
         <div>
-          <dt>Reward : Risk</dt>
+          <dt>Reward : risk</dt>
           <dd>{rr != null && Number.isFinite(rr) ? `${rr.toFixed(2)}R` : "—"}</dd>
-        </div>
-        <div>
-          <dt>Setup score</dt>
-          <dd title={lc.setupScoreDisclaimer}>
-            {score}/100
-            <span className="decision-muted"> · not win %</span>
-          </dd>
         </div>
       </dl>
 

@@ -610,10 +610,59 @@ a {
 
 .chart-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.35rem 0.55rem;
+}
+
+.chart-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.chart-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.chart-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 0.28rem 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chart-action-btn.active {
+  color: var(--teal);
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.12);
+}
+
+.chart-wrap.chart-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  margin: 0;
+  border-radius: 0;
+  max-height: none;
+  background: var(--bg);
+}
+
+.chart-wrap.chart-fullscreen .chart-host {
+  min-height: calc(100vh - 3.5rem);
 }
 
 .tf-group {
@@ -1889,6 +1938,54 @@ a {
   gap: 0.45rem;
   align-items: center;
   justify-content: space-between;
+}
+
+.signal-action-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(8, 13, 20, 0.65);
+}
+
+.signal-action-hero .action-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.signal-action-hero .action-value {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.signal-action-hero.wait .action-value {
+  color: #fcd34d;
+}
+
+.signal-action-hero.buy .action-value {
+  color: var(--teal);
+}
+
+.signal-action-hero.sell .action-value {
+  color: var(--red);
+}
+
+.signal-entry-zone {
+  grid-column: 1 / -1;
+  padding-top: 0.25rem;
+  border-top: 1px dashed var(--border);
+}
+
+.signal-entry-zone dd {
+  font-size: 1rem;
 }
 
 .signal-status {

@@ -12,7 +12,8 @@ import {
   type LineData,
   type Time,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { Maximize2, Minimize2, Radio } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartBar } from "../../lib/api";
 import { formatEtChartTime } from "../../lib/format";
 
@@ -51,6 +52,9 @@ const TFS = [
   { id: "1D", label: "1D" },
 ] as const;
 
+/** Empty “future” space to the right of the last candle (in bars). */
+const DEFAULT_RIGHT_OFFSET = 18;
+
 export function CandleChart(props: {
   bars: ChartBar[] | null;
   loading: boolean;
@@ -71,6 +75,48 @@ export function CandleChart(props: {
   const fitKeyRef = useRef<string>("");
   const structureKeyRef = useRef<string>("");
   const levelsKeyRef = useRef<string>("");
+  const followLiveRef = useRef(true);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [followLive, setFollowLive] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const goLive = useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    followLiveRef.current = true;
+    setFollowLive(true);
+    chart.timeScale().applyOptions({ rightOffset: DEFAULT_RIGHT_OFFSET });
+    chart.timeScale().scrollToRealTime();
+  }, []);
+
+  useEffect(() => {
+    const onFs = () => {
+      setFullscreen(document.fullscreenElement === wrapRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      /* iOS / unsupported */
+    }
+  }, []);
+
+  useEffect(() => {
+    followLiveRef.current = true;
+    setFollowLive(true);
+    fitKeyRef.current = "";
+    structureKeyRef.current = "";
+  }, [props.symbol, props.timeframe]);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -95,10 +141,25 @@ export function CandleChart(props: {
         timeVisible: true,
         secondsVisible: false,
         tickMarkFormatter: (time: Time) => etChartTimeFormatter(time),
+        rightOffset: DEFAULT_RIGHT_OFFSET,
+        fixRightEdge: false,
+        fixLeftEdge: false,
+        shiftVisibleRangeOnNewBar: false,
+        barSpacing: 8,
+        minBarSpacing: 2,
       },
       crosshair: { mode: 1 },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
     });
     const series = chart.addSeries(CandlestickSeries, {
       upColor: "#35C89A",
@@ -135,6 +196,17 @@ export function CandleChart(props: {
       });
     });
     ro.observe(hostRef.current);
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range) return;
+      const lastIdx = seriesRef.current?.data()?.length ?? 0;
+      if (lastIdx <= 0) return;
+      const atLiveEdge = range.to >= lastIdx - 1.5;
+      if (!atLiveEdge && followLiveRef.current) {
+        followLiveRef.current = false;
+        setFollowLive(false);
+      }
+    });
 
     return () => {
       ro.disconnect();
@@ -231,8 +303,10 @@ export function CandleChart(props: {
 
       const fitKey = `${props.symbol}|${props.timeframe}|${aligned[0]?.time}|${aligned.at(-1)?.time}|${aligned.length}`;
       if (fitKeyRef.current !== fitKey) {
-        chartRef.current?.timeScale().fitContent();
         fitKeyRef.current = fitKey;
+        if (followLiveRef.current) {
+          requestAnimationFrame(() => goLive());
+        }
       }
     }
 
@@ -278,10 +352,13 @@ export function CandleChart(props: {
         ];
       }
     }
-  }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe]);
+  }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe, goLive]);
 
   return (
-    <div className="panel chart-wrap chart-wrap-hero">
+    <div
+      ref={wrapRef}
+      className={`panel chart-wrap chart-wrap-hero${fullscreen ? " chart-fullscreen" : ""}`}
+    >
       <div className="chart-toolbar">
         <div className="tf-group" role="group" aria-label="Chart timeframe">
           {TFS.map((tf) => (
@@ -295,19 +372,41 @@ export function CandleChart(props: {
             </button>
           ))}
         </div>
-        <div className="chart-legend" aria-hidden="true">
-          <span className="leg vwap">VWAP</span>
-          <span className="leg entry">Entry</span>
-          <span className="leg stop">Stop</span>
-          <span className="leg t1">T1</span>
-          <span className="leg t2">T2</span>
+        <div className="chart-toolbar-right">
+          <div className="chart-legend" aria-hidden="true">
+            <span className="leg vwap">VWAP</span>
+            <span className="leg entry">Entry</span>
+            <span className="leg stop">Stop</span>
+            <span className="leg t1">T1</span>
+            <span className="leg t2">T2</span>
+          </div>
+          <div className="chart-actions" role="group" aria-label="Chart view">
+            <button
+              type="button"
+              className={`chart-action-btn${followLive ? " active" : ""}`}
+              title="Jump to latest candle with space for upcoming bars"
+              onClick={() => goLive()}
+            >
+              <Radio size={14} aria-hidden />
+              Live
+            </button>
+            <button
+              type="button"
+              className="chart-action-btn"
+              title={fullscreen ? "Exit fullscreen" : "Fullscreen chart"}
+              onClick={() => void toggleFullscreen()}
+            >
+              {fullscreen ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
+              {fullscreen ? "Exit" : "Full"}
+            </button>
+          </div>
+          <span className="badge muted-axis" title="Candle times use US Eastern, same as the top bar clock">
+            AXIS · ET
+          </span>
+          <span className="badge hide-sm" title="Setup levels are indicative — not broker orders">
+            LEVELS = SETUP (NOT ORDERS)
+          </span>
         </div>
-        <span className="badge muted-axis" title="Candle times use US Eastern, same as the top bar clock">
-          AXIS · ET
-        </span>
-        <span className="badge" title="Setup levels are indicative — not broker orders">
-          LEVELS = SETUP (NOT ORDERS)
-        </span>
       </div>
       <div className="chart-host" ref={hostRef}>
         {props.error && (
