@@ -141,7 +141,7 @@ export function AlertsPage() {
         <EmptyState
           badge="Alerts"
           title="No alerts yet"
-          body="When a watched symbol changes status, it will show up here. You can also turn on browser notifications."
+          body="Alerts appear only when a symbol’s status changes. If every symbol stays NO TRADE / DATA NOT VERIFIED, this page stays empty on purpose. That is the closed-market freshness rule, not a missing alert feed."
         />
       ) : (
         <div className="panel">

@@ -287,7 +287,7 @@ function MonitorCard({
       ) : null}
       {!row.dataFresh ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
-          DATA NOT VERIFIED — no trade from this row until the price check passes.
+          DATA NOT VERIFIED — no trade. This is the freshness rule: the quote is older than this session allows (market closed, after hours, or a stale quote). The row is not a failed download.
         </p>
       ) : null}
       {row.waitingFor.length > 0 ? (

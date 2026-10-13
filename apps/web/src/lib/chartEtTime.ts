@@ -47,7 +47,7 @@ export function formatEtChartTick(time: Time, tickMarkType: TickMarkType): strin
       );
     case TickMarkType.Time:
     default:
-      return formatEtChartTime(sec);
+      return `${formatEtChartTime(sec)} ET`;
   }
 }
 

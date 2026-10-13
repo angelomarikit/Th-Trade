@@ -4,7 +4,7 @@ import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
-import { ageLabel, fmtPct, fmtPrice } from "../lib/format";
+import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
 
 export function ScannerPage() {
   const openSymbol = useOpenSymbol();
@@ -21,7 +21,6 @@ export function ScannerPage() {
     setInspectorOpen,
     recentScans,
     loading,
-    updatedAt,
     displayPrice,
     dayChangePct,
     health,
@@ -54,6 +53,14 @@ export function ScannerPage() {
     : null;
 
   const last = displayPrice;
+  const lastBar = bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1) : undefined;
+  const lastBarAt = lastBar ? formatEtTime(lastBar.time * 1000) : null;
+  const quotePx = lc?.lastPrice;
+  const quoteDiffers =
+    last != null &&
+    quotePx != null &&
+    Number.isFinite(quotePx) &&
+    Math.abs(quotePx - last) / last > 0.001;
   const chg = dayChangePct;
   const rvol = lc?.relativeMomentum?.rvol;
   const feedLabel = (health?.alpacaFeed ?? bars?.feed ?? "iex").toUpperCase();
@@ -74,8 +81,9 @@ export function ScannerPage() {
       )}
       {data && (data.liveCard.dataFresh === false || data.card.dataFresh === false) && (
         <p className="banner warn">
-          Data not verified / stale — confirmation fail-closed. Session:{" "}
-          {data.liveCard.session?.session ?? data.card.session?.session ?? "—"}.
+          No trade — the quote is too old for this session (
+          {data.liveCard.session?.session ?? data.card.session?.session ?? "closed"}). Candles below are
+          still the Alpaca bars we received. They are not a live permission to enter.
         </p>
       )}
 
@@ -116,14 +124,26 @@ export function ScannerPage() {
                 </div>
               </div>
               <div className="scanner-price-row">
-                <span className="last">{last != null ? fmtPrice(last) : "—"}</span>
+                <span className="last" title="Close of the last candle on this timeframe. Not edited to match a quote.">
+                  {last != null ? fmtPrice(last) : "—"}
+                </span>
                 {chg != null && (
                   <span className={`chg ${chg >= 0 ? "up" : "down"}`} title="Session change from setup">
                     {fmtPct(chg)}
                   </span>
                 )}
                 <span className="muted">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
-                <span className="muted">UPD {ageLabel(updatedAt)}</span>
+                <span className="muted" title="US Eastern time of the last candle open">
+                  Last bar {lastBarAt ?? "—"}
+                </span>
+                <span className="badge blue" title="Alpaca Basic IEX via REST. Not the SIP consolidated feed and not a websocket.">
+                  {feedLabel} REST
+                </span>
+                {quoteDiffers && (
+                  <span className="muted" title="Latest quote from the setup check. The candle is not changed to this number.">
+                    Quote {fmtPrice(quotePx)}
+                  </span>
+                )}
               </div>
             </div>
           </header>

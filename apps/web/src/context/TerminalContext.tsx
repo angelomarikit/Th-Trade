@@ -295,6 +295,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       // Polls must not cancel a symbol switch that is still waiting on Alpaca.
       // That abort loop is what left the chart on "Loading MU…" with no price.
       if (isPoll) {
+        if (opts?.refreshBars) {
+          void loadBars(t, chartTfRef.current, { soft: true, limit: FULL_BAR_LIMIT });
+        }
         if (setupInflightRef.current) return;
       } else {
         abortRef.current?.abort();
@@ -476,7 +479,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(() => void scan({ brief: false, fast: true, poll: true }), POLL_MS);
+    const id = window.setInterval(
+      () => void scan({ brief: false, fast: true, poll: true, refreshBars: true }),
+      POLL_MS,
+    );
     return () => {
       window.clearInterval(id);
       abortRef.current?.abort();
