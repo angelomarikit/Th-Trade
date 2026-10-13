@@ -1,4 +1,5 @@
 import type { LiveSetupCard } from "@wulu/confirmation";
+import { withAlpacaPriority } from "@wulu/market-data";
 import type { TradeSide } from "@wulu/domain";
 import {
   buildAlertEvent,
@@ -538,27 +539,33 @@ export class MonitorHub {
       }
       this.uniquePairsLastCycle = pairMap.size;
 
-      for (const { cfg, monitors } of pairMap.values()) {
-        try {
-          const card = await this.scanner.scan({
-            symbol: cfg.symbol,
-            side: cfg.side,
-            recordJournal: false,
-          });
-          for (const mon of monitors) {
-            const evt = mon.applyCard(cfg, card, this.feed);
-            if (evt && this.alertStore) await this.alertStore.record(evt);
-            // Foundation: log every evaluated card per user (store dedupes by id).
-            if (this.onSignalCard) this.onSignalCard(card, mon.userId);
-          }
-        } catch (err) {
-          failed += 1;
-          for (const mon of monitors) {
-            const evt = mon.applyError(cfg, err);
-            if (evt && this.alertStore) await this.alertStore.record(evt);
+      await withAlpacaPriority("background", async () => {
+        const symbols = [...pairMap.values()].map(({ cfg }) => cfg.symbol);
+        const snapBySymbol = await this.scanner.preloadSnapshots(symbols);
+
+        for (const { cfg, monitors } of pairMap.values()) {
+          try {
+            const card = await this.scanner.scan({
+              symbol: cfg.symbol,
+              side: cfg.side,
+              recordJournal: false,
+              preloadedSnapshot: snapBySymbol.get(cfg.symbol.toUpperCase()),
+            });
+            for (const mon of monitors) {
+              const evt = mon.applyCard(cfg, card, this.feed);
+              if (evt && this.alertStore) await this.alertStore.record(evt);
+              // Foundation: log every evaluated card per user (store dedupes by id).
+              if (this.onSignalCard) this.onSignalCard(card, mon.userId);
+            }
+          } catch (err) {
+            failed += 1;
+            for (const mon of monitors) {
+              const evt = mon.applyError(cfg, err);
+              if (evt && this.alertStore) await this.alertStore.record(evt);
+            }
           }
         }
-      }
+      });
 
       const cycleMs = Date.now() - started;
       this.lastCycleMs = cycleMs;

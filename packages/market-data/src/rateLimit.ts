@@ -3,6 +3,24 @@
  * Shared by market-data calls so monitor multi-symbol scans do not burst the free/IEX limits.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
+
+export type AlpacaRequestLane = "interactive" | "background";
+
+const alpacaLaneStore = new AsyncLocalStorage<AlpacaRequestLane>();
+
+/** User-facing API routes (charts, setup) — scheduled ahead of background monitor work. */
+export function withAlpacaPriority<T>(
+  lane: AlpacaRequestLane,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return alpacaLaneStore.run(lane, fn);
+}
+
+function laneFromStore(): AlpacaRequestLane {
+  return alpacaLaneStore.getStore() ?? "background";
+}
+
 export interface AlpacaRequestGateOptions {
   /** Minimum spacing between request starts (default 350ms ≈ ~170 req/min). */
   minIntervalMs?: number;
@@ -16,8 +34,17 @@ const DEFAULT_MIN_INTERVAL_MS = 350;
 const DEFAULT_MAX_RETRIES = 4;
 const DEFAULT_MAX_BACKOFF_MS = 15_000;
 
+type QueuedJob<T> = {
+  lane: AlpacaRequestLane;
+  run: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+};
+
 export class AlpacaRequestGate {
-  private chain: Promise<unknown> = Promise.resolve();
+  private interactiveQueue: QueuedJob<unknown>[] = [];
+  private backgroundQueue: QueuedJob<unknown>[] = [];
+  private draining = false;
   private lastStartAt = 0;
   private readonly minIntervalMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -30,19 +57,41 @@ export class AlpacaRequestGate {
   }
 
   /** Serialize work and enforce min spacing between starts. */
-  schedule<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.chain.then(async () => {
-      const elapsed = this.now() - this.lastStartAt;
-      const wait = Math.max(0, this.minIntervalMs - elapsed);
-      if (wait > 0) await this.sleep(wait);
-      this.lastStartAt = this.now();
-      return fn();
+  schedule<T>(fn: () => Promise<T>, lane: AlpacaRequestLane = "background"): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const job: QueuedJob<T> = { lane, run: fn, resolve, reject };
+      if (lane === "interactive") {
+        this.interactiveQueue.push(job as QueuedJob<unknown>);
+      } else {
+        this.backgroundQueue.push(job as QueuedJob<unknown>);
+      }
+      void this.drain();
     });
-    this.chain = run.then(
-      () => undefined,
-      () => undefined,
-    );
-    return run;
+  }
+
+  private async drain(): Promise<void> {
+    if (this.draining) return;
+    this.draining = true;
+    try {
+      while (this.interactiveQueue.length > 0 || this.backgroundQueue.length > 0) {
+        const job = this.interactiveQueue.shift() ?? this.backgroundQueue.shift();
+        if (!job) break;
+        const elapsed = this.now() - this.lastStartAt;
+        const wait = Math.max(0, this.minIntervalMs - elapsed);
+        if (wait > 0) await this.sleep(wait);
+        this.lastStartAt = this.now();
+        try {
+          job.resolve(await job.run());
+        } catch (err) {
+          job.reject(err);
+        }
+      }
+    } finally {
+      this.draining = false;
+      if (this.interactiveQueue.length > 0 || this.backgroundQueue.length > 0) {
+        void this.drain();
+      }
+    }
   }
 }
 
@@ -93,10 +142,12 @@ export async function fetchAlpacaWithRetry(
   const sleep = opts?.sleep ?? defaultSleep;
   const timeoutMs = opts?.timeoutMs ?? Number(process.env.ALPACA_REQUEST_TIMEOUT_MS ?? 12_000);
 
+  const lane = laneFromStore();
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await gate.schedule(() =>
-      dedupedGet(fetchImpl, url, init, Number.isFinite(timeoutMs) ? timeoutMs : 12_000),
+    const res = await gate.schedule(
+      () => dedupedGet(fetchImpl, url, init, Number.isFinite(timeoutMs) ? timeoutMs : 12_000),
+      lane,
     );
     if (res.status !== 429 && res.status !== 503) {
       return res;

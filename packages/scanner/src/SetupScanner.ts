@@ -85,6 +85,20 @@ export class SetupScanner {
     return result.card;
   }
 
+  /** Batch Alpaca snapshots for monitor ticks (~3 HTTP calls vs ~4×N sequential). */
+  async preloadSnapshots(symbols: string[]): Promise<Map<string, MarketSnapshot>> {
+    const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+    if (unique.length === 0 || !this.marketData.getSnapshots) {
+      return new Map();
+    }
+    try {
+      const batch = await this.marketData.getSnapshots(unique);
+      return new Map(batch.map((s) => [s.symbol, s]));
+    } catch {
+      return new Map();
+    }
+  }
+
   async scanWithJournal(request: ScanSetupRequest): Promise<ScanSetupResult> {
     const symbol = request.symbol.toUpperCase();
     const snapshot =

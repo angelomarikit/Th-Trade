@@ -8,6 +8,35 @@ import {
 import { AlpacaMarketDataProvider } from "../src/providers/alpaca.js";
 
 describe("Alpaca request pacing", () => {
+  it("runs interactive lane before queued background work", async () => {
+    const gate = new AlpacaRequestGate({
+      minIntervalMs: 0,
+      sleep: async () => undefined,
+    });
+    const order: number[] = [];
+    let releaseFirst: () => void = () => undefined;
+    const firstBlocked = new Promise<void>((r) => {
+      releaseFirst = r;
+    });
+    const p1 = gate.schedule(async () => {
+      order.push(1);
+      await firstBlocked;
+      return 1;
+    }, "background");
+    await Promise.resolve();
+    const p2 = gate.schedule(async () => {
+      order.push(2);
+      return 2;
+    }, "background");
+    const p3 = gate.schedule(async () => {
+      order.push(3);
+      return 3;
+    }, "interactive");
+    releaseFirst();
+    await Promise.all([p1, p2, p3]);
+    expect(order).toEqual([1, 3, 2]);
+  });
+
   it("spaces scheduled calls by minIntervalMs", async () => {
     let now = 1_000_000;
     const sleeps: number[] = [];

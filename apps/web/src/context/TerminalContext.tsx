@@ -19,6 +19,7 @@ import {
   type HealthResponse,
   type SetupResponse,
 } from "../lib/api";
+import { readBarsCache, writeBarsCache } from "../lib/barsCache";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -217,8 +218,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     // Hard switch: clear so prior symbol candles never linger.
     // Soft refresh (setup poll): keep candles until the new series arrives.
     if (!soft) {
-      setBars(null);
-      setBarsLoading(true);
+      const cached = readBarsCache(target, tf);
+      if (cached) {
+        setBars(cached);
+        setBarsLoading(true);
+      } else {
+        setBars(null);
+        setBarsLoading(true);
+      }
     }
     setBarsError(null);
     try {
@@ -226,6 +233,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
       setBars(b);
+      writeBarsCache(target, tf, b);
       if (limit < FULL_BAR_LIMIT && !ac.signal.aborted && seq === barsSeqRef.current) {
         const refineSeq = seq;
         window.setTimeout(() => {
@@ -235,6 +243,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
               const full = await fetchBars(target, tf, FULL_BAR_LIMIT);
               if (refineSeq !== barsSeqRef.current) return;
               setBars(full);
+              writeBarsCache(target, tf, full);
             } catch {
               /* keep fast candles visible */
             }

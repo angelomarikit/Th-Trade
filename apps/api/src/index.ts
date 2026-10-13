@@ -15,7 +15,12 @@ import {
   POSITION_SIZE_NOT_CALCULATED_MESSAGE,
   type TradeSide,
 } from "@wulu/domain";
-import { EXECUTION_POLICY, hasAlpacaCredentials, loadAlpacaCredentials } from "@wulu/market-data";
+import {
+  EXECUTION_POLICY,
+  hasAlpacaCredentials,
+  loadAlpacaCredentials,
+  withAlpacaPriority,
+} from "@wulu/market-data";
 import { createNewsServiceFromEnv } from "@wulu/news";
 import { searchSymbols } from "@wulu/regime";
 import { listStrategies } from "@wulu/strategies";
@@ -84,7 +89,7 @@ function envFlag(name: string): string {
 
 /** Short TTL cache so chart + setup polls do not duplicate Alpaca bar fetches. */
 const barsResponseCache = new Map<string, { at: number; payload: unknown }>();
-const BARS_CACHE_MS = 3_000;
+const BARS_CACHE_MS = 15_000;
 
 async function main() {
   console.log(
@@ -228,6 +233,9 @@ async function main() {
           newsProvider: news.providerName,
           marketDataProvider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
           alpacaFeed: process.env.ALPACA_DATA_FEED ?? "iex",
+          supportsFastSetup: true,
+          barsCacheMs: BARS_CACHE_MS,
+          alpacaInteractivePriority: true,
           alpacaCredentialsPresent: hasAlpacaCredentials(alpaca),
           journalEnabled: journal != null,
           journalCount: journal?.count() ?? 0,
@@ -419,6 +427,7 @@ async function main() {
       }
 
       if (url.pathname === "/v1/bars" && req.method === "GET") {
+        return withAlpacaPriority("interactive", async () => {
         const ticker = url.searchParams.get("ticker");
         if (!ticker) {
           return json(res, 400, { error: "ticker query required" });
@@ -471,6 +480,7 @@ async function main() {
         };
         barsResponseCache.set(cacheKey, { at: Date.now(), payload });
         return json(res, 200, payload);
+        });
       }
 
       if (url.pathname === "/v1/catalyst" && req.method === "GET") {
@@ -503,6 +513,7 @@ async function main() {
       }
 
       if (url.pathname === "/v1/setup" && req.method === "GET") {
+        return withAlpacaPriority("interactive", async () => {
         const ticker = url.searchParams.get("ticker");
         const sideParam = (url.searchParams.get("side") ?? "LONG").toUpperCase();
         if (!ticker) {
@@ -676,6 +687,7 @@ async function main() {
             executionPlatform: EXECUTION_POLICY.platform,
             alpacaRole: EXECUTION_POLICY.alpacaRole,
           },
+        });
         });
       }
 
