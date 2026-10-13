@@ -1,14 +1,14 @@
-import { Bell, Coins, LogOut, Search, UserRound, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Bell, Coins, LogOut, UserRound, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SymbolSearch } from "../search/SymbolSearch";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
 import { formatEtClock } from "../../lib/format";
 
 export function TopBar() {
   const {
-    symbolDraft,
-    setSymbolDraft,
+    symbol,
     scan,
     side,
     health,
@@ -20,7 +20,6 @@ export function TopBar() {
   } = useTerminal();
   const { profile, plan, signOut, configured, session } = useAuth();
   const [clock, setClock] = useState(() => formatEtClock());
-  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,29 +29,11 @@ export function TopBar() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (
-        e.key === "/" &&
-        !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
-      ) {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-      if (e.key === "Escape") {
-        setInspectorOpen(false);
-        inputRef.current?.blur();
-      }
+      if (e.key === "Escape") setInspectorOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [setInspectorOpen]);
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const t = symbolDraft.trim().toUpperCase();
-    if (!t) return;
-    navigate("/scanner");
-    void scan({ ticker: t, side, brief: true });
-  }
 
   const sessionInfo = data?.liveCard.session ?? data?.card.session;
   const env = health?.accountEnvironment ?? "SIGNALS_ONLY";
@@ -61,20 +42,14 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <form className="top-search" onSubmit={onSubmit}>
-        <Search size={14} aria-hidden="true" />
-        <input
-          ref={inputRef}
-          value={symbolDraft}
-          onChange={(e) => setSymbolDraft(e.target.value.toUpperCase())}
-          placeholder="Symbol"
-          aria-label="Symbol search"
-          maxLength={8}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <kbd>/</kbd>
-      </form>
+      <SymbolSearch
+        initial={symbol}
+        size="top"
+        onSelect={(s) => {
+          navigate("/scanner");
+          void scan({ ticker: s, side, brief: false });
+        }}
+      />
 
       <div className="top-meta">
         {sessionInfo ? (

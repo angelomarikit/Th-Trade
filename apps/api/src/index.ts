@@ -17,6 +17,7 @@ import {
 } from "@wulu/domain";
 import { EXECUTION_POLICY, hasAlpacaCredentials, loadAlpacaCredentials } from "@wulu/market-data";
 import { createNewsServiceFromEnv } from "@wulu/news";
+import { searchSymbols } from "@wulu/regime";
 import { listStrategies } from "@wulu/strategies";
 import { summarizeJournal } from "@wulu/journal";
 import { formatBestContractCard } from "@wulu/options";
@@ -1076,6 +1077,19 @@ async function main() {
         return json(res, 200, { brief, text });
       }
 
+      if (url.pathname === "/v1/symbols/search" && req.method === "GET") {
+        const q = url.searchParams.get("q") ?? "";
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 12), 1), 25);
+        const results = searchSymbols(q, limit);
+        return json(res, 200, {
+          query: q,
+          count: results.length,
+          results,
+          note: "Curated liquid universe typeahead — not a full exchange directory.",
+          automaticOrders: false,
+        });
+      }
+
       if (url.pathname === "/v1/strategies" && req.method === "GET") {
         return json(res, 200, {
           strategies: listStrategies().map((s) => ({
@@ -1393,6 +1407,7 @@ async function main() {
     console.log("  GET /v1/backtest/compare?ticker=NVDA");
     console.log("  GET /v1/measured-performance?source=LIVE_VALIDATED");
     console.log("  POST /v1/signals/:id/live-validate");
+    console.log("  GET /v1/symbols/search?q=NVDA");
     console.log("  GET /v1/signal-performance");
     console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");

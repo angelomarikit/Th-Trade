@@ -308,6 +308,21 @@ export function fetchBars(ticker: string, timeframe: string, limit = 150) {
   );
 }
 
+export interface SymbolSearchHit {
+  symbol: string;
+  name: string;
+  match: "ticker" | "name";
+}
+
+export function searchSymbolsApi(q: string, limit = 12) {
+  return getJson<{
+    query: string;
+    count: number;
+    results: SymbolSearchHit[];
+    note?: string;
+  }>(`/v1/symbols/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+}
+
 export function fetchHealth() {
   return getJson<HealthResponse>("/health");
 }
