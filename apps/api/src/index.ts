@@ -1421,6 +1421,19 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
+function isCorsOriginAllowed(origin: string, allowed: string[]): boolean {
+  if (!origin) return false;
+  if (allowed.includes("*") || allowed.includes(origin)) return true;
+  // Vercel Preview / branch aliases for this project (shared Railway API).
+  if (/^https:\/\/[\w.-]+-supporttoptiersoluts-projects\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+  if (allowed.some((a) => a === "https://*.vercel.app" || a === "*.vercel.app")) {
+    return /^https:\/\/[\w.-]+\.vercel\.app$/i.test(origin);
+  }
+  return false;
+}
+
 function applyCors(
   req: import("node:http").IncomingMessage,
   res: import("node:http").ServerResponse,
@@ -1430,7 +1443,7 @@ function applyCors(
   const allow =
     corsOrigin === "*"
       ? "*"
-      : origin && allowed.includes(origin)
+      : origin && isCorsOriginAllowed(origin, allowed)
         ? origin
         : allowed[0] || "*";
   res.setHeader("Access-Control-Allow-Origin", allow);
