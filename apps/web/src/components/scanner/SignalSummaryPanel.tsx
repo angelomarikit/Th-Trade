@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { StatusBadge, normalizeStatus } from "../ui/StatusBadge";
 import { useTerminal } from "../../context/TerminalContext";
 import { fmtPct, fmtPrice } from "../../lib/format";
 
@@ -72,7 +73,7 @@ export function SignalSummaryPanel() {
             SHORT
           </button>
         </div>
-        <span className={`signal-status badge ${statusBadge(status)}`}>{status}</span>
+        <StatusBadge status={status} className="signal-status" />
       </div>
 
       <dl className="signal-levels">
@@ -153,25 +154,4 @@ export function SignalSummaryPanel() {
       )}
     </aside>
   );
-}
-
-function normalizeStatus(status: string): string {
-  const u = status.toUpperCase();
-  if (u.includes("ENTRY ACTIVE")) return "ENTRY ACTIVE";
-  if (u.includes("NEAR ACTIVE")) return "NEAR ACTIVE";
-  if (u.includes("MISSED")) return "MISSED";
-  if (u.includes("INVALIDATED")) return "INVALIDATED";
-  if (u.includes("DATA NOT VERIFIED") || u.includes("DATA_NOT")) return "DATA NOT VERIFIED";
-  if (u.includes("NO TRADE") || u.includes("NO_TRADE")) return "NO TRADE";
-  if (u.includes("WAIT")) return "WAIT";
-  return status;
-}
-
-function statusBadge(status: string): string {
-  const u = status.toUpperCase();
-  if (u.includes("ENTRY ACTIVE")) return "green";
-  if (u.includes("NEAR ACTIVE")) return "amber";
-  if (u.includes("MISSED") || u.includes("INVALIDATED") || u.includes("NO TRADE")) return "red";
-  if (u.includes("DATA") || u.includes("WAIT")) return "amber";
-  return "";
 }

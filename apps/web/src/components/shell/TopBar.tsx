@@ -4,13 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { SymbolSearch } from "../search/SymbolSearch";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
+import { useOpenSymbol } from "../../hooks/useOpenSymbol";
 import { formatEtClock } from "../../lib/format";
 
 export function TopBar() {
   const {
     symbol,
-    scan,
-    side,
     health,
     feedConnected,
     data,
@@ -18,6 +17,7 @@ export function TopBar() {
     setInspectorOpen,
     inspectorOpen,
   } = useTerminal();
+  const openSymbol = useOpenSymbol();
   const { profile, plan, signOut, configured, session } = useAuth();
   const [clock, setClock] = useState(() => formatEtClock());
   const navigate = useNavigate();
@@ -45,10 +45,7 @@ export function TopBar() {
       <SymbolSearch
         initial={symbol}
         size="top"
-        onSelect={(s) => {
-          navigate("/scanner");
-          void scan({ ticker: s, side, brief: false });
-        }}
+        onSelect={(s) => openSymbol(s, { brief: false })}
       />
 
       <div className="top-meta">

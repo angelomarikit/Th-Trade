@@ -478,6 +478,7 @@ export interface OpportunityRow {
   catalystBoost?: number;
   catalystHeadline?: string | null;
   features?: {
+    lastPrice?: number;
     dayChangePct: number | null;
     vsSpyPct: number | null;
     rvolProxy: number | null;

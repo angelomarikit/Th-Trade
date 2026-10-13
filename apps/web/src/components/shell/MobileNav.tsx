@@ -1,11 +1,11 @@
-import { LayoutDashboard, Radar, Search, Settings, Star } from "lucide-react";
+import { Bell, Radar, Search, Settings, Star } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/", end: true, label: "Home", icon: LayoutDashboard },
+  { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/opportunities", label: "Discover", icon: Search },
-  { to: "/scanner", label: "Scan", icon: Radar },
-  { to: "/watchlist", label: "Monitor", icon: Star },
+  { to: "/watchlist", label: "Watch", icon: Star },
+  { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
@@ -16,7 +16,6 @@ export function MobileNav() {
         <NavLink
           key={item.to}
           to={item.to}
-          end={item.end}
           className={({ isActive }) => (isActive ? "active" : undefined)}
         >
           <item.icon size={18} />

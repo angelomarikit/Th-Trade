@@ -1471,6 +1471,95 @@ a {
   gap: 0.5rem;
 }
 
+/* Shared page chrome (Opportunities / Watchlist / etc.) */
+.wulu-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+.wulu-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.btn {
+  border: 1px solid var(--border);
+  background: var(--raised);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.btn.primary {
+  border-color: transparent;
+  background: var(--green);
+  color: #062418;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--teal);
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+.table-wrap,
+.wulu-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.wulu-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.wulu-data-table th,
+.wulu-data-table td {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.wulu-data-table th {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.wulu-data-table .chg.up {
+  color: var(--green);
+}
+.wulu-data-table .chg.down {
+  color: var(--red);
+}
+.error-banner {
+  color: var(--red);
+}
+.opp-tabs {
+  margin: 0.75rem 0;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.status-badge {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 /* ——— Phase 7 design system: search + scanner ——— */
 .symbol-search {
   position: relative;

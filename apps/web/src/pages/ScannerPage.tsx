@@ -3,9 +3,11 @@ import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
 import { SymbolSearch } from "../components/search/SymbolSearch";
 import { useTerminal } from "../context/TerminalContext";
+import { useOpenSymbol } from "../hooks/useOpenSymbol";
 import { ageLabel, fmtPct, fmtPrice } from "../lib/format";
 
 export function ScannerPage() {
+  const openSymbol = useOpenSymbol();
   const {
     data,
     bars,
@@ -16,7 +18,6 @@ export function ScannerPage() {
     symbol,
     error,
     inspectorOpen,
-    selectSymbol,
     recentScans,
     loading,
     updatedAt,
@@ -63,7 +64,7 @@ export function ScannerPage() {
         <SymbolSearch
           initial={symbol}
           size="hero"
-          onSelect={(s) => selectSymbol(s, { brief: false })}
+          onSelect={(s) => openSymbol(s, { brief: false })}
         />
       </div>
 
@@ -73,7 +74,7 @@ export function ScannerPage() {
           <ul>
             {recentScans.slice(0, 10).map((r) => (
               <li key={`${r.symbol}-${r.at}`}>
-                <button type="button" onClick={() => selectSymbol(r.symbol, { brief: false })}>
+                <button type="button" onClick={() => openSymbol(r.symbol, { brief: false })}>
                   <strong>{r.symbol}</strong>
                   <span className="muted">{r.status}</span>
                 </button>
