@@ -10,7 +10,9 @@
   --red: #f87171;
   --amber: #f5b942;
   --blue: #60a5fa;
-  --radius: 8px;
+  --wulu-gold: #d4af37;
+  --radius: 10px;
+  --panel-radius: 12px;
   --sidebar-w: 220px;
   --sidebar-collapsed: 64px;
   --topbar-h: 56px;
@@ -2033,6 +2035,17 @@ a {
     overscroll-behavior: contain;
     width: 100%;
     max-width: 100%;
+  }
+
+  .chart-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .tf-group button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
   }
 
   .page {

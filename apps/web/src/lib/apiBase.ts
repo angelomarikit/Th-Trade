@@ -55,6 +55,16 @@ export function friendlyApiError(err: unknown): string {
   if (lower.includes("http 5")) {
     return "Market data API is temporarily unavailable.";
   }
+  if (
+    lower.includes("plan limit") ||
+    lower.includes("monitor limit") ||
+    (lower.includes("max") && lower.includes("monitored symbol"))
+  ) {
+    return "You've reached your current watchlist limit. Remove a stock or upgrade your plan.";
+  }
+  if (lower.includes("invalid json body") || (rawMsg.includes("{") && rawMsg.includes('"error"'))) {
+    return "Something went wrong. Please try again.";
+  }
   // Strip huge HTML / JSON dump bodies
   if (rawMsg.length > 180 || rawMsg.trimStart().startsWith("<")) {
     return "Something went wrong loading market data. Please try again.";

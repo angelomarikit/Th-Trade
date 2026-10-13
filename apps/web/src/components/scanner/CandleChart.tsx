@@ -51,6 +51,8 @@ export function CandleChart(props: {
   const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const fitKeyRef = useRef<string>("");
+  const structureKeyRef = useRef<string>("");
+  const levelsKeyRef = useRef<string>("");
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -69,6 +71,8 @@ export function CandleChart(props: {
       rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.08, bottom: 0.22 } },
       timeScale: { borderColor: "#2a3a4d", timeVisible: true, secondsVisible: false },
       crosshair: { mode: 1 },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     });
     const series = chart.addSeries(CandlestickSeries, {
       upColor: "#35C89A",
@@ -123,16 +127,18 @@ export function CandleChart(props: {
     const vwap = vwapRef.current;
     if (!series || !volume || !vwap) return;
 
-    for (const line of linesRef.current) {
-      try {
-        series.removePriceLine(line);
-      } catch {
-        /* series may already be cleared */
-      }
-    }
-    linesRef.current = [];
-
     if (!props.bars?.length) {
+      structureKeyRef.current = "";
+      levelsKeyRef.current = "";
+      fitKeyRef.current = "";
+      for (const line of linesRef.current) {
+        try {
+          series.removePriceLine(line);
+        } catch {
+          /* cleared */
+        }
+      }
+      linesRef.current = [];
       series.setData([]);
       volume.setData([]);
       vwap.setData([]);
@@ -143,7 +149,6 @@ export function CandleChart(props: {
       if (i !== props.bars!.length - 1) return b;
       const px = props.lastPrice;
       if (px == null || !Number.isFinite(px) || px <= 0) return b;
-      // Keep chart last close in sync with setup quote (same symbol source).
       return {
         ...b,
         close: px,
@@ -153,31 +158,56 @@ export function CandleChart(props: {
       };
     });
 
-    const candles: CandlestickData<Time>[] = aligned.map((b) => ({
-      time: b.time as Time,
-      open: b.open,
-      high: b.high,
-      low: b.low,
-      close: b.close,
-    }));
-    series.setData(candles);
+    const structureKey = `${props.symbol}|${props.timeframe}|${aligned.length}|${aligned[0]?.time}|${aligned.at(-1)?.time}`;
+    const canPatchLast = structureKeyRef.current === structureKey && structureKey.length > 0;
 
-    const vols: HistogramData<Time>[] = aligned.map((b) => ({
-      time: b.time as Time,
-      value: b.volume ?? 0,
-      color: b.close >= b.open ? "rgba(53,200,154,0.35)" : "rgba(248,113,113,0.35)",
-    }));
-    volume.setData(vols);
+    if (canPatchLast) {
+      const last = aligned.at(-1)!;
+      const t = last.time as Time;
+      series.update({
+        time: t,
+        open: last.open,
+        high: last.high,
+        low: last.low,
+        close: last.close,
+      });
+      volume.update({
+        time: t,
+        value: last.volume ?? 0,
+        color: last.close >= last.open ? "rgba(53,200,154,0.35)" : "rgba(248,113,113,0.35)",
+      });
+      if (last.vwap != null && Number.isFinite(last.vwap)) {
+        vwap.update({ time: t, value: last.vwap });
+      }
+    } else {
+      structureKeyRef.current = structureKey;
 
-    const vwapPts: LineData<Time>[] = aligned
-      .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
-      .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
-    vwap.setData(vwapPts);
+      const candles: CandlestickData<Time>[] = aligned.map((b) => ({
+        time: b.time as Time,
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+      }));
+      series.setData(candles);
 
-    const fitKey = `${props.symbol}|${props.timeframe}|${aligned[0]?.time}|${aligned.at(-1)?.time}|${aligned.length}`;
-    if (fitKeyRef.current !== fitKey) {
-      chartRef.current?.timeScale().fitContent();
-      fitKeyRef.current = fitKey;
+      const vols: HistogramData<Time>[] = aligned.map((b) => ({
+        time: b.time as Time,
+        value: b.volume ?? 0,
+        color: b.close >= b.open ? "rgba(53,200,154,0.35)" : "rgba(248,113,113,0.35)",
+      }));
+      volume.setData(vols);
+
+      const vwapPts: LineData<Time>[] = aligned
+        .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
+        .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
+      vwap.setData(vwapPts);
+
+      const fitKey = `${props.symbol}|${props.timeframe}|${aligned[0]?.time}|${aligned.at(-1)?.time}|${aligned.length}`;
+      if (fitKeyRef.current !== fitKey) {
+        chartRef.current?.timeScale().fitContent();
+        fitKeyRef.current = fitKey;
+      }
     }
 
     const levelsOk =
@@ -185,26 +215,42 @@ export function CandleChart(props: {
       (!props.levels.forSymbol ||
         props.levels.forSymbol.toUpperCase() === props.symbol.toUpperCase());
 
-    if (levelsOk && props.levels) {
-      const L = props.levels;
-      const mk = (price: number, color: string, title: string) =>
-        series.createPriceLine({
-          price,
-          color,
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title,
-        });
-      // Fewer overlapping titles: zone mid as Entry, skip duplicate zone hi/lo labels
-      const entryMid = (L.zoneLow + L.zoneHigh) / 2;
-      linesRef.current = [
-        mk(L.trigger, "#93C5FD", "TRIG"),
-        mk(entryMid, "#2DD4BF", "ENTRY"),
-        mk(L.stop, "#F87171", "STOP"),
-        mk(L.t1, "#34D399", "T1"),
-        mk(L.t2, "#A78BFA", "T2"),
-      ];
+    const levelsKey =
+      levelsOk && props.levels
+        ? `${props.levels.trigger}|${props.levels.stop}|${props.levels.t1}|${props.levels.t2}|${props.levels.zoneLow}|${props.levels.zoneHigh}`
+        : "";
+
+    if (levelsKey !== levelsKeyRef.current) {
+      for (const line of linesRef.current) {
+        try {
+          series.removePriceLine(line);
+        } catch {
+          /* cleared */
+        }
+      }
+      linesRef.current = [];
+      levelsKeyRef.current = levelsKey;
+
+      if (levelsOk && props.levels) {
+        const L = props.levels;
+        const mk = (price: number, color: string, title: string) =>
+          series.createPriceLine({
+            price,
+            color,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title,
+          });
+        const entryMid = (L.zoneLow + L.zoneHigh) / 2;
+        linesRef.current = [
+          mk(L.trigger, "#93C5FD", "TRIG"),
+          mk(entryMid, "#2DD4BF", "ENTRY"),
+          mk(L.stop, "#F87171", "STOP"),
+          mk(L.t1, "#34D399", "T1"),
+          mk(L.t2, "#A78BFA", "T2"),
+        ];
+      }
     }
   }, [props.bars, props.lastPrice, props.levels, props.symbol, props.timeframe]);
 
@@ -235,7 +281,9 @@ export function CandleChart(props: {
         </span>
       </div>
       <div className="chart-host" ref={hostRef}>
-        {props.loading && <div className="chart-overlay-msg">Loading {props.symbol}…</div>}
+        {props.loading && (!props.bars || props.bars.length === 0) && (
+          <div className="chart-overlay-msg">Loading {props.symbol}…</div>
+        )}
         {!props.loading && props.error && (
           <div className="chart-overlay-msg">Chart feed error: {props.error}</div>
         )}
