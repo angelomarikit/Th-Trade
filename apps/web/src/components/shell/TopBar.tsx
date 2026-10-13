@@ -16,6 +16,7 @@ export function TopBar() {
     alerts,
     setInspectorOpen,
     inspectorOpen,
+    loading,
   } = useTerminal();
   const openSymbol = useOpenSymbol();
   const { profile, plan, signOut, configured, session } = useAuth();
@@ -56,8 +57,12 @@ export function TopBar() {
           >
             {sessionInfo.session}
           </span>
+        ) : loading ? (
+          <span className="badge amber" title="Loading market session">
+            UPDATING…
+          </span>
         ) : (
-          <span className="badge">SESSION UNKNOWN</span>
+          <span className="badge">SESSION —</span>
         )}
 
         <span className={`badge ${feedConnected ? "teal" : "red"}`} title="Market data API connectivity">
