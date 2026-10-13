@@ -45,6 +45,68 @@ export async function insertSignalPerformanceRecord(
   return true;
 }
 
+/**
+ * Mark a LIVE record as operator-verified (RTH). Rejects REPLAY and unresolved rows.
+ * Does not invent outcomes — only flips live_validated when evidence already exists.
+ */
+export async function markSignalLiveValidated(opts: {
+  id: string;
+  note?: string;
+}): Promise<{ ok: true; record: SignalPerformanceRecord } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Supabase not configured" };
+  }
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("signal_performance_records")
+    .select("*")
+    .eq("id", opts.id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Signal record not found" };
+
+  const row = rowToRecord(data as Record<string, unknown>);
+  if (row.source !== "LIVE") {
+    return { ok: false, error: "Only LIVE records can be live-validated (not HISTORICAL_REPLAY)" };
+  }
+  const resolved = ["WIN", "LOSS", "HIT_T1", "HIT_T2", "STOPPED", "TIME_STOP"].includes(
+    String(row.outcomeStatus).toUpperCase(),
+  );
+  if (!resolved && row.outcomeR == null) {
+    return {
+      ok: false,
+      error: "Outcome must be resolved (WIN/LOSS/HIT/STOPPED) before live validation",
+    };
+  }
+  if (row.liveValidated) {
+    return { ok: true, record: row };
+  }
+
+  const { data: updated, error: upErr } = await sb
+    .from("signal_performance_records")
+    .update({ live_validated: true })
+    .eq("id", opts.id)
+    .select("*")
+    .maybeSingle();
+  if (upErr) return { ok: false, error: upErr.message };
+  if (!updated) return { ok: false, error: "Update failed" };
+
+  const record = rowToRecord(updated as Record<string, unknown>);
+  if (opts.note) {
+    console.log(`[live-validate] ${opts.id} marked validated: ${opts.note.slice(0, 200)}`);
+  }
+  return { ok: true, record };
+}
+
+/** Allowlist emails from LIVE_VALIDATE_EMAILS (comma-separated). Empty = any authenticated user. */
+export function canMarkLiveValidated(email: string | undefined): boolean {
+  const raw = (process.env.LIVE_VALIDATE_EMAILS ?? "").trim();
+  if (!raw) return true;
+  if (!email) return false;
+  const allowed = raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return allowed.includes(email.toLowerCase());
+}
+
 export async function listSignalPerformanceRecords(opts: {
   userId?: string | null;
   limit?: number;

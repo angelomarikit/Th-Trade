@@ -3,7 +3,7 @@
  * Never invents win rates — insufficient samples return null rates + clear notes.
  */
 
-export type MeasuredSource = "LIVE" | "HISTORICAL_REPLAY" | "ALL";
+export type MeasuredSource = "LIVE" | "HISTORICAL_REPLAY" | "LIVE_VALIDATED" | "ALL";
 
 export interface MeasuredPerformanceInputRow {
   symbol?: string;
@@ -45,7 +45,7 @@ export interface MeasuredPerformanceReport {
 const DEFAULT_MIN_SAMPLE = 20;
 
 const DISCLAIMER =
-  "Measured performance from stored scanner records. HISTORICAL_REPLAY is hypothetical. LIVE outcomes are not a published edge until liveValidated. Auto-trading disabled. Past results ≠ future performance.";
+  "Measured performance from stored scanner records. HISTORICAL_REPLAY is hypothetical. LIVE outcomes are not a published edge until liveValidated. LIVE_VALIDATED is the only bucket suitable for launch claims. Auto-trading disabled. Past results ≠ future performance.";
 
 export function aggregateMeasuredPerformance(
   rows: MeasuredPerformanceInputRow[],
@@ -56,6 +56,9 @@ export function aggregateMeasuredPerformance(
 
   const filtered = rows.filter((r) => {
     if (sourceFilter === "ALL") return true;
+    if (sourceFilter === "LIVE_VALIDATED") {
+      return (r.source ?? "LIVE") === "LIVE" && r.liveValidated === true;
+    }
     return (r.source ?? "LIVE") === sourceFilter;
   });
 

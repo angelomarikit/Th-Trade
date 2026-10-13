@@ -389,10 +389,39 @@ export interface MeasuredPerformanceResponse {
   automaticOrders: false;
 }
 
-export function fetchMeasuredPerformance(source: "ALL" | "LIVE" | "HISTORICAL_REPLAY" = "ALL") {
+export function fetchMeasuredPerformance(
+  source: "ALL" | "LIVE" | "HISTORICAL_REPLAY" | "LIVE_VALIDATED" = "ALL",
+) {
   return getJson<MeasuredPerformanceResponse>(
     `/v1/measured-performance?source=${encodeURIComponent(source)}`,
   );
+}
+
+export async function markSignalLiveValidated(
+  id: string,
+  accessToken: string,
+  note?: string,
+) {
+  const res = await fetch(
+    `${API_BASE}/v1/signals/${encodeURIComponent(id)}/live-validate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ note }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<{
+    record: { id: string; liveValidated: boolean; symbol: string };
+    automaticOrders: false;
+    note: string;
+  }>;
 }
 
 export function fetchRegime() {

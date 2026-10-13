@@ -73,6 +73,8 @@ export function BacktestPage() {
   const [measuredReplay, setMeasuredReplay] = useState<MeasuredPerformanceResponse | null>(
     null,
   );
+  const [measuredValidated, setMeasuredValidated] =
+    useState<MeasuredPerformanceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -92,16 +94,18 @@ export function BacktestPage() {
     setLoading(true);
     setError(null);
     try {
-      const [e, c, live, replay] = await Promise.all([
+      const [e, c, live, replay, validated] = await Promise.all([
         fetchEdge(symbol, strategyId),
         fetchBacktestCompare(symbol),
         fetchMeasuredPerformance("LIVE"),
         fetchMeasuredPerformance("HISTORICAL_REPLAY"),
+        fetchMeasuredPerformance("LIVE_VALIDATED"),
       ]);
       setEdge(e);
       setCompare(c);
       setMeasuredLive(live);
       setMeasuredReplay(replay);
+      setMeasuredValidated(validated);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -153,9 +157,14 @@ export function BacktestPage() {
           <h2>Measured performance (separated sources)</h2>
           <p className="muted" style={{ fontSize: "0.85rem" }}>
             Use LIVE for scanner soak outcomes. Use REPLAY only for offline historical simulation.
-            liveValidated counts toward launch confidence; raw LIVE alone is not a published edge.
+            Use VALIDATED for operator-verified RTH outcomes — the only bucket for launch claims.
           </p>
           <div className="row gap" style={{ flexWrap: "wrap", marginTop: "0.75rem" }}>
+            <MeasuredPanel
+              title="Validated LIVE (launch)"
+              badge="VALIDATED"
+              measured={measuredValidated}
+            />
             <MeasuredPanel title="LIVE scanner history" badge="LIVE" measured={measuredLive} />
             <MeasuredPanel
               title="Historical replay"

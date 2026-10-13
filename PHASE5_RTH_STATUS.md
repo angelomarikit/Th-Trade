@@ -12,3 +12,5 @@ Tracked alongside Phase 6 so development does not stall.
 | 6 | Confirm latency | Baseline 165s → optimized | **Re-measure** | Use `confirmElapsedMs` |
 
 **Next RTH window:** run authenticated promote of 10–12 names, watch MonitorHub cycleMs + alert timestamps, capture `/v1/opportunities?confirm=3` timings.
+
+**Note (2026-10-13 ~08:30 UTC+8):** Still outside US RTH for this session. Confirm latency already re-measured AH (~9–12s). Items 3–5 remain open until a regular session. Tracked in parallel with Phase 7.

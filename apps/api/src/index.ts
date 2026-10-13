@@ -52,8 +52,10 @@ import {
   upsertOpenTrack,
 } from "./monitor/openTracks.js";
 import {
+  canMarkLiveValidated,
   getAlertPreferences,
   HybridSignalPerformanceStore,
+  markSignalLiveValidated,
   saveAlertPreferences,
 } from "./monitor/signalHistory.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
@@ -1093,25 +1095,65 @@ async function main() {
         });
       }
 
-      // Phase 6: measured performance from durable signal history
+      // Phase 6/7: measured performance from durable signal history
       if (url.pathname === "/v1/measured-performance" && req.method === "GET") {
         const sourceParam = (url.searchParams.get("source") ?? "ALL").toUpperCase();
         const source =
-          sourceParam === "LIVE" || sourceParam === "HISTORICAL_REPLAY" ? sourceParam : "ALL";
+          sourceParam === "LIVE" ||
+          sourceParam === "HISTORICAL_REPLAY" ||
+          sourceParam === "LIVE_VALIDATED"
+            ? sourceParam
+            : "ALL";
         const minSample = Math.min(
           Math.max(Number(url.searchParams.get("minSample") ?? 20), 5),
           200,
         );
         const records = await signalPerformanceStore.listMerged(500, null);
         const report = aggregateMeasuredPerformance(records, {
-          source: source as "LIVE" | "HISTORICAL_REPLAY" | "ALL",
+          source: source as "LIVE" | "HISTORICAL_REPLAY" | "LIVE_VALIDATED" | "ALL",
           minSampleForRate: minSample,
         });
         return json(res, 200, {
           ...report,
           recordsConsidered: records.length,
-          note: "Foundation measured stats from stored rows — not a marketed accuracy claim.",
+          note:
+            source === "LIVE_VALIDATED"
+              ? "Operator-validated LIVE outcomes only — suitable for launch claims once sample floors are met."
+              : "Foundation measured stats from stored rows — not a marketed accuracy claim.",
         });
+      }
+
+      // Phase 7: operator marks a LIVE resolved outcome as RTH-verified
+      if (
+        url.pathname.startsWith("/v1/signals/") &&
+        url.pathname.endsWith("/live-validate") &&
+        req.method === "POST"
+      ) {
+        if (!supabaseReady) {
+          return json(res, 503, { error: "Supabase not configured" });
+        }
+        try {
+          const user = await requireUser(req.headers.authorization);
+          if (!canMarkLiveValidated(user.email ?? undefined)) {
+            return json(res, 403, {
+              error: "Not authorized to live-validate (check LIVE_VALIDATE_EMAILS)",
+            });
+          }
+          const id = decodeURIComponent(
+            url.pathname.slice("/v1/signals/".length, -"/live-validate".length),
+          );
+          if (!id) return json(res, 400, { error: "signal id required" });
+          const body = (await readJson(req).catch(() => ({}))) as { note?: string };
+          const result = await markSignalLiveValidated({ id, note: body.note });
+          if (!result.ok) return json(res, 400, { error: result.error });
+          return json(res, 200, {
+            record: result.record,
+            automaticOrders: false,
+            note: "liveValidated=true. Use measured-performance?source=LIVE_VALIDATED for launch stats.",
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
       }
 
       if (url.pathname === "/v1/journal" && req.method === "GET") {
@@ -1232,7 +1274,8 @@ async function main() {
     console.log("  GET /v1/opportunities?top=15&confirm=0");
     console.log("  POST /v1/monitor/promote");
     console.log("  GET /v1/backtest/compare?ticker=NVDA");
-    console.log("  GET /v1/measured-performance?source=ALL");
+    console.log("  GET /v1/measured-performance?source=LIVE_VALIDATED");
+    console.log("  POST /v1/signals/:id/live-validate");
     console.log("  GET /v1/signal-performance");
     console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");

@@ -36,4 +36,36 @@ describe("aggregateMeasuredPerformance", () => {
     const liveOnly = aggregateMeasuredPerformance(rows, { source: "LIVE", minSampleForRate: 10 });
     expect(liveOnly.overall.sampleSize).toBe(0);
   });
+
+  it("LIVE_VALIDATED only includes liveValidated LIVE rows", () => {
+    const rows = [
+      {
+        symbol: "A",
+        outcomeStatus: "WIN" as const,
+        outcomeR: 1,
+        source: "LIVE",
+        liveValidated: true,
+      },
+      {
+        symbol: "B",
+        outcomeStatus: "WIN" as const,
+        outcomeR: 1,
+        source: "LIVE",
+        liveValidated: false,
+      },
+      {
+        symbol: "C",
+        outcomeStatus: "WIN" as const,
+        outcomeR: 1,
+        source: "HISTORICAL_REPLAY",
+        liveValidated: true,
+      },
+    ];
+    const report = aggregateMeasuredPerformance(rows, {
+      source: "LIVE_VALIDATED",
+      minSampleForRate: 1,
+    });
+    expect(report.overall.sampleSize).toBe(1);
+    expect(report.overall.wins).toBe(1);
+  });
 });
