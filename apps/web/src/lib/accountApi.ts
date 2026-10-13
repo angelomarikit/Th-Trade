@@ -1,6 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+import { apiUrl, friendlyApiError } from "./apiBase";
 
 export interface PlanInfo {
   id: string;
@@ -66,30 +65,37 @@ async function authedFetch<T>(
   session: Session,
   init?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+  try {
+    const res = await fetch(apiUrl(path), {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+    }
+    return body as T;
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
   }
-  return body as T;
 }
 
 export function fetchMe(session: Session) {
   return authedFetch<MeResponse>("/v1/me", session);
 }
 
-export function fetchPlans() {
-  return fetch(`${API_BASE}/v1/plans`).then(async (res) => {
-    if (!res.ok) throw new Error(`Plans HTTP ${res.status}`);
+export async function fetchPlans() {
+  try {
+    const res = await fetch(apiUrl("/v1/plans"));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json() as Promise<{ plans: PlanInfo[] }>;
-  });
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
+  }
 }
 
 export function selectPlan(session: Session, plan: string) {

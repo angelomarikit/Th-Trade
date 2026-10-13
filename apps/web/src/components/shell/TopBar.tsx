@@ -1,26 +1,26 @@
-import { Bell, Coins, LogOut, Search, UserRound, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Bell, Coins, LogOut, UserRound, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SymbolSearch } from "../search/SymbolSearch";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
+import { useOpenSymbol } from "../../hooks/useOpenSymbol";
 import { formatEtClock } from "../../lib/format";
 
 export function TopBar() {
   const {
-    symbolDraft,
-    setSymbolDraft,
-    scan,
-    side,
+    symbol,
     health,
     feedConnected,
     data,
     alerts,
     setInspectorOpen,
     inspectorOpen,
+    loading,
   } = useTerminal();
+  const openSymbol = useOpenSymbol();
   const { profile, plan, signOut, configured, session } = useAuth();
   const [clock, setClock] = useState(() => formatEtClock());
-  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,29 +30,11 @@ export function TopBar() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (
-        e.key === "/" &&
-        !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
-      ) {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-      if (e.key === "Escape") {
-        setInspectorOpen(false);
-        inputRef.current?.blur();
-      }
+      if (e.key === "Escape") setInspectorOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [setInspectorOpen]);
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const t = symbolDraft.trim().toUpperCase();
-    if (!t) return;
-    navigate("/scanner");
-    void scan({ ticker: t, side, brief: true });
-  }
 
   const sessionInfo = data?.liveCard.session ?? data?.card.session;
   const env = health?.accountEnvironment ?? "SIGNALS_ONLY";
@@ -61,20 +43,11 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <form className="top-search" onSubmit={onSubmit}>
-        <Search size={14} aria-hidden="true" />
-        <input
-          ref={inputRef}
-          value={symbolDraft}
-          onChange={(e) => setSymbolDraft(e.target.value.toUpperCase())}
-          placeholder="Symbol"
-          aria-label="Symbol search"
-          maxLength={8}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <kbd>/</kbd>
-      </form>
+      <SymbolSearch
+        initial={symbol}
+        size="top"
+        onSelect={(s) => openSymbol(s, { brief: false })}
+      />
 
       <div className="top-meta">
         {sessionInfo ? (
@@ -84,8 +57,12 @@ export function TopBar() {
           >
             {sessionInfo.session}
           </span>
+        ) : loading ? (
+          <span className="badge amber" title="Loading market session">
+            UPDATING…
+          </span>
         ) : (
-          <span className="badge">SESSION UNKNOWN</span>
+          <span className="badge">SESSION —</span>
         )}
 
         <span className={`badge ${feedConnected ? "teal" : "red"}`} title="Market data API connectivity">

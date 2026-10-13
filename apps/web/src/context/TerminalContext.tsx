@@ -14,6 +14,7 @@ import {
   fetchHealth,
   fetchMonitorEvents,
   fetchSetup,
+  friendlyApiError,
   type BarsResponse,
   type HealthResponse,
   type SetupResponse,
@@ -194,17 +195,33 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const barsAbortRef = useRef<AbortController | null>(null);
+  const barsSeqRef = useRef(0);
+
   const loadBars = useCallback(async (sym: string, tf: string) => {
+    const target = sym.trim().toUpperCase();
+    if (!target) return;
+    barsAbortRef.current?.abort();
+    const ac = new AbortController();
+    barsAbortRef.current = ac;
+    const seq = ++barsSeqRef.current;
+    // Clear immediately so prior symbol candles/levels never linger on screen.
+    setBars(null);
     setBarsLoading(true);
     setBarsError(null);
     try {
-      const b = await fetchBars(sym, tf);
+      const b = await fetchBars(target, tf);
+      if (ac.signal.aborted || seq !== barsSeqRef.current) return;
+      if (b.symbol && b.symbol.toUpperCase() !== target) return;
       setBars(b);
     } catch (err) {
-      setBarsError(err instanceof Error ? err.message : String(err));
+      if (ac.signal.aborted || seq !== barsSeqRef.current) return;
+      setBarsError(friendlyApiError(err));
       setBars(null);
     } finally {
-      setBarsLoading(false);
+      if (!ac.signal.aborted && seq === barsSeqRef.current) {
+        setBarsLoading(false);
+      }
     }
   }, []);
 
@@ -224,6 +241,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setSymbol(t);
       setSymbolDraft(t);
       setSide(s);
+      // Drop prior card so chart levels cannot show the previous ticker mid-switch.
+      setData(null);
       try {
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
@@ -242,13 +261,19 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         const fresh = next.liveCard.dataFresh ?? next.card.dataFresh;
         const action = next.signalRecommendation?.action;
         const alertKind = classifySetupAlert(status, state, fresh);
-        if (prevStatus.current && prevStatus.current !== status) {
-          pushAlert({
-            kind: alertKind,
-            message: `${t} → ${status}${action ? ` · signal ${action}` : ""} (alert ≠ entry)`,
-            symbol: t,
-          });
-        } else if (!prevStatus.current && status) {
+        // Track status per-symbol so hopping tickers does not false-fire alerts.
+        const statusKey = `${t}:${s}`;
+        const prevKey = prevStatus.current;
+        if (prevKey?.startsWith(`${t}:`) && prevKey !== `${statusKey}:${status}`) {
+          const prevSt = prevKey.slice(statusKey.length + 1);
+          if (prevSt && prevSt !== status) {
+            pushAlert({
+              kind: alertKind,
+              message: `${t} → ${status}${action ? ` · signal ${action}` : ""} (alert ≠ entry)`,
+              symbol: t,
+            });
+          }
+        } else if (!prevKey?.startsWith(`${t}:`) && status) {
           pushAlert({
             kind: alertKind === "data_stale" ? "data_stale" : "setup_found",
             message: `${t} setup ${status}${action ? ` · ${action}` : ""}`,
@@ -267,7 +292,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           next.liveCard.nearActive?.active &&
           distPct != null &&
           Math.abs(distPct) <= 0.15 &&
-          prevStatus.current !== status
+          prevKey?.startsWith(`${t}:`)
         ) {
           pushAlert({
             kind: "trigger_approached",
@@ -275,7 +300,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
             symbol: t,
           });
         }
-        prevStatus.current = status;
+        prevStatus.current = `${statusKey}:${status}`;
         prevFresh.current = fresh;
         const recent: RecentScan = {
           at: Date.now(),
@@ -289,16 +314,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });
-        void loadBars(t, chartTfRef.current);
+        // Bars load via the symbol/chartTf effect — avoid double-fetch flicker.
       } catch (err) {
         if (!ac.signal.aborted) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(friendlyApiError(err));
         }
       } finally {
         if (!ac.signal.aborted) setLoading(false);
       }
     },
-    [loadBars, pushAlert, session?.access_token, setCreditsLocal],
+    [pushAlert, session?.access_token, setCreditsLocal],
   );
 
   const selectSymbol = useCallback(

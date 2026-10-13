@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/common/EmptyState";
+import { PageHeader } from "../components/ui/PageHeader";
+import { StatusBadge } from "../components/ui/StatusBadge";
+import { useAuth } from "../context/AuthContext";
 import {
   fetchAlertPreferences,
   fetchMonitorEvents,
@@ -107,37 +109,32 @@ export function AlertsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Alerts</h1>
-      <p className="page-sub">
-        Server-recorded monitor status changes (durable when Supabase is configured). Browser
-        notifications optional. Email / SMS / push are not wired. Alert ≠ entry permission.
-        Automatic trading remains disabled. Signals are not live-validated until RTH testing.
+      <PageHeader
+        title="Alerts"
+        subtitle="Server-recorded monitor status changes. Browser notifications optional. Email / SMS / push not wired. Alert ≠ entry permission. Auto-trading disabled."
+        actions={
+          <>
+            <span className={`badge ${prefs?.browserEnabled ? "green" : ""}`}>
+              {prefs?.browserEnabled ? "Browser ON" : "Browser OFF"}
+            </span>
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void enableBrowserAlerts()}>
+              Enable browser alerts
+            </button>
+            <button type="button" className="btn" disabled={busy} onClick={() => void disableBrowserAlerts()}>
+              Disable browser
+            </button>
+            <button type="button" className="btn" disabled={busy} onClick={() => void refresh()}>
+              Refresh
+            </button>
+          </>
+        }
+      />
+
+      <p className="page-sub" style={{ marginTop: 0 }}>
+        In-app: {prefs?.inAppEnabled === false ? "off" : "on"} · Email/SMS/push: not wired · Recorded events ≠ delivered notifications until push is wired
       </p>
 
-      <div className="panel" style={{ marginBottom: "0.75rem" }}>
-        <div className="panel-h">
-          <h3>Delivery preferences</h3>
-          <span className="badge">{prefs?.browserEnabled ? "Browser ON" : "Browser OFF"}</span>
-        </div>
-        <div className="tab-body" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          <button type="button" className="scan-btn" disabled={busy} onClick={() => void enableBrowserAlerts()}>
-            Enable browser alerts
-          </button>
-          <button type="button" className="icon-btn" disabled={busy} onClick={() => void disableBrowserAlerts()}>
-            Disable browser
-          </button>
-          <button type="button" className="icon-btn" disabled={busy} onClick={() => void refresh()}>
-            Refresh
-          </button>
-          <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-            In-app: {prefs?.inAppEnabled === false ? "off" : "on"} · Email/SMS/push: not wired
-          </span>
-        </div>
-      </div>
-
-      {error ? (
-        <p style={{ color: "var(--danger, #c44)", fontSize: "0.85rem" }}>{error}</p>
-      ) : null}
+      {error ? <p className="error-banner">{error}</p> : null}
       {note ? <p className="disclaimer">{note}</p> : null}
 
       {events.length === 0 ? (
@@ -162,11 +159,12 @@ export function AlertsPage() {
                   fontSize: "0.82rem",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                   <strong style={{ fontFamily: "var(--mono)" }}>
                     {a.symbol}
                     {a.side ? ` · ${a.side}` : ""}
                   </strong>
+                  <StatusBadge status={a.newStatus} />
                   <span style={{ opacity: 0.75 }}>{ageLabel(Date.parse(a.eventAt))}</span>
                 </div>
                 <div style={{ marginTop: "0.3rem", fontFamily: "var(--mono)" }}>

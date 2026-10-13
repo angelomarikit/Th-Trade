@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHeader } from "../components/ui/PageHeader";
 import { fetchPlans, selectPlan, type PlanInfo } from "../lib/accountApi";
 import { useAuth } from "../context/AuthContext";
 
@@ -30,23 +31,22 @@ export function BillingPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Subscription</h1>
-      <p className="page-sub">
-        Choose a plan to unlock Signal Recommendations (live scanner analysis + desk brief). Stripe
-        Checkout comes later — for now plans are assigned in-app and reset monthly credits.
-      </p>
+      <PageHeader
+        title="Plans"
+        subtitle="Unlock Signal Recommendations (live scanner analysis + desk brief). Stripe Checkout comes later — plans are assigned in-app and reset monthly credits. No live order routing on any tier."
+        actions={
+          <span className="badge">
+            {plan?.name ?? profile?.plan_tier ?? "—"} · credits {profile?.credits_balance ?? "—"}
+            {!configured ? " · Supabase not configured" : ""}
+          </span>
+        }
+      />
 
-      <div className="banner info" style={{ marginBottom: "0.85rem" }}>
-        Current plan: <strong>{plan?.name ?? profile?.plan_tier ?? "—"}</strong> · Credits{" "}
-        <strong>{profile?.credits_balance ?? "—"}</strong>
-        {!configured && " · Supabase not configured"}
-      </div>
-
-      {error && (
+      {error ? (
         <p className="banner error" role="alert">
           {error}
         </p>
-      )}
+      ) : null}
 
       <div className="plan-grid">
         {plans.map((p) => {
@@ -71,7 +71,7 @@ export function BillingPage() {
               </ul>
               <button
                 type="button"
-                className={active ? "icon-btn primary" : "scan-btn"}
+                className={active ? "btn" : "btn primary"}
                 disabled={!session || busy === p.id || active}
                 onClick={() => void onSelect(p.id)}
               >
@@ -83,8 +83,8 @@ export function BillingPage() {
       </div>
 
       <p className="disclaimer" style={{ marginTop: "1rem" }}>
-        Ultra Premium ($1,000) reserves team seats / API for the Stripe phase. No live order routing is
-        included on any tier.
+        Ultra Premium ($1,000) reserves team seats / API for the Stripe phase. Automatic trading remains
+        disabled on every plan.
       </p>
     </div>
   );

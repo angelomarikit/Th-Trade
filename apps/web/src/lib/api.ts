@@ -1,3 +1,7 @@
+import { API_BASE, apiUrl, friendlyApiError } from "./apiBase";
+
+export { API_BASE, friendlyApiError };
+
 export interface SessionInfo {
   session: string;
   etLabel: string;
@@ -271,18 +275,27 @@ export interface EdgeResponse {
   text: string;
 }
 
-/** Strip trailing slash so `https://api.example.com/` + `/health` does not become `//health`. */
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
-
 async function getJson<T>(path: string, headers?: Record<string, string>): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: headers && Object.keys(headers).length ? headers : undefined,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || `HTTP ${res.status}`);
+  try {
+    const res = await fetch(apiUrl(path), {
+      headers: headers && Object.keys(headers).length ? headers : undefined,
+    });
+    const text = await res.text();
+    const looksHtml = /^\s*<(!doctype|html|head|body)/i.test(text);
+    if (!res.ok) {
+      throw new Error(looksHtml ? `HTTP ${res.status}` : text || `HTTP ${res.status}`);
+    }
+    if (looksHtml) {
+      throw new Error("Unexpected HTML from API (check VITE_API_BASE).");
+    }
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error("Invalid JSON from market data API.");
+    }
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
   }
-  return res.json() as Promise<T>;
 }
 
 export function fetchSetup(
@@ -306,6 +319,21 @@ export function fetchBars(ticker: string, timeframe: string, limit = 150) {
   return getJson<BarsResponse>(
     `/v1/bars?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`,
   );
+}
+
+export interface SymbolSearchHit {
+  symbol: string;
+  name: string;
+  match: "ticker" | "name";
+}
+
+export function searchSymbolsApi(q: string, limit = 12) {
+  return getJson<{
+    query: string;
+    count: number;
+    results: SymbolSearchHit[];
+    note?: string;
+  }>(`/v1/symbols/search?q=${encodeURIComponent(q)}&limit=${limit}`);
 }
 
 export function fetchHealth() {
@@ -402,26 +430,27 @@ export async function markSignalLiveValidated(
   accessToken: string,
   note?: string,
 ) {
-  const res = await fetch(
-    `${API_BASE}/v1/signals/${encodeURIComponent(id)}/live-validate`,
-    {
+  try {
+    const res = await fetch(apiUrl(`/v1/signals/${encodeURIComponent(id)}/live-validate`), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ note }),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || `HTTP ${res.status}`);
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{
+      record: { id: string; liveValidated: boolean; symbol: string };
+      automaticOrders: false;
+      note: string;
+    }>;
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
   }
-  return res.json() as Promise<{
-    record: { id: string; liveValidated: boolean; symbol: string };
-    automaticOrders: false;
-    note: string;
-  }>;
 }
 
 export function fetchRegime() {
@@ -463,6 +492,7 @@ export interface OpportunityRow {
   catalystBoost?: number;
   catalystHeadline?: string | null;
   features?: {
+    lastPrice?: number;
     dayChangePct: number | null;
     vsSpyPct: number | null;
     rvolProxy: number | null;
@@ -599,19 +629,26 @@ async function monitorFetch(
   path: string,
   opts?: { method?: string; body?: unknown; accessToken?: string | null },
 ): Promise<MonitorSnapshot> {
-  const headers: Record<string, string> = {};
-  if (opts?.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
-  if (opts?.body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: opts?.method ?? "GET",
-    headers: Object.keys(headers).length ? headers : undefined,
-    body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || `HTTP ${res.status}`);
+  try {
+    const headers: Record<string, string> = {};
+    if (opts?.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
+    if (opts?.body !== undefined) headers["Content-Type"] = "application/json";
+    const res = await fetch(apiUrl(path), {
+      method: opts?.method ?? "GET",
+      headers: Object.keys(headers).length ? headers : undefined,
+      body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(/^\s*</.test(text) ? `HTTP ${res.status}` : text || `HTTP ${res.status}`);
+    }
+    if (/^\s*</.test(text)) {
+      throw new Error("Unexpected HTML from API (check VITE_API_BASE).");
+    }
+    return JSON.parse(text) as MonitorSnapshot;
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
   }
-  return res.json() as Promise<MonitorSnapshot>;
 }
 
 export function fetchMonitor(accessToken?: string | null) {
@@ -695,21 +732,24 @@ export function fetchAlertPreferences(accessToken?: string | null) {
   }>("/v1/alert-preferences", accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
 }
 
-export function saveAlertPreferencesApi(
+export async function saveAlertPreferencesApi(
   body: { inAppEnabled?: boolean; browserEnabled?: boolean },
   accessToken?: string | null,
 ) {
-  return fetch(`${API_BASE}/v1/alert-preferences`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify(body),
-  }).then(async (res) => {
+  try {
+    const res = await fetch(apiUrl("/v1/alert-preferences"), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
     if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
     return res.json() as Promise<{ preferences: AlertPreferences; note: string }>;
-  });
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
+  }
 }
 
 export interface SignalPerformanceRow {

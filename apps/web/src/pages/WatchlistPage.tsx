@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { PageHeader } from "../components/ui/PageHeader";
+import { StatusBadge } from "../components/ui/StatusBadge";
 import { useAuth } from "../context/AuthContext";
-import { useTerminal } from "../context/TerminalContext";
+import { useOpenSymbol } from "../hooks/useOpenSymbol";
 import {
   addMonitorSymbol,
   fetchMonitor,
@@ -16,8 +17,7 @@ import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
 
 export function WatchlistPage() {
   const { session } = useAuth();
-  const { selectSymbol } = useTerminal();
-  const navigate = useNavigate();
+  const openSymbol = useOpenSymbol();
   const token = session?.access_token ?? null;
 
   const [snap, setSnap] = useState<MonitorSnapshot | null>(null);
@@ -117,40 +117,27 @@ export function WatchlistPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">WULU LIVE WATCHLIST</h1>
-      <p className="page-sub">
-        Server-side multi-stock monitor (Phase 3 intelligence on Phase 2 hub). Up to{" "}
-        {snap?.maxSymbols ?? 6} symbols · shared scan cycle ~
-        {Math.round((snap?.intervalMs ?? 20_000) / 1000)}s · feed{" "}
-        {(snap?.feed ?? "iex").toUpperCase()} (not consolidated volume). Browser may close; API keeps
-        scanning. Auto-trading remains disabled. Statuses are not live-validated until RTH testing —
-        see Signals for history/replay and Alerts for status-change notifications.
-      </p>
-
-      <div className="scan-controls" style={{ marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <span
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "0.45rem 0.7rem",
-            fontFamily: "var(--mono)",
-            fontSize: "0.8rem",
-          }}
-        >
-          {snap?.running ? "RUNNING" : "IDLE"} · hub ticks {snap?.hub?.tickCount ?? snap?.tickCount ?? 0}
-          {snap?.hub?.lastCycleMs != null ? ` · cycle ${snap.hub.lastCycleMs}ms` : ""}
-          {snap?.lastTickAt ? ` · last ${formatEtTime(snap.lastTickAt)}` : ""}
-        </span>
-        <button type="button" className="scan-btn" disabled={busy} onClick={() => void loadDefaultSix()}>
-          Load default six
-        </button>
-        <button type="button" className="scan-btn" disabled={busy} onClick={() => void onForceTick()}>
-          Scan now
-        </button>
-        <button type="button" className="icon-btn" disabled={busy} onClick={() => void refresh()}>
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Watchlist"
+        subtitle={`Server-side multi-stock monitor · up to ${snap?.maxSymbols ?? 6} symbols · feed ${(snap?.feed ?? "iex").toUpperCase()} · auto-trading disabled. Statuses are not live-validated until RTH testing.`}
+        actions={
+          <>
+            <span className="badge">
+              {snap?.running ? "RUNNING" : "IDLE"} · ticks {snap?.hub?.tickCount ?? snap?.tickCount ?? 0}
+              {snap?.lastTickAt ? ` · ${formatEtTime(snap.lastTickAt)}` : ""}
+            </span>
+            <button type="button" className="btn" disabled={busy} onClick={() => void loadDefaultSix()}>
+              Load default six
+            </button>
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void onForceTick()}>
+              Scan now
+            </button>
+            <button type="button" className="btn" disabled={busy} onClick={() => void refresh()}>
+              Refresh
+            </button>
+          </>
+        }
+      />
 
       <form className="scan-controls" onSubmit={onAdd} style={{ marginBottom: "0.85rem" }}>
         <input
@@ -180,16 +167,12 @@ export function WatchlistPage() {
           <option value="LONG">LONG</option>
           <option value="SHORT">SHORT</option>
         </select>
-        <button type="submit" className="scan-btn" disabled={busy}>
+        <button type="submit" className="btn primary" disabled={busy}>
           Add
         </button>
       </form>
 
-      {error ? (
-        <p style={{ color: "var(--danger, #c44)", marginBottom: "0.75rem", fontSize: "0.9rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className="error-banner" style={{ marginBottom: "0.75rem" }}>{error}</p> : null}
 
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
@@ -206,10 +189,7 @@ export function WatchlistPage() {
               <MonitorCard
                 key={row.symbol}
                 row={row}
-                onOpen={() => {
-                  selectSymbol(row.symbol, { brief: true });
-                  navigate("/scanner");
-                }}
+                onOpen={() => openSymbol(row.symbol, { side: row.side, brief: true })}
                 onRemove={() => void onRemove(row.symbol)}
                 busy={busy}
               />
@@ -223,7 +203,7 @@ export function WatchlistPage() {
           <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
             Status events (recorded — no push/SMS yet)
           </h2>
-          <table className="table">
+          <table className="wulu-data-table">
             <thead>
               <tr>
                 <th>When</th>
@@ -262,15 +242,6 @@ function MonitorCard({
   onRemove: () => void;
   busy: boolean;
 }) {
-  const statusClass =
-    row.status === "ENTRY ACTIVE"
-      ? "green"
-      : row.status === "NEAR ACTIVE" || row.status === "CONFIRMATION"
-        ? "amber"
-        : row.status === "DATA NOT VERIFIED" || row.status === "INVALIDATED" || row.status === "MISSED"
-          ? "red"
-          : "";
-
   return (
     <article
       className="panel"
@@ -281,7 +252,7 @@ function MonitorCard({
         <strong style={{ fontFamily: "var(--mono)" }}>
           {row.symbol} — {row.side}
         </strong>
-        <span className={`badge ${statusClass}`}>{row.status}</span>
+        <StatusBadge status={row.status} />
       </div>
       <div
         style={{
@@ -322,15 +293,15 @@ function MonitorCard({
         <span>Setup: {row.setupScore != null ? `${row.setupScore}/100` : "—"}</span>
         <span>Invalidation: {fmtPrice(row.invalidation)}</span>
         <span>Fake-break risk: {row.falseBreakoutRisk ?? "NONE"}</span>
-        <span>Retest: {row.retestPhase ?? "—"}{row.retestRequired ? " (required)" : ""}</span>
+        <span>
+          Retest: {row.retestPhase ?? "—"}
+          {row.retestRequired ? " (required)" : ""}
+        </span>
         <span>
           Feed: {(row.feed ?? "iex").toUpperCase()}
           {!row.dataFresh ? " · NOT VERIFIED" : ""}
         </span>
-        <span>
-          Data:{" "}
-          {row.marketDataAt ? formatEtTime(row.marketDataAt) : "—"}
-        </span>
+        <span>Data: {row.marketDataAt ? formatEtTime(row.marketDataAt) : "—"}</span>
       </div>
       {row.actionHint ? (
         <p style={{ margin: "0.45rem 0 0", fontSize: "0.82rem", fontWeight: 600 }}>
@@ -355,7 +326,7 @@ function MonitorCard({
       <div style={{ marginTop: "0.5rem" }}>
         <button
           type="button"
-          className="icon-btn"
+          className="btn"
           disabled={busy}
           onClick={(e) => {
             e.stopPropagation();

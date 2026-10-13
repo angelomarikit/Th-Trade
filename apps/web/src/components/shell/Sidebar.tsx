@@ -19,25 +19,26 @@ import {
 import { NavLink } from "react-router-dom";
 import { useTerminal } from "../../context/TerminalContext";
 
+/** Primary IA aligned to redesign reference (Performance = measured/backtest hub). */
 const PRIMARY = [
-  { to: "/", end: true, label: "Overview", icon: LayoutDashboard },
   { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/opportunities", label: "Opportunities", icon: Search },
-  { to: "/watchlist", label: "Live Monitor", icon: Star },
-  { to: "/signals", label: "Signals", icon: Activity },
-  { to: "/charts", label: "Charts", icon: CandlestickChart },
+  { to: "/watchlist", label: "Watchlist", icon: Star },
+  { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/backtest", label: "Performance", icon: FlaskConical },
+  { to: "/billing", label: "Plans", icon: CreditCard },
 ];
 
 const ACCOUNT = [
-  { to: "/billing", label: "Subscription", icon: CreditCard },
+  { to: "/", end: true, label: "Overview", icon: LayoutDashboard },
+  { to: "/signals", label: "Signals", icon: Activity },
+  { to: "/charts", label: "Charts", icon: CandlestickChart },
   { to: "/positions", label: "Positions", icon: Wallet },
   { to: "/orders", label: "Orders", icon: ListOrdered },
-  { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
 const ANALYSIS = [
   { to: "/journal", label: "Trade Journal", icon: BookOpen },
-  { to: "/backtest", label: "Backtesting", icon: FlaskConical },
   { to: "/news", label: "News & Catalysts", icon: Newspaper },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -61,7 +62,6 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.end}
             className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
             title={item.label}
           >
@@ -75,6 +75,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            end={"end" in item ? Boolean((item as { end?: boolean }).end) : undefined}
             className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
             title={item.label}
           >

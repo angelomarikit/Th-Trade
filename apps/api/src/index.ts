@@ -17,6 +17,7 @@ import {
 } from "@wulu/domain";
 import { EXECUTION_POLICY, hasAlpacaCredentials, loadAlpacaCredentials } from "@wulu/market-data";
 import { createNewsServiceFromEnv } from "@wulu/news";
+import { searchSymbols } from "@wulu/regime";
 import { listStrategies } from "@wulu/strategies";
 import { summarizeJournal } from "@wulu/journal";
 import { formatBestContractCard } from "@wulu/options";
@@ -1076,6 +1077,19 @@ async function main() {
         return json(res, 200, { brief, text });
       }
 
+      if (url.pathname === "/v1/symbols/search" && req.method === "GET") {
+        const q = url.searchParams.get("q") ?? "";
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 12), 1), 25);
+        const results = searchSymbols(q, limit);
+        return json(res, 200, {
+          query: q,
+          count: results.length,
+          results,
+          note: "Curated liquid universe typeahead — not a full exchange directory.",
+          automaticOrders: false,
+        });
+      }
+
       if (url.pathname === "/v1/strategies" && req.method === "GET") {
         return json(res, 200, {
           strategies: listStrategies().map((s) => ({
@@ -1393,6 +1407,7 @@ async function main() {
     console.log("  GET /v1/backtest/compare?ticker=NVDA");
     console.log("  GET /v1/measured-performance?source=LIVE_VALIDATED");
     console.log("  POST /v1/signals/:id/live-validate");
+    console.log("  GET /v1/symbols/search?q=NVDA");
     console.log("  GET /v1/signal-performance");
     console.log("  GET /v1/signal-outcomes");
     console.log("  GET/PUT /v1/alert-preferences");
@@ -1406,6 +1421,19 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
+function isCorsOriginAllowed(origin: string, allowed: string[]): boolean {
+  if (!origin) return false;
+  if (allowed.includes("*") || allowed.includes(origin)) return true;
+  // Vercel Preview / branch aliases for this project (shared Railway API).
+  if (/^https:\/\/[\w.-]+-supporttoptiersoluts-projects\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+  if (allowed.some((a) => a === "https://*.vercel.app" || a === "*.vercel.app")) {
+    return /^https:\/\/[\w.-]+\.vercel\.app$/i.test(origin);
+  }
+  return false;
+}
+
 function applyCors(
   req: import("node:http").IncomingMessage,
   res: import("node:http").ServerResponse,
@@ -1415,7 +1443,7 @@ function applyCors(
   const allow =
     corsOrigin === "*"
       ? "*"
-      : origin && allowed.includes(origin)
+      : origin && isCorsOriginAllowed(origin, allowed)
         ? origin
         : allowed[0] || "*";
   res.setHeader("Access-Control-Allow-Origin", allow);

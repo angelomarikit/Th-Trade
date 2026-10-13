@@ -2,10 +2,14 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
+  HistogramSeries,
+  LineSeries,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
   type CandlestickData,
+  type HistogramData,
+  type LineData,
   type Time,
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
@@ -18,6 +22,8 @@ export interface LevelOverlay {
   stop: number;
   t1: number;
   t2: number;
+  /** When set, overlays only apply if this matches the chart symbol. */
+  forSymbol?: string;
 }
 
 const TFS = [
@@ -39,8 +45,10 @@ export function CandleChart(props: {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
-  const fitOnce = useRef<string>("");
+  const fitKeyRef = useRef<string>("");
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -48,16 +56,16 @@ export function CandleChart(props: {
       height: hostRef.current.clientHeight || 520,
       layout: {
         background: { type: ColorType.Solid, color: "#080D14" },
-        textColor: "#8C9BAE",
-        fontFamily: "JetBrains Mono, monospace",
-        fontSize: 11,
+        textColor: "#9AA8BA",
+        fontFamily: "JetBrains Mono, ui-monospace, monospace",
+        fontSize: 12,
       },
       grid: {
-        vertLines: { color: "#182433" },
-        horzLines: { color: "#182433" },
+        vertLines: { color: "#15202c" },
+        horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#263446" },
-      timeScale: { borderColor: "#263446", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.08, bottom: 0.22 } },
+      timeScale: { borderColor: "#2a3a4d", timeVisible: true, secondsVisible: false },
       crosshair: { mode: 1 },
     });
     const series = chart.addSeries(CandlestickSeries, {
@@ -68,8 +76,24 @@ export function CandleChart(props: {
       wickUpColor: "#35C89A",
       wickDownColor: "#F87171",
     });
+    const volume = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+    });
+    chart.priceScale("vol").applyOptions({
+      scaleMargins: { top: 0.82, bottom: 0 },
+    });
+    const vwap = chart.addSeries(LineSeries, {
+      color: "#60A5FA",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
     chartRef.current = chart;
     seriesRef.current = series;
+    volumeRef.current = volume;
+    vwapRef.current = vwap;
 
     const ro = new ResizeObserver(() => {
       if (!hostRef.current || !chartRef.current) return;
@@ -85,39 +109,67 @@ export function CandleChart(props: {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      volumeRef.current = null;
+      vwapRef.current = null;
+      linesRef.current = [];
     };
   }, []);
 
   useEffect(() => {
     const series = seriesRef.current;
-    if (!series) return;
+    const volume = volumeRef.current;
+    const vwap = vwapRef.current;
+    if (!series || !volume || !vwap) return;
 
     for (const line of linesRef.current) {
-      series.removePriceLine(line);
+      try {
+        series.removePriceLine(line);
+      } catch {
+        /* series may already be cleared */
+      }
     }
     linesRef.current = [];
 
     if (!props.bars?.length) {
       series.setData([]);
+      volume.setData([]);
+      vwap.setData([]);
       return;
     }
 
-    const data: CandlestickData<Time>[] = props.bars.map((b) => ({
+    const candles: CandlestickData<Time>[] = props.bars.map((b) => ({
       time: b.time as Time,
       open: b.open,
       high: b.high,
       low: b.low,
       close: b.close,
     }));
-    series.setData(data);
+    series.setData(candles);
 
-    const key = `${props.symbol}:${props.timeframe}:${props.bars.length}:${props.bars[0]?.time}`;
-    if (fitOnce.current !== key) {
+    const vols: HistogramData<Time>[] = props.bars.map((b) => ({
+      time: b.time as Time,
+      value: b.volume ?? 0,
+      color: b.close >= b.open ? "rgba(53,200,154,0.35)" : "rgba(248,113,113,0.35)",
+    }));
+    volume.setData(vols);
+
+    const vwapPts: LineData<Time>[] = props.bars
+      .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
+      .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
+    vwap.setData(vwapPts);
+
+    const fitKey = `${props.symbol}|${props.timeframe}|${props.bars[0]?.time}|${props.bars.at(-1)?.time}|${props.bars.length}`;
+    if (fitKeyRef.current !== fitKey) {
       chartRef.current?.timeScale().fitContent();
-      fitOnce.current = key;
+      fitKeyRef.current = fitKey;
     }
 
-    if (props.levels) {
+    const levelsOk =
+      props.levels != null &&
+      (!props.levels.forSymbol ||
+        props.levels.forSymbol.toUpperCase() === props.symbol.toUpperCase());
+
+    if (levelsOk && props.levels) {
       const L = props.levels;
       const mk = (price: number, color: string, title: string) =>
         series.createPriceLine({
@@ -128,19 +180,20 @@ export function CandleChart(props: {
           axisLabelVisible: true,
           title,
         });
+      // Fewer overlapping titles: zone mid as Entry, skip duplicate zone hi/lo labels
+      const entryMid = (L.zoneLow + L.zoneHigh) / 2;
       linesRef.current = [
-        mk(L.trigger, "#60A5FA", "TRIG"),
-        mk(L.zoneLow, "#2DD4BF", "ZONE LO"),
-        mk(L.zoneHigh, "#2DD4BF", "ZONE HI"),
+        mk(L.trigger, "#93C5FD", "TRIG"),
+        mk(entryMid, "#2DD4BF", "ENTRY"),
         mk(L.stop, "#F87171", "STOP"),
-        mk(L.t1, "#60A5FA", "T1"),
+        mk(L.t1, "#34D399", "T1"),
         mk(L.t2, "#A78BFA", "T2"),
       ];
     }
   }, [props.bars, props.levels, props.symbol, props.timeframe]);
 
   return (
-    <div className="panel chart-wrap">
+    <div className="panel chart-wrap chart-wrap-hero">
       <div className="chart-toolbar">
         <div className="tf-group" role="group" aria-label="Chart timeframe">
           {TFS.map((tf) => (
@@ -154,17 +207,24 @@ export function CandleChart(props: {
             </button>
           ))}
         </div>
+        <div className="chart-legend" aria-hidden="true">
+          <span className="leg vwap">VWAP</span>
+          <span className="leg entry">Entry</span>
+          <span className="leg stop">Stop</span>
+          <span className="leg t1">T1</span>
+          <span className="leg t2">T2</span>
+        </div>
         <span className="badge" title="Setup levels are indicative — not broker orders">
           LEVELS = SETUP (NOT ORDERS)
         </span>
       </div>
       <div className="chart-host" ref={hostRef}>
-        {props.loading && <div className="chart-overlay-msg">Loading bars…</div>}
+        {props.loading && <div className="chart-overlay-msg">Loading {props.symbol}…</div>}
         {!props.loading && props.error && (
           <div className="chart-overlay-msg">Chart feed error: {props.error}</div>
         )}
         {!props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
-          <div className="chart-overlay-msg">No bar data for this symbol/timeframe.</div>
+          <div className="chart-overlay-msg">No bar data for {props.symbol} / {props.timeframe}.</div>
         )}
       </div>
     </div>
