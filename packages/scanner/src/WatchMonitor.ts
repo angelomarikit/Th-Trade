@@ -1,6 +1,6 @@
 import type { LiveSetupCard } from "@wulu/confirmation";
 import { backgroundAlpacaShouldWait, withAlpacaPriority } from "@wulu/market-data";
-import type { TradeSide } from "@wulu/domain";
+import { SETUP_STATES, type SetupState, type TradeSide } from "@wulu/domain";
 import {
   buildAlertEvent,
   isAlertWorthyTransition,
@@ -128,6 +128,12 @@ export class WatchMonitor {
 
   list(): MonitorSymbolConfig[] {
     return [...this.configs.values()];
+  }
+
+  previousSetupState(symbol: string): SetupState | undefined {
+    const raw = this.states.get(symbol.toUpperCase())?.state;
+    if (!raw) return undefined;
+    return SETUP_STATES.includes(raw as SetupState) ? (raw as SetupState) : undefined;
   }
 
   setWatchlist(items: MonitorSymbolConfig[]): MonitorSymbolConfig[] {
@@ -551,11 +557,13 @@ export class MonitorHub {
 
         for (const { cfg, monitors } of pairMap.values()) {
           try {
+            const previousState = monitors[0]?.previousSetupState(cfg.symbol);
             const card = await this.scanner.scan({
               symbol: cfg.symbol,
               side: cfg.side,
               recordJournal: false,
               preloadedSnapshot: snapBySymbol.get(cfg.symbol.toUpperCase()),
+              previousState,
             });
             for (const mon of monitors) {
               const evt = mon.applyCard(cfg, card, this.feed);

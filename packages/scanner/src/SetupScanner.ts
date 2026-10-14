@@ -1,5 +1,5 @@
 import { evaluateSetup, type LiveSetupCard, type OptionsCardInfo } from "@wulu/confirmation";
-import type { TradeSide } from "@wulu/domain";
+import type { SetupState, TradeSide } from "@wulu/domain";
 import type { MarketDataProvider, MarketSnapshot } from "@wulu/market-data";
 import {
   buildWhyMoving,
@@ -37,6 +37,8 @@ export interface ScanSetupRequest {
   preloadedCatalyst?: { why: WhyMovingBlock; event: CatalystEvent | null };
   /** Skip options engine — confirm path only needs setup state/gates. */
   skipOptions?: boolean;
+  /** Prior lifecycle state — enables MISSED / INVALIDATED transitions on monitor ticks. */
+  previousState?: SetupState;
 }
 
 export interface ScanSetupResult {
@@ -160,6 +162,7 @@ export class SetupScanner {
       symbol,
       side: request.side,
       snapshot,
+      previousState: request.previousState,
       whyMoving: why,
       marketRegime: {
         status: regimeCtx.marketRegime.status,

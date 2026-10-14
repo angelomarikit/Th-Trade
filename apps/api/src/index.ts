@@ -13,6 +13,7 @@ import {
   calculatePositionSize,
   loadFeatureFlags,
   POSITION_SIZE_NOT_CALCULATED_MESSAGE,
+  type SetupState,
   type TradeSide,
 } from "@wulu/domain";
 import {
@@ -93,6 +94,12 @@ const barsResponseCache = new Map<string, { at: number; payload: unknown }>();
 const barsInflight = new Map<string, Promise<unknown>>();
 const BARS_CACHE_MS = 15_000;
 const BARS_STALE_MS = 5 * 60_000;
+/** Per-symbol setup lifecycle for MISSED / INVALIDATED on interactive /v1/setup polls. */
+const interactiveSetupState = new Map<string, SetupState>();
+
+function setupStateKey(symbol: string, side: TradeSide): string {
+  return `${symbol.toUpperCase()}:${side}`;
+}
 
 async function main() {
   console.log(
@@ -597,13 +604,23 @@ async function main() {
             receivedAt: new Date(),
             marketTimestamp: quote?.timestamp ?? lastBar?.timestamp ?? null,
           };
+          const stateKey = setupStateKey(sym, side);
           ({ card, journalEntry } = await scanner.scanWithJournal({
             symbol: sym,
             side,
             preloadedSnapshot: snapshot,
+            previousState: interactiveSetupState.get(stateKey),
           }));
+          interactiveSetupState.set(stateKey, card.state);
         } else {
-          ({ card, journalEntry } = await scanner.scanWithJournal({ symbol: ticker, side }));
+          const sym = ticker.toUpperCase();
+          const stateKey = setupStateKey(sym, side);
+          ({ card, journalEntry } = await scanner.scanWithJournal({
+            symbol: sym,
+            side,
+            previousState: interactiveSetupState.get(stateKey),
+          }));
+          interactiveSetupState.set(stateKey, card.state);
         }
 
         const verifiedRaw = process.env.VERIFIED_ACCOUNT_VALUE;
