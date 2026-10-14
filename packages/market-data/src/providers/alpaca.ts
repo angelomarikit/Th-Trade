@@ -113,7 +113,10 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       limit: String(limit),
       adjustment: "raw",
       feed: this.feed,
-      sort: "asc",
+      // `limit` applies to this sort. Ascending returns the oldest bars in the
+      // lookback, so 1m/5m/15m landed on different sessions. Descending returns
+      // the latest bars; we reverse below so callers still get oldest → newest.
+      sort: "desc",
       start: start.toISOString(),
       end: end.toISOString(),
     });
@@ -139,7 +142,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         vwap: b.vw,
         completed: end <= now,
       };
-    });
+    }).reverse();
   }
 
   async getSnapshot(symbol: string): Promise<MarketSnapshot> {
@@ -263,7 +266,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     return out;
   }
 
-  /** Alpaca multi-symbol bars — one gated HTTP call per timeframe (with page follow). */
+  /** Alpaca multi-symbol bars — one gated HTTP call per timeframe. */
   private async getMultiBars(
     symbols: string[],
     timeframe: Bar["timeframe"],
@@ -276,57 +279,40 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const end = new Date();
     const start = new Date(end.getTime() - lookbackForTimeframe(timeframe, limit));
     const tfMs = timeframeMs(timeframe);
-    let pageToken: string | null = null;
-    let pages = 0;
+    const params = new URLSearchParams({
+      symbols: symbols.join(","),
+      timeframe: tf,
+      limit: String(limit),
+      adjustment: "raw",
+      feed: this.feed,
+      sort: "desc",
+      start: start.toISOString(),
+      end: end.toISOString(),
+    });
+    const url = `${this.baseUrl}/v2/stocks/bars?${params}`;
+    const data = await this.getJson<{
+      bars?: Record<string, AlpacaBar[] | null> | null;
+    }>(url);
 
-    do {
-      const params = new URLSearchParams({
-        symbols: symbols.join(","),
-        timeframe: tf,
-        limit: String(limit),
-        adjustment: "raw",
-        feed: this.feed,
-        sort: "asc",
-        start: start.toISOString(),
-        end: end.toISOString(),
+    const now = Date.now();
+    for (const [sym, rawBars] of Object.entries(data.bars ?? {})) {
+      const mapped = (rawBars ?? []).slice(0, limit).map((b) => {
+        const ts = new Date(b.t);
+        const barEnd = ts.getTime() + tfMs;
+        return {
+          symbol: sym.toUpperCase(),
+          timeframe,
+          timestamp: ts,
+          open: b.o,
+          high: b.h,
+          low: b.l,
+          close: b.c,
+          volume: b.v,
+          vwap: b.vw,
+          completed: barEnd <= now,
+        } satisfies Bar;
       });
-      if (pageToken) params.set("page_token", pageToken);
-      const url = `${this.baseUrl}/v2/stocks/bars?${params}`;
-      const data = await this.getJson<{
-        bars?: Record<string, AlpacaBar[] | null> | null;
-        next_page_token?: string | null;
-      }>(url);
-
-      const now = Date.now();
-      for (const [sym, rawBars] of Object.entries(data.bars ?? {})) {
-        const mapped = (rawBars ?? []).map((b) => {
-          const ts = new Date(b.t);
-          const barEnd = ts.getTime() + tfMs;
-          return {
-            symbol: sym.toUpperCase(),
-            timeframe,
-            timestamp: ts,
-            open: b.o,
-            high: b.h,
-            low: b.l,
-            close: b.c,
-            volume: b.v,
-            vwap: b.vw,
-            completed: barEnd <= now,
-          } satisfies Bar;
-        });
-        const prev = result.get(sym.toUpperCase()) ?? [];
-        result.set(sym.toUpperCase(), prev.concat(mapped));
-      }
-      pageToken = data.next_page_token ?? null;
-      pages += 1;
-    } while (pageToken && pages < 4);
-
-    // Trim to requested limit (keep newest)
-    for (const [sym, bars] of result) {
-      if (bars.length > limit) {
-        result.set(sym, bars.slice(-limit));
-      }
+      result.set(sym.toUpperCase(), mapped.reverse());
     }
     return result;
   }
