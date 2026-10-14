@@ -8,7 +8,7 @@ import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecomme
  * Primary trading assistant panel — same setup card as chart levels and monitor.
  */
 export function SignalSummaryPanel() {
-  const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist, displayPrice } =
+  const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist, displayPrice, bars } =
     useTerminal();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const lc = data?.liveCard;
@@ -28,7 +28,33 @@ export function SignalSummaryPanel() {
   const rr = lc.rewardToRisk;
   const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
   const strat = primaryStrategyName(lc);
+  const chartClose =
+    bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
+  const setupPx = displayPrice ?? lc.lastPrice;
+  const setupStale =
+    setupPx != null &&
+    chartClose != null &&
+    Number.isFinite(setupPx) &&
+    Number.isFinite(chartClose) &&
+    Math.abs(setupPx - chartClose) / Math.max(chartClose, 1e-6) > 0.008;
+  const showExecutableLevels = lc.dataFresh && !setupStale;
   const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
+  const indicatorRows =
+    (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
+    (lc.matrixChecklist ?? []).map((row) => ({
+      id: row.id,
+      label: row.label,
+      bias:
+        row.status === "PASS"
+          ? ("BULLISH" as const)
+          : row.status === "FAIL"
+            ? ("BEARISH" as const)
+            : row.status === "WAITING"
+              ? ("NEUTRAL" as const)
+              : ("NOT VERIFIED" as const),
+      explanation: row.reason,
+      gateStatus: row.status,
+    }));
 
   return (
     <aside className="signal-panel panel" aria-label="Trading recommendation">
@@ -77,11 +103,15 @@ export function SignalSummaryPanel() {
       </div>
 
       <div className="signal-brief" role="status">
+        {setupStale ? (
+          <p className="muted">Updating setup — entry levels hidden until chart and scan match.</p>
+        ) : null}
         {briefLines.map((line) => (
           <p key={line}>{line}</p>
         ))}
       </div>
 
+      {showExecutableLevels ? (
       <dl className="signal-levels">
         <div>
           <dt>Trigger</dt>
@@ -112,6 +142,12 @@ export function SignalSummaryPanel() {
           </div>
         )}
       </dl>
+      ) : (
+        <p className="muted" style={{ margin: "0.5rem 0" }}>
+          Entry trigger, zone, stop, and targets are hidden until data is verified and aligned with the
+          chart.
+        </p>
+      )}
 
       <p className="disclaimer">
         Signals only — no orders sent. Entry requires completed 5m confirmation, ~2R, fresh data, and
@@ -129,14 +165,16 @@ export function SignalSummaryPanel() {
       {detailsOpen && (
         <div className="decision-section-body">
           <ul className="signal-checklist">
-            {(lc.matrixChecklist ?? []).map((row) => (
-              <li key={row.id} className={`check-${row.status.toLowerCase()}`}>
-                <strong>{row.label}</strong>
-                <span>{row.status}</span>
-                <p>{row.reason}</p>
+            {indicatorRows.map((ind) => (
+              <li key={ind.id} className={`check-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>
+                <strong>{ind.label}</strong>
+                <span className={`ind-bias ind-bias-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>
+                  {ind.bias}
+                </span>
+                <p>{ind.explanation}</p>
               </li>
             ))}
-            {!lc.matrixChecklist?.length &&
+            {!indicatorRows.length &&
               (lc.waitingFor ?? []).map((w) => <li key={w}>{w}</li>)}
           </ul>
           {lc.relativeMomentum && (

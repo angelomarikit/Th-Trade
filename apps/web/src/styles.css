@@ -2092,6 +2092,54 @@ a {
   color: var(--muted);
 }
 
+.signal-checklist li.check-bullish {
+  border-left-color: var(--green);
+}
+
+.signal-checklist li.check-bearish {
+  border-left-color: var(--red);
+}
+
+.signal-checklist li.check-neutral {
+  border-left-color: #d4a017;
+}
+
+.signal-checklist li.check-not-verified {
+  border-left-color: var(--border);
+}
+
+.ind-bias {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
+}
+
+.ind-bias-bullish {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+
+.ind-bias-bearish {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.ind-bias-neutral {
+  color: #b8860b;
+  background: color-mix(in srgb, #d4a017 14%, transparent);
+}
+
+.ind-bias-not-verified {
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
 @media (max-width: 1100px) {
   .scanner-layout-v7,
   .scanner-layout-v7.with-inspector {
@@ -2317,6 +2365,21 @@ a {
 
 .watch-card-detail p {
   margin: 0.25rem 0 0;
+}
+
+.watch-card-brief {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  border-top: 1px solid var(--border);
+}
+
+.watch-card-brief p {
+  margin: 0.2rem 0;
+}
+
+.watch-card-levels-full {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .watch-card-error {

@@ -1,4 +1,4 @@
-import type { LiveSetupCard } from "@wulu/confirmation";
+import type { IndicatorReading, LiveSetupCard } from "@wulu/confirmation";
 import { backgroundAlpacaShouldWait, withAlpacaPriority } from "@wulu/market-data";
 import { SETUP_STATES, type SetupState, type TradeSide } from "@wulu/domain";
 import {
@@ -67,6 +67,9 @@ export interface MonitoredSymbolState {
   target3: number | null;
   invalidation: number | null;
   setupId: string | null;
+  statusLabel: string;
+  strategyName: string | null;
+  indicatorChecklist: IndicatorReading[];
   error: string | null;
   updatedAt: string;
 }
@@ -235,6 +238,12 @@ export class WatchMonitor {
       target3: card.target3 ?? null,
       invalidation: card.invalidation ?? null,
       setupId: card.setupId,
+      statusLabel: card.statusLabel,
+      strategyName:
+        card.matchedStrategies[0]?.strategyName ??
+        card.historicalEdge?.strategyName ??
+        null,
+      indicatorChecklist: card.indicatorChecklist ?? [],
       error: null,
       updatedAt,
     };
@@ -309,6 +318,9 @@ export class WatchMonitor {
       target3: prev?.target3 ?? null,
       invalidation: prev?.invalidation ?? null,
       setupId: prev?.setupId ?? null,
+      statusLabel: "DATA NOT VERIFIED",
+      strategyName: prev?.strategyName ?? null,
+      indicatorChecklist: prev?.indicatorChecklist ?? [],
       error: readable,
       updatedAt,
     };

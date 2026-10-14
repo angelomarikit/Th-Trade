@@ -70,6 +70,13 @@ export interface SetupResponse {
       requiredForEntry: boolean;
       reason: string;
     }>;
+    indicatorChecklist?: Array<{
+      id: string;
+      label: string;
+      bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "NOT VERIFIED";
+      explanation: string;
+      gateStatus: string;
+    }>;
     rewardToRisk?: number;
     dataFresh?: boolean;
     evaluatedAt?: string;
@@ -635,6 +642,15 @@ export interface MonitorSymbolState {
   target3: number | null;
   invalidation: number | null;
   setupId: string | null;
+  statusLabel: string;
+  strategyName: string | null;
+  indicatorChecklist: Array<{
+    id: string;
+    label: string;
+    bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "NOT VERIFIED";
+    explanation: string;
+    gateStatus: string;
+  }>;
   error: string | null;
   updatedAt: string;
 }

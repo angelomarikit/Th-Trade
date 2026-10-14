@@ -16,6 +16,7 @@ import { scoreSetupQuality10 } from "./qualityScore10.js";
 import { evaluateRetest, type RetestPhase } from "./retest.js";
 import { setupScoreFromMatrix } from "./scoreFromMatrix.js";
 import { assertEntryNotFromNewsAlone, decideSetupState } from "./stateMachine.js";
+import { buildIndicatorChecklist } from "./indicatorReadouts.js";
 import type {
   HistoricalEdgeCardInfo,
   LiveSetupCard,
@@ -153,6 +154,13 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
   const actionHint = actionHintFor(state, breakout.mode, retest, falseBreakoutRisk, freshness.ok);
   const setupId = `${input.symbol.toUpperCase()}:${input.side}:${levels.trigger.toFixed(4)}`;
+  const indicatorChecklist = buildIndicatorChecklist({
+    side: input.side,
+    snapshot: input.snapshot,
+    levels,
+    dataFresh: freshness.ok,
+    minRvol: profile.minRelativeVolume,
+  });
 
   return {
     symbol: input.symbol.toUpperCase(),
@@ -211,6 +219,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     historicalEdge: input.historicalEdge ?? null,
     matchedStrategies: input.matchedStrategies ?? [],
     options: input.options ?? null,
+    indicatorChecklist,
   };
 }
 

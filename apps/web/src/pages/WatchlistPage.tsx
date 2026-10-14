@@ -14,6 +14,7 @@ import {
   type MonitorSymbolState,
 } from "../lib/api";
 import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
+import { buildWatchlistBrief } from "../lib/tradingRecommendation";
 
 export function WatchlistPage() {
   const { session } = useAuth();
@@ -119,7 +120,7 @@ export function WatchlistPage() {
     <div className="page">
       <PageHeader
         title="Watchlist"
-        subtitle="Stocks you are watching. Open a symbol to see its chart, entry, stop, and targets. Alerts are signals only — nothing is sent to a broker."
+        subtitle="Live trading recommendations for monitored symbols. Signals only — nothing is sent to a broker."
         actions={
           <>
             <span className="badge">{snap?.running ? "Watching" : "Paused"}</span>
@@ -173,12 +174,11 @@ export function WatchlistPage() {
 
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
-          Ranked opportunities ({ordered.length}/{snap?.maxSymbols ?? 6})
+          Monitored setups ({ordered.length}/{snap?.maxSymbols ?? 6})
         </h2>
         {ordered.length === 0 ? (
           <p className="page-sub" style={{ margin: 0 }}>
             No symbols yet. Add a ticker, or load the starter list (TSLA, MU, NVDA, AMD, SPY, QQQ).
-            Sign in to keep this list on your account.
           </p>
         ) : (
           <div style={{ display: "grid", gap: "0.65rem" }}>
@@ -240,25 +240,36 @@ function MonitorCard({
   busy: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const entry = row.entryZone
-    ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
-    : "—";
+  const brief = buildWatchlistBrief(row);
+  const showLevels = row.dataFresh && !row.error;
 
   return (
     <article className="watch-card">
-      <button type="button" className="watch-card-main" onClick={onOpen}>
-        <div className="watch-card-top">
-          <strong className="watch-card-symbol">
-            {row.symbol}
-            <span className="watch-card-side">Watching {row.side}</span>
-          </strong>
-          <StatusBadge status={row.status} />
-        </div>
-        <div className="watch-card-price">{fmtPrice(row.lastPrice)}</div>
-        <div className="watch-card-levels">
+      <div className="watch-card-top">
+        <strong className="watch-card-symbol">
+          {row.symbol}
+          <span className="watch-card-side">{row.side} watch</span>
+        </strong>
+        <StatusBadge status={row.statusLabel || row.status} />
+      </div>
+
+      <div className="watch-card-brief" role="status">
+        {brief.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+
+      {showLevels ? (
+        <div className="watch-card-levels watch-card-levels-full">
+          <span>
+            <b>Trigger</b>
+            {fmtPrice(row.alertAt)}
+          </span>
           <span>
             <b>Entry</b>
-            {entry}
+            {row.entryZone
+              ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
+              : "—"}
           </span>
           <span>
             <b>Stop</b>
@@ -268,39 +279,50 @@ function MonitorCard({
             <b>T1</b>
             {fmtPrice(row.t1)}
           </span>
+          <span>
+            <b>T2</b>
+            {fmtPrice(row.t2)}
+          </span>
+          <span>
+            <b>T3</b>
+            {fmtPrice(row.target3)}
+          </span>
         </div>
-      </button>
+      ) : null}
+
       <div className="watch-card-actions">
+        <button type="button" className="btn primary" onClick={onOpen}>
+          Open chart
+        </button>
         <button
           type="button"
           className="btn"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
-          {open ? "Hide details" : "Details"}
+          {open ? "Hide indicators" : "Indicators"}
         </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={busy}
-          onClick={() => onRemove()}
-        >
+        <button type="button" className="btn" disabled={busy} onClick={() => onRemove()}>
           Remove
         </button>
       </div>
+
       {open ? (
         <div className="watch-card-detail">
-          <p>Change {fmtPct(row.pctChange)} · Trigger {fmtPrice(row.alertAt)} · T2 {fmtPrice(row.t2)}</p>
-          <p>
-            Reward / risk {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
-            {" · "}
-            Volume {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}
-          </p>
-          {row.actionHint ? <p>Action: {row.actionHint}</p> : null}
-          {!row.dataFresh ? (
-            <p>Price is not fresh enough for a trade in this session. Candles are still the bars received.</p>
-          ) : null}
-          {row.waitingFor.length > 0 ? <p>Waiting: {row.waitingFor.slice(0, 3).join(" · ")}</p> : null}
+          <ul className="signal-checklist">
+            {(row.indicatorChecklist ?? []).map((ind) => (
+              <li key={ind.id} className={`check-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>
+                <strong>{ind.label}</strong>
+                <span className={`ind-bias ind-bias-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>
+                  {ind.bias}
+                </span>
+                <p>{ind.explanation}</p>
+              </li>
+            ))}
+            {(row.indicatorChecklist ?? []).length === 0 && (
+              <li>Indicator checklist will appear after the next monitor scan.</li>
+            )}
+          </ul>
           {row.error ? <p className="watch-card-error">{row.error}</p> : null}
         </div>
       ) : null}

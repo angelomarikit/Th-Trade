@@ -9,6 +9,7 @@ import type { BreakoutAnalysis } from "./breakoutAnalysis.js";
 import type { FakeBreakoutWarning } from "./fakeBreakout.js";
 import type { NearActiveView } from "./nearActive.js";
 import type { RetestState } from "./retest.js";
+import type { IndicatorReading } from "./indicatorReadouts.js";
 
 export interface RegimeCardInfo {
   primary: string;
@@ -69,6 +70,8 @@ export interface LiveSetupCard {
   options: OptionsCardInfo | null;
   /** Relative strength / momentum vs SPY, QQQ, sector — context only, not entry permission */
   relativeMomentum: RelativeMomentumCardInfo | null;
+  /** Customer-facing indicator biases — context for the monitored direction. */
+  indicatorChecklist: IndicatorReading[];
 }
 
 export interface RelativeMomentumCardInfo {

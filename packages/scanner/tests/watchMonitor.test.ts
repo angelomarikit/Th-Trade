@@ -96,6 +96,7 @@ function fakeCard(
     regime: null,
     historicalEdge: null,
     matchedStrategies: [],
+    indicatorChecklist: [],
     options: null,
     relativeMomentum: {
       feed: "iex",

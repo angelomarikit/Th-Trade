@@ -16,6 +16,7 @@ export * from "./breakoutAnalysis.js";
 export * from "./fakeBreakout.js";
 export * from "./retest.js";
 export * from "./qualityScore10.js";
+export * from "./indicatorReadouts.js";
 export * from "./signalReplay.js";
 export * from "./signalPerformance.js";
 export * from "./signalPersistGate.js";

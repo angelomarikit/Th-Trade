@@ -1,4 +1,4 @@
-import type { SetupResponse } from "./api";
+import type { MonitorSymbolState, SetupResponse } from "./api";
 import { fmtPrice } from "./format";
 import { normalizeStatus } from "../components/ui/StatusBadge";
 
@@ -63,5 +63,36 @@ export function buildTradingBrief(input: {
     lines.push(`Status: ${status}.`);
   }
 
+  return lines;
+}
+
+/** Watchlist monitor row — same fields as server scan, no chart required. */
+export function buildWatchlistBrief(row: MonitorSymbolState): string[] {
+  const status = normalizeStatus(row.statusLabel || row.status);
+  const lines: string[] = [];
+  const tradeDir =
+    status.includes("NO TRADE") || status.includes("DATA NOT VERIFIED")
+      ? "NO TRADE"
+      : row.side;
+
+  lines.push(`${row.symbol} — ${tradeDir} — ${status}`);
+  lines.push(
+    `Current price: ${fmtPrice(row.lastPrice)}${row.dataFresh ? " (verified)" : " (not verified for trading)"}`,
+  );
+
+  const wait = row.waitingFor[0] ?? row.actionHint;
+  if (wait) lines.push(wait);
+
+  if (!row.dataFresh) {
+    lines.push("Do not act on entry levels until data is verified.");
+    return lines;
+  }
+
+  lines.push(`Trigger ${fmtPrice(row.alertAt)} · Entry ${fmtPrice(row.entryZone?.low)}–${fmtPrice(row.entryZone?.high)}`);
+  lines.push(`Stop ${fmtPrice(row.stop)} · Targets ${fmtPrice(row.t1)} / ${fmtPrice(row.t2)} / ${fmtPrice(row.target3)}`);
+  if (row.rewardToRisk != null) {
+    lines.push(`Reward : risk ${row.rewardToRisk.toFixed(2)}R · Setup score ${row.qualityScore10 ?? row.setupScore ?? "—"}/10`);
+  }
+  if (row.strategyName) lines.push(`Strategy: ${row.strategyName}`);
   return lines;
 }

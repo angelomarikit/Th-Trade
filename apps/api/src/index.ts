@@ -722,6 +722,7 @@ async function main() {
               requiredForEntry: r.requiredForEntry,
               reason: r.reason,
             })),
+            indicatorChecklist: card.indicatorChecklist,
             rewardToRisk: card.rewardToRisk,
             dataFresh: card.dataFresh,
             evaluatedAt: card.evaluatedAt,
