@@ -133,10 +133,11 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const now = Date.now();
     const tfMs = timeframeMs(query.timeframe);
 
-    const ordered = bars.map((b) => {
+    const ordered = bars.flatMap((b) => {
+      if (!b?.t || b.o == null || b.h == null || b.l == null || b.c == null) return [];
       const ts = new Date(b.t);
       const barEnd = ts.getTime() + tfMs;
-      return {
+      return [{
         symbol: query.symbol.toUpperCase(),
         timeframe: query.timeframe,
         timestamp: ts,
@@ -147,7 +148,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         volume: b.v,
         vwap: b.vw,
         completed: barEnd <= now,
-      };
+      }];
     }).reverse();
     if (!regularHoursOnly) return ordered;
     return ordered.filter((b) => isRegularSessionBarStart(b.timestamp)).slice(-want);
@@ -164,8 +165,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       quote && quote.bid > 0 && quote.ask > 0
         ? null
         : await this.getLatestTrade(sym);
-    const bars1m = await this.getBars({ symbol: sym, timeframe: "1Min", limit: 120 });
-    const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78 });
+    const bars1m = await this.getBars({ symbol: sym, timeframe: "1Min", limit: 120, regularHoursOnly: true });
+    const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78, regularHoursOnly: true });
 
     const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
     const lastPrice =
@@ -249,8 +250,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       }
     }
 
-    const bars1mBy = await this.getMultiBars(unique, "1Min", 120);
-    const bars5mBy = await this.getMultiBars(unique, "5Min", 78);
+    const bars1mBy = await this.getMultiBars(unique, "1Min", 120, true);
+    const bars5mBy = await this.getMultiBars(unique, "5Min", 78, true);
 
     const out: MarketSnapshot[] = [];
     for (const sym of unique) {
@@ -279,6 +280,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     symbols: string[],
     timeframe: Bar["timeframe"],
     limit: number,
+    regularHoursOnly = false,
   ): Promise<Map<string, Bar[]>> {
     const result = new Map<string, Bar[]>();
     if (symbols.length === 0) return result;
@@ -304,10 +306,11 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
     const now = Date.now();
     for (const [sym, rawBars] of Object.entries(data.bars ?? {})) {
-      const mapped = (rawBars ?? []).slice(0, limit).map((b) => {
+      const mapped = (rawBars ?? []).flatMap((b) => {
+        if (!b?.t || b.o == null || b.h == null || b.l == null || b.c == null) return [];
         const ts = new Date(b.t);
         const barEnd = ts.getTime() + tfMs;
-        return {
+        return [{
           symbol: sym.toUpperCase(),
           timeframe,
           timestamp: ts,
@@ -318,9 +321,14 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
           volume: b.v,
           vwap: b.vw,
           completed: barEnd <= now,
-        } satisfies Bar;
+        } satisfies Bar];
       });
-      result.set(sym.toUpperCase(), mapped.reverse());
+      const ordered = mapped.reverse();
+      const kept =
+        regularHoursOnly && timeframe !== "1Day"
+          ? ordered.filter((bar) => isRegularSessionBarStart(bar.timestamp)).slice(-limit)
+          : ordered.slice(-limit);
+      result.set(sym.toUpperCase(), kept);
     }
     return result;
   }

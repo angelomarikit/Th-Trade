@@ -4,6 +4,7 @@ export function sessionVwap(bars: Bar[]): number | null {
   let pv = 0;
   let vol = 0;
   for (const b of bars) {
+    if (!b || b.close == null) continue;
     const typical = b.vwap ?? (b.high + b.low + b.close) / 3;
     pv += typical * b.volume;
     vol += b.volume;
@@ -32,7 +33,8 @@ export function relativeVolume(
 
 export function lastCompletedBar(bars: Bar[]): Bar | null {
   for (let i = bars.length - 1; i >= 0; i--) {
-    if (bars[i]!.completed) return bars[i]!;
+    const bar = bars[i];
+    if (bar?.completed) return bar;
   }
   return null;
 }

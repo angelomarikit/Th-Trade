@@ -36,13 +36,18 @@ export function matchStrategiesOnBars(input: {
       const allowed = input.enabledFamilies[strategy.family];
       if (allowed === false) continue;
     }
-    const signal = strategy.detect({
-      symbol: input.symbol,
-      bars: input.bars,
-      barIndex,
-      regimePrimary: input.regimePrimary,
-      hasCatalyst: input.hasCatalyst,
-    });
+    let signal: ReturnType<typeof strategy.detect> = null;
+    try {
+      signal = strategy.detect({
+        symbol: input.symbol,
+        bars: input.bars,
+        barIndex,
+        regimePrimary: input.regimePrimary,
+        hasCatalyst: input.hasCatalyst,
+      });
+    } catch {
+      continue;
+    }
     if (signal) {
       matches.push({
         signal,

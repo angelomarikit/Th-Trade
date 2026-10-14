@@ -52,6 +52,8 @@ export function CandleChart(props: {
   onTimeframe: (tf: string) => void;
   levels: LevelOverlay | null;
   symbol: string;
+  extendedHours?: boolean;
+  onExtendedHours?: (on: boolean) => void;
   /** Latest regular-session close. Candles are not rewritten to match a quote. */
   lastPrice?: number | null;
   onRetry?: () => void;
@@ -285,7 +287,7 @@ export function CandleChart(props: {
         .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
         .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
       vwap.setData(vwapPts);
-      shadeRef.current?.setBands(sessionBands(aligned, props.timeframe));
+      shadeRef.current?.setBands(sessionBands(aligned, props.timeframe, props.extendedHours === true));
 
       chartRef.current?.applyOptions({
         localization: chartEtLocalization,
@@ -346,7 +348,7 @@ export function CandleChart(props: {
         ];
       }
     }
-  }, [props.bars, props.levels, props.symbol, props.timeframe, goLive]);
+  }, [props.bars, props.levels, props.symbol, props.timeframe, props.extendedHours, goLive]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
@@ -379,6 +381,14 @@ export function CandleChart(props: {
             <span className="leg t1">T1</span>
             <span className="leg t2">T2</span>
           </div>
+          <button
+            type="button"
+            className={`chart-action-btn${props.extendedHours ? " active" : ""}`}
+            title="Off: 9:30 AM–4:00 PM ET only. On: premarket and after-hours are shown in blue and are not the regular-session close."
+            onClick={() => props.onExtendedHours?.(!props.extendedHours)}
+          >
+            Extended {props.extendedHours ? "ON" : "OFF"}
+          </button>
           <div className="chart-actions" role="group" aria-label="Chart view">
             <button
               type="button"
@@ -399,8 +409,9 @@ export function CandleChart(props: {
               {fullscreen ? "Exit" : "Full"}
             </button>
           </div>
-          <span className="badge muted-axis" title="Regular session only, 09:30–16:00 US Eastern. No after-hours candles.">
-            RTH · ET{lastBarEt ? ` · last ${lastBarEt}` : ""}
+          <span className="badge muted-axis" title={props.extendedHours ? "Blue bands are premarket and after-hours. Regular session is still 09:30–16:00 ET." : "Regular session only, 09:30–16:00 US Eastern. No after-hours candles."}>
+            {props.extendedHours ? "EXT · ET" : "RTH · ET"}
+            {lastBarEt ? ` · last ${lastBarEt}` : ""}
           </span>
           <span className="badge hide-sm" title="Setup levels are indicative — not broker orders">
             LEVELS = SETUP (NOT ORDERS)

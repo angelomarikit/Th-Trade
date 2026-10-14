@@ -11,31 +11,74 @@ export interface SessionBand {
   from: number;
   to: number;
   alt: boolean;
+  extended: boolean;
 }
 
 /** Alternate session bands so each trading day reads as its own block. */
-export function sessionBands(bars: { time: number }[], timeframe: string): SessionBand[] {
+export function sessionBands(
+  bars: { time: number }[],
+  timeframe: string,
+  extendedHours = false,
+): SessionBand[] {
   if (bars.length === 0) return [];
   const daily = timeframe.toLowerCase() === "1d";
-  if (daily) {
-    return bars.map((b, i) => ({
-      from: b.time,
-      to: bars[i + 1]?.time ?? b.time,
-      alt: i % 2 === 1,
-    }));
+  if (daily || !extendedHours) {
+    if (daily) {
+      return bars.map((b, i) => ({
+        from: b.time,
+        to: bars[i + 1]?.time ?? b.time,
+        alt: i % 2 === 1,
+        extended: false,
+      }));
+    }
+    const groups: { from: number; to: number }[] = [];
+    let key = "";
+    for (const b of bars) {
+      const day = etDayKey(b.time);
+      if (day !== key) {
+        groups.push({ from: b.time, to: b.time });
+        key = day;
+      } else {
+        groups[groups.length - 1]!.to = b.time;
+      }
+    }
+    return groups.map((g, i) => ({ ...g, alt: i % 2 === 1, extended: false }));
   }
-  const groups: { from: number; to: number }[] = [];
+
+  const groups: { from: number; to: number; extended: boolean; day: string }[] = [];
   let key = "";
   for (const b of bars) {
     const day = etDayKey(b.time);
-    if (day !== key) {
-      groups.push({ from: b.time, to: b.time });
-      key = day;
+    const extended = !isRthMinute(b.time);
+    const nextKey = `${day}|${extended ? "x" : "r"}`;
+    if (nextKey !== key) {
+      groups.push({ from: b.time, to: b.time, extended, day });
+      key = nextKey;
     } else {
       groups[groups.length - 1]!.to = b.time;
     }
   }
-  return groups.map((g, i) => ({ ...g, alt: i % 2 === 1 }));
+  let rthIndex = 0;
+  return groups.map((g) => {
+    const alt = g.extended ? false : rthIndex++ % 2 === 1;
+    return { from: g.from, to: g.to, alt, extended: g.extended };
+  });
+}
+
+function isRthMinute(unixSeconds: number): boolean {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const bag = Object.fromEntries(
+    fmt.formatToParts(new Date(unixSeconds * 1000)).map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+  let hour = Number(bag.hour);
+  if (hour === 24) hour = 0;
+  const mins = hour * 60 + Number(bag.minute);
+  return mins >= 9 * 60 + 30 && mins < 16 * 60;
 }
 
 function etDayKey(unixSeconds: number): string {
@@ -70,7 +113,11 @@ class SessionShadeRenderer implements IPrimitivePaneRenderer {
         const right = (x2 ?? x1) + barSpacing;
         const x = Math.round(Math.min(left, right) * ratio);
         const w = Math.max(1, Math.round(Math.abs(right - left) * ratio));
-        ctx.fillStyle = band.alt ? "rgba(226, 232, 240, 0.055)" : "rgba(0, 0, 0, 0.22)";
+        ctx.fillStyle = band.extended
+          ? "rgba(96, 165, 250, 0.10)"
+          : band.alt
+            ? "rgba(226, 232, 240, 0.055)"
+            : "rgba(0, 0, 0, 0.22)";
         ctx.fillRect(x, 0, w, height);
       }
     });

@@ -3,7 +3,7 @@ import { useTerminal } from "../../context/TerminalContext";
 import { ageLabel } from "../../lib/format";
 
 export function BottomDock() {
-  const { bottomDockOpen, setBottomDockOpen, recentScans, alerts, health } = useTerminal();
+  const { bottomDockOpen, setBottomDockOpen, recentScans, alerts } = useTerminal();
   const [tab, setTab] = useState<"scans" | "alerts" | "log">("scans");
 
   return (
@@ -59,7 +59,7 @@ export function BottomDock() {
           )}
           {tab === "alerts" && (
             alerts.length === 0 ? (
-              <p className="disclaimer">Local in-app alerts only — email/SMS/push not configured.</p>
+              <p className="disclaimer">No alerts yet. A notification appears when a watched setup changes into a trade decision.</p>
             ) : (
               <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem" }}>
                 {alerts.slice(0, 10).map((a) => (
@@ -72,10 +72,7 @@ export function BottomDock() {
           )}
           {tab === "log" && (
             <p className="disclaimer">
-              Phase {health?.phase ?? "—"} · journal {health?.journalEnabled ? "on" : "off"} (
-              {health?.journalCount ?? 0}) · execution automaticOrders=
-              {String(health?.execution.automaticOrders ?? false)} · Alpaca role{" "}
-              {health?.execution.alpacaRole ?? "market_data_and_news"}
+              Signals only. Orders are not sent from WULU. Operator details live under Settings → Diagnostics.
             </p>
           )}
         </div>

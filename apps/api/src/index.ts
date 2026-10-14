@@ -224,6 +224,7 @@ async function main() {
     ticker: string,
     timeframe: "1Min" | "5Min" | "15Min" | "1Day",
     safeLimit: number,
+    regularHoursOnly: boolean,
   ): Promise<unknown> {
     const existing = barsInflight.get(cacheKey);
     if (existing) return existing;
@@ -233,7 +234,7 @@ async function main() {
         symbol: ticker,
         timeframe,
         limit: safeLimit,
-        regularHoursOnly: true,
+        regularHoursOnly,
       });
       const alpacaMs = Date.now() - started;
       const payload = {
@@ -504,17 +505,19 @@ async function main() {
         }
         const limit = Math.min(2000, Math.max(10, Number(url.searchParams.get("limit") ?? 150)));
         const safeLimit = Number.isFinite(limit) ? limit : 150;
-        const cacheKey = `${ticker.toUpperCase()}|${timeframe}|${safeLimit}`;
+        const extended = url.searchParams.get("session") === "all";
+        const regularHoursOnly = !extended;
+        const cacheKey = `${ticker.toUpperCase()}|${timeframe}|${safeLimit}|${extended ? "all" : "rth"}`;
         const cached = barsResponseCache.get(cacheKey);
         const age = cached ? Date.now() - cached.at : Infinity;
         if (cached && age < BARS_CACHE_MS) {
           return json(res, 200, cached.payload);
         }
         if (cached && age < BARS_STALE_MS) {
-          void refreshBarsCache(cacheKey, ticker, timeframe, safeLimit);
+          void refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
           return json(res, 200, cached.payload);
         }
-        const pending = barsInflight.get(cacheKey) ?? refreshBarsCache(cacheKey, ticker, timeframe, safeLimit);
+        const pending = barsInflight.get(cacheKey) ?? refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
         const payload = await pending;
         return json(res, 200, payload);
         });
@@ -567,7 +570,7 @@ async function main() {
         if (useFastSnapshot) {
           const sym = ticker.toUpperCase();
           const [bars5m, quote] = await Promise.all([
-            marketData.getBars({ symbol: sym, timeframe: "5Min", limit: 45 }),
+            marketData.getBars({ symbol: sym, timeframe: "5Min", limit: 45, regularHoursOnly: true }),
             marketData.getQuote(sym),
           ]);
           const lastBar = bars5m.at(-1);

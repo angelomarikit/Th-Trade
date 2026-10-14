@@ -74,8 +74,7 @@ export function buildAlertEvent(input: {
 }): MonitorAlertEvent {
   const eventAt = new Date().toISOString();
   const setupId = `${input.symbol}:${input.side}:${input.newStatus}`;
-  // Bucket to minute so poll loops don't spam identical transitions
-  const bucket = eventAt.slice(0, 16);
+  const bucket = eventAt.slice(0, 10);
   const dedupeKey = `${input.userId}|${input.symbol}|${input.previousStatus}|${input.newStatus}|${bucket}`;
   return {
     id: randomUUID(),
@@ -105,10 +104,8 @@ export function isAlertWorthyTransition(prev: string, next: string): boolean {
   const p = normalizeStatusFamily(prev);
   const n = normalizeStatusFamily(next);
   if (p === n) return false;
-  if (n === "DATA NOT VERIFIED") return true;
   if (n === "NEAR ACTIVE" || n === "CONFIRMATION" || n === "ENTRY ACTIVE") return true;
   if (n === "MISSED" || n === "INVALIDATED") return true;
-  if (p === "WAIT" && n !== "WAIT") return true;
   return false;
 }
 

@@ -4,6 +4,7 @@ export function vwap(bars: Bar[]): number | null {
   let pv = 0;
   let vol = 0;
   for (const b of bars) {
+    if (!b || b.close == null) continue;
     const typical = b.vwap ?? (b.high + b.low + b.close) / 3;
     pv += typical * b.volume;
     vol += b.volume;

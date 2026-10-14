@@ -15,6 +15,8 @@ export function ScannerPage() {
     barsError,
     chartTf,
     setChartTf,
+    extendedHours,
+    setExtendedHours,
     symbol,
     error,
     inspectorOpen,
@@ -157,6 +159,8 @@ export function ScannerPage() {
             onTimeframe={setChartTf}
             levels={levels}
             symbol={symbol}
+            extendedHours={extendedHours}
+            onExtendedHours={setExtendedHours}
             lastPrice={last}
             onRetry={() => void scan({ ticker: symbol, fast: true })}
           />

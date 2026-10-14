@@ -347,10 +347,11 @@ export function fetchBars(
   ticker: string,
   timeframe: string,
   limit = 80,
-  opts?: { timeoutMs?: number; signal?: AbortSignal },
+  opts?: { timeoutMs?: number; signal?: AbortSignal; extendedHours?: boolean },
 ) {
+  const session = opts?.extendedHours ? "&session=all" : "";
   return getJson<BarsResponse>(
-    `/v1/bars?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`,
+    `/v1/bars?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(timeframe)}&limit=${limit}${session}`,
     undefined,
     opts,
   );

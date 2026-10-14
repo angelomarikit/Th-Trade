@@ -49,5 +49,5 @@ export interface StrategyDefinition {
 }
 
 export function sliceTo(ctx: StrategyContext): Bar[] {
-  return ctx.bars.slice(0, ctx.barIndex + 1).filter((b) => b.completed);
+  return ctx.bars.slice(0, ctx.barIndex + 1).filter((b) => b != null && b.completed);
 }

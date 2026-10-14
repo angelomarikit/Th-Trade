@@ -20,6 +20,12 @@ export class SignalJournal {
    * Record EVERY evaluated setup (WAIT, NEAR ACTIVE, ENTRY ACTIVE, MISSED, etc.).
    */
   record(card: LiveSetupCard): JournalEntry {
+    const latest = this.store
+      .list({ symbol: card.symbol, limit: 30 })
+      .find((entry) => entry.side === card.side);
+    if (latest && latest.state === card.state && isRoutineJournalState(card.state)) {
+      return latest;
+    }
     const features = buildFeatureSnapshotV1(card);
     assertNoFeatureLeakage(features, card.evaluatedAt);
 
@@ -151,6 +157,10 @@ function initialOutcome(state: LiveSetupCard["state"]): SignalOutcome {
     exitReason: "NONE",
     labeledAt: new Date().toISOString(),
   };
+}
+
+function isRoutineJournalState(state: string): boolean {
+  return state === "DATA_NOT_VERIFIED" || state === "WAIT" || state === "NO_TRADE";
 }
 
 function makeId(card: LiveSetupCard): string {

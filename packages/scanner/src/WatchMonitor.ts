@@ -259,6 +259,9 @@ export class WatchMonitor {
     const updatedAt = new Date().toISOString();
     const prev = this.states.get(cfg.symbol);
     const message = err instanceof Error ? err.message : String(err);
+    const readable = /cannot read properties of undefined/i.test(message)
+      ? "Price check failed for this symbol. No trade from this row."
+      : message;
     const next: MonitoredSymbolState = {
       symbol: cfg.symbol,
       side: cfg.side,
@@ -300,7 +303,7 @@ export class WatchMonitor {
       target3: prev?.target3 ?? null,
       invalidation: prev?.invalidation ?? null,
       setupId: prev?.setupId ?? null,
-      error: message,
+      error: readable,
       updatedAt,
     };
     this.states.set(cfg.symbol, next);
@@ -542,7 +545,9 @@ export class MonitorHub {
 
       await withAlpacaPriority("background", async () => {
         const symbols = [...pairMap.values()].map(({ cfg }) => cfg.symbol);
-        const snapBySymbol = await this.scanner.preloadSnapshots(symbols);
+        const snapBySymbol = this.scanner.preloadSnapshots
+          ? await this.scanner.preloadSnapshots(symbols)
+          : new Map();
 
         for (const { cfg, monitors } of pairMap.values()) {
           try {

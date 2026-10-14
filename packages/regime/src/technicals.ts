@@ -3,7 +3,7 @@ import { sessionVwap } from "@wulu/market-data";
 
 /** Use only completed bars to prevent look-ahead. */
 export function completedBars(bars: Bar[]): Bar[] {
-  return bars.filter((b) => b.completed);
+  return bars.filter((b) => b != null && b.completed);
 }
 
 export function sma(values: number[], period: number): number | null {

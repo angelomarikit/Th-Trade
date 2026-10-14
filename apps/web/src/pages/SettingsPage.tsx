@@ -4,7 +4,6 @@ import { useTerminal } from "../context/TerminalContext";
 
 export function SettingsPage() {
   const {
-    health,
     sidebarCollapsed,
     setSidebarCollapsed,
     inspectorOpen,
@@ -17,7 +16,7 @@ export function SettingsPage() {
   return (
     <div className="page">
       <h1 className="page-title">Settings</h1>
-      <p className="page-sub">Account, layout preferences, and backend capability readout.</p>
+      <p className="page-sub">Account and layout.</p>
 
       <div className="panel" style={{ marginBottom: "0.75rem" }}>
         <div className="panel-h">
@@ -30,10 +29,6 @@ export function SettingsPage() {
           <table className="table">
             <tbody>
               <tr>
-                <td>Supabase</td>
-                <td>{configured ? "Configured" : "Not configured"}</td>
-              </tr>
-              <tr>
                 <td>Email</td>
                 <td>{user?.email ?? profile?.email ?? "—"}</td>
               </tr>
@@ -45,10 +40,6 @@ export function SettingsPage() {
                 <td>Credits</td>
                 <td>{profile?.credits_balance ?? "—"}</td>
               </tr>
-              <tr>
-                <td>OpenAI (API)</td>
-                <td>{health?.openaiConfigured == null ? "—" : String(health.openaiConfigured)}</td>
-              </tr>
             </tbody>
           </table>
           {configured && user && (
@@ -59,7 +50,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ marginBottom: "0.75rem" }}>
+      <div className="panel">
         <div className="panel-h">
           <h3>Layout</h3>
         </div>
@@ -88,7 +79,10 @@ export function SettingsPage() {
             />{" "}
             Expand bottom dock
           </label>
-          <p className="disclaimer">Preferences persist in localStorage.</p>
+          <p className="disclaimer">
+            Preferences stay on this device.{" "}
+            <Link to="/admin">Diagnostics</Link>
+          </p>
         </div>
       </div>
 
@@ -101,62 +95,11 @@ export function SettingsPage() {
         </div>
         <div className="tab-body">
           <p className="disclaimer" style={{ marginBottom: "0.5rem" }}>
-            Configure browser/in-app alert delivery on the Alerts page. Signal history and historical
-            replay live on Signals. Email/SMS/push are not wired. Apply Supabase migration{" "}
-            <code>20261012_phase3_signal_history.sql</code> for durable storage across Railway restarts.
+            Turn browser notifications on or off from the Alerts page. A notification is not permission to enter a trade.
           </p>
           <Link to="/signals" className="icon-btn">
             Open Signals & performance
           </Link>
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-h">
-          <h3>Backend capability</h3>
-        </div>
-        <div className="tab-body">
-          <table className="table">
-            <tbody>
-              <tr>
-                <td>Account environment</td>
-                <td>{health?.accountEnvironment ?? "SIGNALS_ONLY"}</td>
-              </tr>
-              <tr>
-                <td>Market data</td>
-                <td>
-                  {health?.marketDataProvider ?? "—"} · {health?.alpacaFeed ?? "—"}
-                </td>
-              </tr>
-              <tr>
-                <td>News</td>
-                <td>{health?.newsProvider ?? "—"}</td>
-              </tr>
-              <tr>
-                <td>Alpaca credentials present</td>
-                <td>{String(health?.alpacaCredentialsPresent ?? false)}</td>
-              </tr>
-              <tr>
-                <td>Automatic orders</td>
-                <td>{String(health?.execution.automaticOrders ?? false)}</td>
-              </tr>
-              <tr>
-                <td>Execution platform</td>
-                <td>{health?.execution.platform ?? "thinkorswim"}</td>
-              </tr>
-              <tr>
-                <td>Alpaca role</td>
-                <td>{health?.execution.alpacaRole ?? "market_data_and_news"}</td>
-              </tr>
-              <tr>
-                <td>Options engine</td>
-                <td>{String(health?.optionsEngine ?? false)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="disclaimer">
-            API secrets never ship to the browser. Credentials remain server-side in the API process.
-          </p>
         </div>
       </div>
     </div>

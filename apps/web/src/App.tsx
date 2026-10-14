@@ -17,6 +17,7 @@ import { PositionsPage } from "./pages/PositionsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ScannerPage } from "./pages/ScannerPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { AdminPage } from "./pages/AdminPage";
 import { SignalsPage } from "./pages/SignalsPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
 
@@ -50,6 +51,7 @@ export function App() {
               <Route path="backtest" element={<BacktestPage />} />
               <Route path="news" element={<NewsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="admin" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Route>

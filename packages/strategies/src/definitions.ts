@@ -319,6 +319,7 @@ export const STRATEGY_DEFINITIONS: StrategyDefinition[] = [
     description: "RSI oversold then reclaim confirmation",
     detect: (ctx) => {
       const bars = sliceTo(ctx);
+      if (bars.length < 16) return null;
       const closes = bars.map((b) => b.close);
       const r = rsi(closes, 14);
       if (r == null || r > 35) return null;

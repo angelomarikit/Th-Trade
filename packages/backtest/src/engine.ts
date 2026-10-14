@@ -46,8 +46,8 @@ export function runBacktest(input: BacktestEngineInput): BacktestRunResult {
   let i = Math.max(start, 1);
 
   while (i < end - 1) {
-    const bar = bars[i]!;
-    if (!bar.completed) {
+    const bar = bars[i];
+    if (!bar?.completed) {
       i += 1;
       continue;
     }
@@ -127,7 +127,8 @@ function simulateTrade(input: {
   const lastIndex = Math.min(entryIndex + input.maxHold, input.hardEnd - 1);
 
   for (let j = entryIndex; j <= lastIndex; j++) {
-    const b = input.bars[j]!;
+    const b = input.bars[j];
+    if (!b) break;
     if (input.signal.side === "LONG") {
       const fav = (b.high - entryPrice) / risk;
       const adv = (entryPrice - b.low) / risk;
@@ -157,7 +158,8 @@ function simulateTrade(input: {
     }
   }
 
-  const timeoutBar = input.bars[lastIndex]!;
+  const timeoutBar = input.bars[lastIndex];
+  if (!timeoutBar) return null;
   const rawExit = timeoutBar.close;
   const exit =
     input.signal.side === "LONG"

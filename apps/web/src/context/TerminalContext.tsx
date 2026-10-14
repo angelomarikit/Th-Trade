@@ -20,7 +20,7 @@ import {
   type SetupResponse,
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
-import { historyLimit, keepRegularSession } from "../lib/regularSession";
+import { barsForChart, historyLimit } from "../lib/regularSession";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -75,6 +75,8 @@ interface TerminalContextValue {
   dayChangePct: number | null;
   chartTf: string;
   setChartTf: (tf: string) => void;
+  extendedHours: boolean;
+  setExtendedHours: (on: boolean) => void;
   loading: boolean;
   barsLoading: boolean;
   error: string | null;
@@ -111,6 +113,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<SetupResponse | null>(null);
   const [bars, setBars] = useState<BarsResponse | null>(null);
   const [chartTf, setChartTf] = useState("5m");
+  const [extendedHours, setExtendedHoursState] = useState(() => {
+    try {
+      return localStorage.getItem("wulu:extended-hours") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [barsLoading, setBarsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,12 +152,15 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const setupInflightRef = useRef(false);
   const prevStatus = useRef<string | null>(null);
   const prevFresh = useRef<boolean | null>(null);
+  const triggerAlerted = useRef("");
   const symbolRef = useRef(symbol);
   const sideRef = useRef(side);
   const chartTfRef = useRef(chartTf);
+  const extendedRef = useRef(false);
   symbolRef.current = symbol;
   sideRef.current = side;
   chartTfRef.current = chartTf;
+  extendedRef.current = extendedHours;
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
     setSidebarCollapsedState(v);
@@ -212,7 +224,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean; limit?: number }) => {
     const target = sym.trim().toUpperCase();
     if (!target) return;
-    const key = `${target}|${tf}`;
+    const extended = extendedRef.current;
+    const key = `${target}|${tf}|${extended ? "all" : "rth"}`;
     if (barsAbortRef.current && barsInflightKeyRef.current === key) {
       return;
     }
@@ -226,7 +239,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     // Hard switch: clear so prior symbol candles never linger.
     // Soft refresh (setup poll): keep candles until the new series arrives.
     if (!soft) {
-      const cached = readBarsCache(target, tf);
+      const cached = readBarsCache(target, tf, extended);
       if (cached) {
         setBars(cached);
         setBarsLoading(false);
@@ -237,16 +250,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }
     setBarsError(null);
     try {
-      const b = await fetchBars(target, tf, limit, { signal: ac.signal });
+      const b = await fetchBars(target, tf, limit, { signal: ac.signal, extendedHours: extended });
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
-      const sessionBars = {
-        ...b,
-        bars: keepRegularSession(b.bars, tf),
-        count: keepRegularSession(b.bars, tf).length,
-      };
+      const shown = barsForChart(b.bars, tf, extended);
+      const sessionBars = { ...b, bars: shown, count: shown.length };
       setBars(sessionBars);
-      writeBarsCache(target, tf, sessionBars);
+      writeBarsCache(target, tf, sessionBars, extended);
       const fullLimit = historyLimit(tf);
       if (limit < fullLimit && !ac.signal.aborted && seq === barsSeqRef.current) {
         const refineSeq = seq;
@@ -254,15 +264,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           if (refineSeq !== barsSeqRef.current) return;
           void (async () => {
             try {
-              const full = await fetchBars(target, tf, fullLimit);
-              if (refineSeq !== barsSeqRef.current) return;
-              const fullSession = {
-                ...full,
-                bars: keepRegularSession(full.bars, tf),
-                count: keepRegularSession(full.bars, tf).length,
-              };
+              const full = await fetchBars(target, tf, fullLimit, { extendedHours: extended });
+              if (refineSeq !== barsSeqRef.current || extendedRef.current !== extended) return;
+              const fullShown = barsForChart(full.bars, tf, extended);
+              const fullSession = { ...full, bars: fullShown, count: fullShown.length };
               setBars(fullSession);
-              writeBarsCache(target, tf, fullSession);
+              writeBarsCache(target, tf, fullSession, extended);
             } catch {
               /* keep fast candles visible */
             }
@@ -276,12 +283,24 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         return;
       }
       setBarsError(friendlyApiError(err));
-      if (!soft && !readBarsCache(target, tf)) setBars(null);
+      if (!soft && !readBarsCache(target, tf, extended)) setBars(null);
     } finally {
       if (barsInflightKeyRef.current === key) barsInflightKeyRef.current = "";
       if (seq === barsSeqRef.current) setBarsLoading(false);
     }
   }, []);
+
+  const setExtendedHours = useCallback((on: boolean) => {
+    extendedRef.current = on;
+    setExtendedHoursState(on);
+    try {
+      localStorage.setItem("wulu:extended-hours", on ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+    const sym = symbolRef.current;
+    if (sym) void loadBars(sym, chartTfRef.current);
+  }, [loadBars]);
 
   const scan = useCallback(
     async (opts?: {
@@ -357,40 +376,30 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         const prevKey = prevStatus.current;
         if (prevKey?.startsWith(`${t}:`) && prevKey !== `${statusKey}:${status}`) {
           const prevSt = prevKey.slice(statusKey.length + 1);
-          if (prevSt && prevSt !== status) {
+          if (prevSt && prevSt !== status && isCustomerAlert(alertKind)) {
             pushAlert({
               kind: alertKind,
               message: `${t} → ${status}${action ? ` · signal ${action}` : ""} (alert ≠ entry)`,
               symbol: t,
             });
           }
-        } else if (!prevKey?.startsWith(`${t}:`) && status) {
-          pushAlert({
-            kind: alertKind === "data_stale" ? "data_stale" : "setup_found",
-            message: `${t} setup ${status}${action ? ` · ${action}` : ""}`,
-            symbol: t,
-          });
-        }
-        if (prevFresh.current === true && fresh === false) {
-          pushAlert({
-            kind: "data_stale",
-            message: `${t} data not verified / stale — fail closed`,
-            symbol: t,
-          });
         }
         const distPct = next.liveCard.nearActive?.distanceToTriggerPct;
         if (
           next.liveCard.nearActive?.active &&
           distPct != null &&
           Math.abs(distPct) <= 0.15 &&
-          prevKey?.startsWith(`${t}:`)
+          prevKey?.startsWith(`${t}:`) &&
+          triggerAlerted.current !== `${t}:${status}`
         ) {
+          triggerAlerted.current = `${t}:${status}`;
           pushAlert({
             kind: "trigger_approached",
             message: `${t} trigger approached (${next.liveCard.nearActive.distanceLabel})`,
             symbol: t,
           });
         }
+        if (!next.liveCard.nearActive?.active) triggerAlerted.current = "";
         prevStatus.current = `${statusKey}:${status}`;
         prevFresh.current = fresh;
         const recent: RecentScan = {
@@ -540,6 +549,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       dayChangePct,
       chartTf,
       setChartTf,
+      extendedHours,
+      setExtendedHours,
       loading,
       barsLoading,
       error,
@@ -573,6 +584,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       displayPrice,
       dayChangePct,
       chartTf,
+      extendedHours,
+      setExtendedHours,
       loading,
       barsLoading,
       error,
@@ -604,6 +617,17 @@ export function useTerminal() {
   const ctx = useContext(TerminalContext);
   if (!ctx) throw new Error("useTerminal outside provider");
   return ctx;
+}
+
+function isCustomerAlert(kind: string): boolean {
+  return (
+    kind === "near_active" ||
+    kind === "entry_zone_active" ||
+    kind === "missed" ||
+    kind === "invalidated" ||
+    kind === "completed_confirmation" ||
+    kind === "trigger_approached"
+  );
 }
 
 /** Map setup status → local alert kind. Never implies order permission. */

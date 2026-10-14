@@ -22,6 +22,11 @@ type ServerEvent = {
   dataFresh?: boolean;
 };
 
+function isRoutineAlert(status: string): boolean {
+  const u = status.toUpperCase();
+  return u.includes("DATA NOT VERIFIED") || u.includes("DATA_NOT") || u === "WAIT" || u.includes("NO TRADE");
+}
+
 export function AlertsPage() {
   const { session } = useAuth();
   const token = session?.access_token ?? null;
@@ -107,6 +112,8 @@ export function AlertsPage() {
     }
   }
 
+  const tradeAlerts = events.filter((e) => !isRoutineAlert(e.newStatus));
+
   return (
     <div className="page">
       <PageHeader
@@ -137,19 +144,19 @@ export function AlertsPage() {
       {error ? <p className="error-banner">{error}</p> : null}
       {note ? <p className="disclaimer">{note}</p> : null}
 
-      {events.length === 0 ? (
+      {tradeAlerts.length === 0 ? (
         <EmptyState
           badge="Alerts"
           title="No alerts yet"
-          body="Alerts appear only when a symbol’s status changes. If every symbol stays NO TRADE / DATA NOT VERIFIED, this page stays empty on purpose. That is the closed-market freshness rule, not a missing alert feed."
+          body="Trade alerts appear when a watched symbol moves into confirmation, near a trigger, or is invalidated. Repeated not-verified checks are not listed here."
         />
       ) : (
         <div className="panel">
           <div className="panel-h">
-            <h3>History ({events.length})</h3>
+            <h3>History ({tradeAlerts.length})</h3>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", padding: "0.55rem 0.75rem" }}>
-            {events.map((a) => (
+            {tradeAlerts.map((a) => (
               <div
                 key={a.id}
                 style={{

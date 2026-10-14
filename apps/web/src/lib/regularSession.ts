@@ -21,7 +21,16 @@ export function isRegularSessionBarStart(unixSeconds: number): boolean {
 
 export function keepRegularSession<T extends { time: number }>(bars: T[], timeframe: string): T[] {
   if (timeframe.toLowerCase() === "1d") return bars;
-  return bars.filter((b) => isRegularSessionBarStart(b.time));
+  return bars.filter((b) => b != null && isRegularSessionBarStart(b.time));
+}
+
+export function barsForChart<T extends { time: number; close: number }>(
+  bars: T[],
+  timeframe: string,
+  extendedHours: boolean,
+): T[] {
+  const clean = bars.filter((b) => b != null && Number.isFinite(b.close));
+  return extendedHours ? clean : keepRegularSession(clean, timeframe);
 }
 
 /** How many regular-session bars to keep on the chart. */

@@ -285,6 +285,8 @@ describe("WatchMonitor / MonitorHub Phase 2", () => {
     expect(EXECUTION_POLICY.automaticOrders).toBe(false);
     expect(isAlertWorthyTransition("WAIT", "NEAR ACTIVE")).toBe(true);
     expect(isAlertWorthyTransition("NEAR ACTIVE", "NEAR ACTIVE")).toBe(false);
+    expect(isAlertWorthyTransition("WAIT", "DATA NOT VERIFIED")).toBe(false);
+    expect(isAlertWorthyTransition("DATA NOT VERIFIED", "DATA NOT VERIFIED")).toBe(false);
   });
 
   it("supports replace and remove", async () => {
