@@ -566,7 +566,8 @@ export class MonitorHub {
           } catch (err) {
             failed += 1;
             const message = err instanceof Error ? err.message : String(err);
-            console.warn(`[monitor] scan failed ${cfg.symbol}: ${message.slice(0, 180)}`);
+            const stack = err instanceof Error && err.stack ? err.stack.split("\n").slice(0, 6).join(" | ") : "";
+            console.warn(`[monitor] scan failed ${cfg.symbol}: ${message.slice(0, 180)} ${stack}`);
             for (const mon of monitors) {
               const evt = mon.applyError(cfg, err);
               if (evt && this.alertStore) await this.alertStore.record(evt);

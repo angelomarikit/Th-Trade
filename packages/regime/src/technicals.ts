@@ -72,14 +72,17 @@ export function relativeStrengthRatio(
 ): number | null {
   const a = completedBars(symbolBars);
   const b = completedBars(benchmarkBars);
-  if (a.length < lookback || b.length < lookback) return null;
-  const a0 = a[a.length - lookback]!.close;
-  const a1 = a[a.length - 1]!.close;
-  const b0 = b[b.length - lookback]!.close;
-  const b1 = b[b.length - 1]!.close;
-  if (a0 <= 0 || b0 <= 0) return null;
-  const symRet = (a1 - a0) / a0;
-  const benRet = (b1 - b0) / b0;
+  if (!Number.isFinite(lookback) || lookback < 2 || a.length < lookback || b.length < lookback) {
+    return null;
+  }
+  const a0 = a[a.length - lookback];
+  const a1 = a[a.length - 1];
+  const b0 = b[b.length - lookback];
+  const b1 = b[b.length - 1];
+  if (!a0 || !a1 || !b0 || !b1) return null;
+  if (a0.close <= 0 || b0.close <= 0) return null;
+  const symRet = (a1.close - a0.close) / a0.close;
+  const benRet = (b1.close - b0.close) / b0.close;
   // RS as difference in returns (percentage points) — clearer than ratio near zero
   return (symRet - benRet) * 100;
 }
