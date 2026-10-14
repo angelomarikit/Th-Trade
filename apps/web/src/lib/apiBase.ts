@@ -8,14 +8,22 @@ const PREVIEW_API = "https://th-trade-preview.up.railway.app";
 
 function isolatedPreviewHost(): boolean {
   if (typeof window === "undefined") return false;
-  return window.location.hostname.includes("phase7-scanner-v2-preview");
+  const h = window.location.hostname.toLowerCase();
+  return (
+    h.includes("phase7-scanner-v2-preview") ||
+    h.includes("scanner-v2-preview") ||
+    h.includes("web-git-phase7-scanner-v2")
+  );
 }
 
 const raw = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/+$/, "");
+const bakedPreviewBranch = import.meta.env.VITE_IS_SCANNER_V2_PREVIEW === "1";
+const rawPointsAtPreview = raw.includes("th-trade-preview");
 
-export const API_BASE = isolatedPreviewHost()
-  ? PREVIEW_API
-  : raw || (import.meta.env.PROD ? FALLBACK_PROD_API : "");
+export const API_BASE =
+  isolatedPreviewHost() || bakedPreviewBranch || rawPointsAtPreview
+    ? PREVIEW_API
+    : raw || (import.meta.env.PROD ? FALLBACK_PROD_API : "");
 
 export function apiUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;

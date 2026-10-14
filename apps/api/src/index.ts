@@ -282,6 +282,43 @@ async function main() {
 
       const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
+      if (url.pathname === "/" && req.method === "GET") {
+        const railwayEnv = (process.env.RAILWAY_ENVIRONMENT ?? "").toLowerCase();
+        const isPreviewService =
+          railwayEnv === "preview" ||
+          (process.env.NEWS_PROVIDER ?? "").toLowerCase() === "alpaca";
+        const previewWeb =
+          (process.env.PREVIEW_WEB_URL ?? "").trim() ||
+          "https://web-git-phase7-scanner-v2-preview-supporttoptiersoluts-projects.vercel.app";
+        const productionWeb =
+          (process.env.PRODUCTION_WEB_URL ?? "").trim() ||
+          "https://web-tawny-iota-56.vercel.app";
+        return json(res, 200, {
+          service: "wulu-api",
+          message:
+            "This URL is the JSON API only. Open the web app links below in your browser — do not expect HTML here.",
+          environment: isPreviewService ? "preview" : "production",
+          webApp: isPreviewService ? previewWeb : productionWeb,
+          pages: isPreviewService
+            ? {
+                login: `${previewWeb}/login`,
+                overview: `${previewWeb}/`,
+                scanner: `${previewWeb}/scanner`,
+                watchlist: `${previewWeb}/watchlist`,
+                charts: `${previewWeb}/charts`,
+                signals: `${previewWeb}/signals`,
+              }
+            : {
+                login: `${productionWeb}/login`,
+                overview: `${productionWeb}/`,
+                scanner: `${productionWeb}/scanner`,
+                watchlist: `${productionWeb}/watchlist`,
+              },
+          health: "/health",
+          exampleSetup: "/v1/setup?ticker=SPY&side=LONG&fast=1",
+        });
+      }
+
       if (url.pathname === "/health") {
         return json(res, 200, {
           ok: true,
