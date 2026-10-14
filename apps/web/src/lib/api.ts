@@ -77,6 +77,12 @@ export interface SetupResponse {
       explanation: string;
       gateStatus: string;
     }>;
+    tradingAction?: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
+    watchingSummary?: string | null;
+    outcomeDetail?: string | null;
+    outcomeR?: number | null;
+    marketDataAt?: string | null;
+    dataFeed?: string | null;
     rewardToRisk?: number;
     dataFresh?: boolean;
     evaluatedAt?: string;
@@ -651,6 +657,10 @@ export interface MonitorSymbolState {
     explanation: string;
     gateStatus: string;
   }>;
+  tradingAction: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
+  watchingSummary: string | null;
+  outcomeDetail: string | null;
+  outcomeR: number | null;
   error: string | null;
   updatedAt: string;
 }

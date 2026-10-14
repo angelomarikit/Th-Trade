@@ -250,8 +250,10 @@ function MonitorCard({
           {row.symbol}
           <span className="watch-card-side">{row.side} watch</span>
         </strong>
+        <span className="badge">{row.tradingAction ?? "WAIT"}</span>
         <StatusBadge status={row.statusLabel || row.status} />
       </div>
+      {row.watchingSummary ? <p className="watch-card-watching">{row.watchingSummary}</p> : null}
 
       <div className="watch-card-brief" role="status">
         {brief.map((line) => (

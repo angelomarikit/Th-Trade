@@ -17,6 +17,8 @@ export function normalizeStatus(status: string): string {
   if (u.includes("NEAR ACTIVE")) return "NEAR ACTIVE";
   if (u.includes("MISSED")) return "MISSED";
   if (u.includes("INVALIDATED")) return "INVALIDATED";
+  if (u.includes("TARGET HIT")) return u.includes("T2") ? "TARGET HIT (T2)" : u.includes("T3") ? "TARGET HIT (T3)" : "TARGET HIT (T1)";
+  if (u.includes("STOP HIT")) return "STOP HIT";
   if (u.includes("DATA NOT VERIFIED") || u.includes("DATA_NOT")) return "DATA NOT VERIFIED";
   if (u.includes("NO TRADE") || u.includes("NO_TRADE")) return "NO TRADE";
   if (u.includes("SETUP")) return "SETUP";
@@ -30,6 +32,7 @@ function toneFor(status: string): string {
   if (u === "LONG" || u.includes("ENTRY ACTIVE") || u.includes("SETUP")) return "green";
   if (u === "SHORT") return "red";
   if (u.includes("NEAR ACTIVE") || u.includes("WAIT") || u.includes("WATCH")) return "amber";
+  if (u.includes("TARGET HIT")) return "green";
   if (u.includes("MISSED") || u.includes("INVALIDATED") || u.includes("NO TRADE") || u.includes("STOP"))
     return "red";
   if (u.includes("DATA")) return "amber";

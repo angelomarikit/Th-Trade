@@ -2378,6 +2378,14 @@ a {
   margin: 0.2rem 0;
 }
 
+.watch-card-watching {
+  margin: 0.35rem 0 0;
+  padding: 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .watch-card-levels-full {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

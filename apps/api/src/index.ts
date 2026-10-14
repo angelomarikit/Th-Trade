@@ -8,6 +8,9 @@ import {
   runSignalReplay,
   SignalPersistGate,
   SignalOutcomeTracker,
+  buildWatchingSummary,
+  deriveTradingAction,
+  outcomeDetailToStatusLabel,
 } from "@wulu/confirmation";
 import {
   calculatePositionSize,
@@ -153,6 +156,7 @@ async function main() {
         );
         void closeOpenTrack(track.resolution.id);
       }
+      return track;
     },
     persistWatchlist: async (userId, symbols) => {
       await saveMonitorWatchlist(userId, symbols);
@@ -730,10 +734,45 @@ async function main() {
           creditsRemaining,
         };
 
+        const setupTrack = outcomeTracker.onCard(card, null, "LIVE", card.lastCompletedBar);
+        const resolvedDetail = setupTrack.resolution?.detail ?? null;
+        const displayStatus = resolvedDetail
+          ? outcomeDetailToStatusLabel(resolvedDetail)
+          : card.statusLabel;
+        const tradingAction = deriveTradingAction({
+          state: card.state,
+          statusLabel: displayStatus,
+          userStatus: displayStatus,
+          dataFresh: card.dataFresh,
+          entryExecutable: card.entryZone.executable,
+          outcomeDetail: resolvedDetail,
+        });
+        const strategyName =
+          card.matchedStrategies[0]?.strategyName ??
+          card.historicalEdge?.strategyName ??
+          null;
+        const watchingSummary = buildWatchingSummary({
+          symbol: card.symbol,
+          side: card.side,
+          strategyName,
+          alertAt: card.alertAt,
+          waitingFor: card.nearActive.stillWaitingFor,
+          tradingAction,
+        });
+
         return json(res, 200, {
           liveCard: {
             headline: `${card.symbol} — ${card.side}`,
-            status: card.statusLabel,
+            status: displayStatus,
+            tradingAction,
+            watchingSummary,
+            outcomeDetail: resolvedDetail,
+            outcomeR: setupTrack.resolution?.outcomeR ?? null,
+            marketDataAt:
+              card.nearActive.dataTimestamp ??
+              card.lastCompletedBar?.timestamp ??
+              card.evaluatedAt,
+            dataFeed: process.env.ALPACA_DATA_FEED ?? "iex",
             state: card.state,
             whyMoving: card.whyMoving.whyMoving,
             catalyst: card.whyMoving.catalystLabel,

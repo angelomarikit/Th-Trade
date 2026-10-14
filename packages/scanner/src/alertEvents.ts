@@ -106,6 +106,7 @@ export function isAlertWorthyTransition(prev: string, next: string): boolean {
   if (p === n) return false;
   if (n === "NEAR ACTIVE" || n === "CONFIRMATION" || n === "ENTRY ACTIVE") return true;
   if (n === "MISSED" || n === "INVALIDATED") return true;
+  if (n.includes("TARGET HIT") || n.includes("STOP HIT")) return true;
   return false;
 }
 
@@ -118,6 +119,8 @@ export function normalizeStatusFamily(status: string): string {
   if (u.includes("MISSED")) return "MISSED";
   if (u.includes("INVALIDATED")) return "INVALIDATED";
   if (u.includes("NO TRADE") || u.includes("NO_TRADE")) return "NO TRADE";
+  if (u.includes("TARGET HIT")) return "TARGET HIT";
+  if (u.includes("STOP HIT")) return "STOP HIT";
   if (u.includes("WAIT")) return "WAIT";
   return u || "WAIT";
 }

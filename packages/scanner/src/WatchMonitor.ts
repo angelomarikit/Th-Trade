@@ -1,4 +1,9 @@
-import type { IndicatorReading, LiveSetupCard } from "@wulu/confirmation";
+import type { IndicatorReading, LiveSetupCard, OutcomeResolution } from "@wulu/confirmation";
+import {
+  buildWatchingSummary,
+  deriveTradingAction,
+  outcomeDetailToStatusLabel,
+} from "@wulu/confirmation";
 import { backgroundAlpacaShouldWait, withAlpacaPriority } from "@wulu/market-data";
 import { SETUP_STATES, type SetupState, type TradeSide } from "@wulu/domain";
 import {
@@ -70,6 +75,11 @@ export interface MonitoredSymbolState {
   statusLabel: string;
   strategyName: string | null;
   indicatorChecklist: IndicatorReading[];
+  /** WAIT | ENTER | SKIP | INVALIDATED — customer action, not a broker order. */
+  tradingAction: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
+  watchingSummary: string | null;
+  outcomeDetail: string | null;
+  outcomeR: number | null;
   error: string | null;
   updatedAt: string;
 }
@@ -244,6 +254,32 @@ export class WatchMonitor {
         card.historicalEdge?.strategyName ??
         null,
       indicatorChecklist: card.indicatorChecklist ?? [],
+      ...(() => {
+        const strategyName =
+          card.matchedStrategies[0]?.strategyName ??
+          card.historicalEdge?.strategyName ??
+          null;
+        const tradingAction = deriveTradingAction({
+          state: card.state,
+          statusLabel: card.statusLabel,
+          userStatus: status,
+          dataFresh: card.dataFresh,
+          entryExecutable: card.entryZone.executable,
+        });
+        return {
+          tradingAction,
+          watchingSummary: buildWatchingSummary({
+            symbol: card.symbol,
+            side: card.side,
+            strategyName,
+            alertAt: card.alertAt,
+            waitingFor: card.nearActive.stillWaitingFor.slice(0, 6),
+            tradingAction,
+          }),
+        };
+      })(),
+      outcomeDetail: null,
+      outcomeR: null,
       error: null,
       updatedAt,
     };
@@ -265,6 +301,62 @@ export class WatchMonitor {
         dataFresh: next.dataFresh,
         reason: `Status ${prev.status} → ${next.status}`,
         confirmationDetails: next.waitingFor,
+      });
+    }
+    return null;
+  }
+
+  applyOutcomeResolution(
+    cfg: MonitorSymbolConfig,
+    card: LiveSetupCard,
+    resolution: OutcomeResolution,
+  ): MonitorAlertEvent | null {
+    const prev = this.states.get(cfg.symbol);
+    if (!prev) return null;
+    const status = outcomeDetailToStatusLabel(resolution.detail);
+    const tradingAction = deriveTradingAction({
+      state: card.state,
+      statusLabel: status,
+      userStatus: status,
+      dataFresh: card.dataFresh,
+      entryExecutable: false,
+      outcomeDetail: resolution.detail,
+    });
+    const next: MonitoredSymbolState = {
+      ...prev,
+      status,
+      statusLabel: status,
+      state: "RESOLVED",
+      tradingAction,
+      watchingSummary: buildWatchingSummary({
+        symbol: card.symbol,
+        side: card.side,
+        strategyName: prev.strategyName,
+        alertAt: prev.alertAt,
+        waitingFor: [resolution.note],
+        tradingAction,
+      }),
+      outcomeDetail: resolution.detail,
+      outcomeR: resolution.outcomeR,
+      updatedAt: new Date().toISOString(),
+    };
+    this.states.set(cfg.symbol, next);
+    if (prev && isAlertWorthyTransition(prev.status, next.status)) {
+      return buildAlertEvent({
+        userId: this.sessionId,
+        symbol: next.symbol,
+        side: next.side,
+        previousStatus: prev.status,
+        newStatus: next.status,
+        marketDataAt: next.marketDataAt,
+        trigger: next.alertAt,
+        entryZone: next.entryZone,
+        stop: next.stop,
+        target1: next.t1,
+        target2: next.t2,
+        dataFresh: next.dataFresh,
+        reason: resolution.note,
+        confirmationDetails: [`outcomeR:${resolution.outcomeR ?? "—"}`, resolution.detail],
       });
     }
     return null;
@@ -321,6 +413,10 @@ export class WatchMonitor {
       statusLabel: "DATA NOT VERIFIED",
       strategyName: prev?.strategyName ?? null,
       indicatorChecklist: prev?.indicatorChecklist ?? [],
+      tradingAction: "WAIT",
+      watchingSummary: prev?.watchingSummary ?? null,
+      outcomeDetail: prev?.outcomeDetail ?? null,
+      outcomeR: prev?.outcomeR ?? null,
       error: readable,
       updatedAt,
     };
@@ -402,7 +498,9 @@ export interface MonitorHubOptions {
   onSignalCard?: (
     card: import("@wulu/confirmation").LiveSetupCard,
     userId: string,
-  ) => void;
+  ) =>
+    | { opened?: unknown; resolution?: OutcomeResolution }
+    | void;
 }
 
 /**
@@ -425,9 +523,7 @@ export class MonitorHub {
   private readonly persistWatchlist:
     | ((userId: string, symbols: MonitorSymbolConfig[]) => Promise<void>)
     | null;
-  private readonly onSignalCard:
-    | ((card: import("@wulu/confirmation").LiveSetupCard, userId: string) => void)
-    | null;
+  private readonly onSignalCard: MonitorHubOptions["onSignalCard"] | null;
 
   constructor(
     private readonly scanner: SetupScanner,
@@ -581,7 +677,13 @@ export class MonitorHub {
               const evt = mon.applyCard(cfg, card, this.feed);
               if (evt && this.alertStore) await this.alertStore.record(evt);
               // Foundation: log every evaluated card per user (store dedupes by id).
-              if (this.onSignalCard) this.onSignalCard(card, mon.userId);
+              if (this.onSignalCard) {
+                const track = this.onSignalCard(card, mon.userId);
+                if (track?.resolution) {
+                  const outEvt = mon.applyOutcomeResolution(cfg, card, track.resolution);
+                  if (outEvt && this.alertStore) await this.alertStore.record(outEvt);
+                }
+              }
             }
           } catch (err) {
             failed += 1;

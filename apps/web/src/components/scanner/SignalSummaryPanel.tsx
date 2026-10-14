@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StatusBadge, normalizeStatus } from "../ui/StatusBadge";
 import { useTerminal } from "../../context/TerminalContext";
-import { fmtPct, fmtPrice } from "../../lib/format";
+import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
 /**
@@ -66,8 +66,22 @@ export function SignalSummaryPanel() {
         <StatusBadge status={status} className="signal-status" />
       </div>
 
-      <div className="signal-action-hero wait">
-        <p className="action-label">Direction</p>
+      <div className={`signal-action-hero ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
+        <p className="action-label">Your action</p>
+        <p className="action-value">{lc.tradingAction ?? "WAIT"}</p>
+        {lc.watchingSummary ? (
+          <p className="action-label" style={{ marginTop: "0.35rem", lineHeight: 1.35 }}>
+            {lc.watchingSummary}
+          </p>
+        ) : null}
+        {lc.marketDataAt ? (
+          <p className="action-label muted">
+            Data {lc.dataFeed?.toUpperCase() ?? "IEX"} · {formatEtTime(lc.marketDataAt)}
+          </p>
+        ) : null}
+        <p className="action-label" style={{ marginTop: "0.5rem" }}>
+          Direction
+        </p>
         <div className="signal-panel-dir" style={{ margin: 0 }}>
           <div className="side-toggle" role="group" aria-label="Direction">
             <button
