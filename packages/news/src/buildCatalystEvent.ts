@@ -86,6 +86,26 @@ export function buildCatalystEvents(
   });
 }
 
+const COMPANY_HEADLINE: Record<string, string[]> = {
+  MU: ["MICRON"],
+  NVDA: ["NVIDIA"],
+  AMD: ["ADVANCED MICRO"],
+  TSLA: ["TESLA"],
+  AAPL: ["APPLE"],
+  AMZN: ["AMAZON"],
+  MSFT: ["MICROSOFT"],
+  GOOGL: ["ALPHABET", "GOOGLE"],
+  META: ["META"],
+  SPY: ["S&P", "S&P 500"],
+  QQQ: ["NASDAQ"],
+};
+
+function headlineNamesTicker(headline: string, ticker: string): boolean {
+  const text = headline.toUpperCase();
+  if (text.includes(ticker)) return true;
+  return (COMPANY_HEADLINE[ticker] ?? []).some((name) => text.includes(name));
+}
+
 export function selectPrimaryCatalystForTicker(
   events: CatalystEvent[],
   ticker: string,
@@ -94,7 +114,11 @@ export function selectPrimaryCatalystForTicker(
   const matched = events.filter((e) => e.tickers.includes(t));
   if (matched.length === 0) return null;
 
-  return matched.sort(
+  const named = matched.filter((e) => headlineNamesTicker(e.headline, t));
+  const focused = matched.filter((e) => e.tickers.length <= 8);
+  const pool = named.length > 0 ? named : focused.length > 0 ? focused : matched;
+
+  return pool.sort(
     (a, b) =>
       b.scores.catalystImportance.score - a.scores.catalystImportance.score ||
       b.scores.newsFreshness.score - a.scores.newsFreshness.score ||
