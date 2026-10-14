@@ -53,10 +53,12 @@ export function ScannerPage() {
     : null;
 
   const last = displayPrice;
+  const sessionLabel = lc?.session?.session ?? data?.card.session?.session;
   const lastBar = bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1) : undefined;
   const lastBarAt = lastBar ? formatEtTime(lastBar.time * 1000) : null;
   const quotePx = lc?.lastPrice;
   const quoteDiffers =
+    sessionLabel === "RTH" &&
     last != null &&
     quotePx != null &&
     Number.isFinite(quotePx) &&
@@ -64,7 +66,6 @@ export function ScannerPage() {
   const chg = dayChangePct;
   const rvol = lc?.relativeMomentum?.rvol;
   const feedLabel = (health?.alpacaFeed ?? bars?.feed ?? "iex").toUpperCase();
-  const sessionLabel = lc?.session?.session ?? data?.card.session?.session;
 
   return (
     <div className="page scanner-page-v7">
@@ -124,7 +125,7 @@ export function ScannerPage() {
                 </div>
               </div>
               <div className="scanner-price-row">
-                <span className="last" title="Close of the last candle on this timeframe. Not edited to match a quote.">
+                <span className="last" title="Regular-session close. The chart stops at 16:00 ET and does not include after-hours prints.">
                   {last != null ? fmtPrice(last) : "—"}
                 </span>
                 {chg != null && (

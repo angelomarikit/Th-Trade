@@ -233,6 +233,7 @@ async function main() {
         symbol: ticker,
         timeframe,
         limit: safeLimit,
+        regularHoursOnly: true,
       });
       const alpacaMs = Date.now() - started;
       const payload = {
@@ -501,7 +502,7 @@ async function main() {
             error: "timeframe must be 1m, 5m, 15m, or 1D (Alpaca-supported)",
           });
         }
-        const limit = Math.min(500, Math.max(10, Number(url.searchParams.get("limit") ?? 150)));
+        const limit = Math.min(2000, Math.max(10, Number(url.searchParams.get("limit") ?? 150)));
         const safeLimit = Number.isFinite(limit) ? limit : 150;
         const cacheKey = `${ticker.toUpperCase()}|${timeframe}|${safeLimit}`;
         const cached = barsResponseCache.get(cacheKey);

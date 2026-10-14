@@ -1,6 +1,7 @@
 import type { MarketDataProvider } from "../MarketDataProvider.js";
 import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "../types.js";
 import { loadAlpacaCredentials } from "../credentials.js";
+import { isRegularSessionBarStart } from "../regularSession.js";
 import {
   fetchAlpacaWithRetry,
   gateOptsFromEnv,
@@ -101,8 +102,13 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     symbol: string;
     timeframe: Bar["timeframe"];
     limit?: number;
+    /** Drop premarket and after-hours so the last bar is the 16:00 ET session close. */
+    regularHoursOnly?: boolean;
   }): Promise<Bar[]> {
-    const limit = query.limit ?? 100;
+    const want = query.limit ?? 100;
+    const regularHoursOnly = query.regularHoursOnly === true && query.timeframe !== "1Day";
+    // IEX also prints a thin extended-hours tape. Over-fetch, then keep 09:30–16:00.
+    const limit = regularHoursOnly ? Math.min(10_000, want * 3) : want;
     const tf = mapTimeframe(query.timeframe);
     /** Explicit window so closed/overnight sessions still return history (Alpaca may omit bars without start). */
     const end = new Date();
@@ -127,9 +133,9 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const now = Date.now();
     const tfMs = timeframeMs(query.timeframe);
 
-    return bars.map((b) => {
+    const ordered = bars.map((b) => {
       const ts = new Date(b.t);
-      const end = ts.getTime() + tfMs;
+      const barEnd = ts.getTime() + tfMs;
       return {
         symbol: query.symbol.toUpperCase(),
         timeframe: query.timeframe,
@@ -140,9 +146,11 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         close: b.c,
         volume: b.v,
         vwap: b.vw,
-        completed: end <= now,
+        completed: barEnd <= now,
       };
     }).reverse();
+    if (!regularHoursOnly) return ordered;
+    return ordered.filter((b) => isRegularSessionBarStart(b.timestamp)).slice(-want);
   }
 
   async getSnapshot(symbol: string): Promise<MarketSnapshot> {
@@ -453,11 +461,11 @@ function lookbackForTimeframe(tf: Bar["timeframe"], limit: number): number {
   const pad = 1.5;
   switch (tf) {
     case "1Min":
-      return Math.max(2 * 86_400_000, Math.ceil(limit * 60_000 * pad));
+      return Math.max(10 * 86_400_000, Math.ceil(limit * 60_000 * pad));
     case "5Min":
-      return Math.max(5 * 86_400_000, Math.ceil(limit * 300_000 * pad));
+      return Math.max(14 * 86_400_000, Math.ceil(limit * 300_000 * pad));
     case "15Min":
-      return Math.max(10 * 86_400_000, Math.ceil(limit * 900_000 * pad));
+      return Math.max(21 * 86_400_000, Math.ceil(limit * 900_000 * pad));
     case "1Day":
       return Math.max(180 * 86_400_000, Math.ceil(limit * 86_400_000 * pad));
   }

@@ -20,6 +20,7 @@ import {
   type SetupResponse,
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
+import { historyLimit, keepRegularSession } from "../lib/regularSession";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -206,8 +207,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const barsSeqRef = useRef(0);
   const barsInflightKeyRef = useRef("");
 
-  const FAST_BAR_LIMIT = 36;
-  const FULL_BAR_LIMIT = 80;
+  const FAST_BAR_LIMIT = 40;
 
   const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean; limit?: number }) => {
     const target = sym.trim().toUpperCase();
@@ -222,7 +222,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     barsInflightKeyRef.current = key;
     const seq = ++barsSeqRef.current;
     const soft = opts?.soft === true;
-    const limit = opts?.limit ?? FULL_BAR_LIMIT;
+    const limit = opts?.limit ?? historyLimit(tf);
     // Hard switch: clear so prior symbol candles never linger.
     // Soft refresh (setup poll): keep candles until the new series arrives.
     if (!soft) {
@@ -240,18 +240,29 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const b = await fetchBars(target, tf, limit, { signal: ac.signal });
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
-      setBars(b);
-      writeBarsCache(target, tf, b);
-      if (limit < FULL_BAR_LIMIT && !ac.signal.aborted && seq === barsSeqRef.current) {
+      const sessionBars = {
+        ...b,
+        bars: keepRegularSession(b.bars, tf),
+        count: keepRegularSession(b.bars, tf).length,
+      };
+      setBars(sessionBars);
+      writeBarsCache(target, tf, sessionBars);
+      const fullLimit = historyLimit(tf);
+      if (limit < fullLimit && !ac.signal.aborted && seq === barsSeqRef.current) {
         const refineSeq = seq;
         window.setTimeout(() => {
           if (refineSeq !== barsSeqRef.current) return;
           void (async () => {
             try {
-              const full = await fetchBars(target, tf, FULL_BAR_LIMIT);
+              const full = await fetchBars(target, tf, fullLimit);
               if (refineSeq !== barsSeqRef.current) return;
-              setBars(full);
-              writeBarsCache(target, tf, full);
+              const fullSession = {
+                ...full,
+                bars: keepRegularSession(full.bars, tf),
+                count: keepRegularSession(full.bars, tf).length,
+              };
+              setBars(fullSession);
+              writeBarsCache(target, tf, fullSession);
             } catch {
               /* keep fast candles visible */
             }
@@ -296,7 +307,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       // That abort loop is what left the chart on "Loading MU…" with no price.
       if (isPoll) {
         if (opts?.refreshBars) {
-          void loadBars(t, chartTfRef.current, { soft: true, limit: FULL_BAR_LIMIT });
+          void loadBars(t, chartTfRef.current, { soft: true, limit: historyLimit(chartTfRef.current) });
         }
         if (setupInflightRef.current) return;
       } else {
@@ -314,7 +325,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setBars(null);
       }
       const useFastPath = symbolChanged || opts?.fast === true;
-      const barLimit = useFastPath ? FAST_BAR_LIMIT : FULL_BAR_LIMIT;
+      const barLimit = useFastPath ? FAST_BAR_LIMIT : historyLimit(chartTfRef.current);
       // Bars first. A parallel setup call uses the same Alpaca queue and delays the chart.
       if (!isPoll && (symbolChanged || opts?.fast === true)) {
         await loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });

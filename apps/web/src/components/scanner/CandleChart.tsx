@@ -21,6 +21,7 @@ import {
   formatEtChartTick,
   formatLastBarEtLabel,
 } from "../../lib/chartEtTime";
+import { SessionShadePrimitive, sessionBands } from "./sessionShade";
 
 export interface LevelOverlay {
   trigger: number;
@@ -51,7 +52,7 @@ export function CandleChart(props: {
   onTimeframe: (tf: string) => void;
   levels: LevelOverlay | null;
   symbol: string;
-  /** Live setup quote — patches the last candle so chart matches header price. */
+  /** Latest regular-session close. Candles are not rewritten to match a quote. */
   lastPrice?: number | null;
   onRetry?: () => void;
 }) {
@@ -60,6 +61,7 @@ export function CandleChart(props: {
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const shadeRef = useRef<SessionShadePrimitive | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const fitKeyRef = useRef<string>("");
   const structureKeyRef = useRef<string>("");
@@ -171,10 +173,13 @@ export function CandleChart(props: {
       lastValueVisible: false,
       crosshairMarkerVisible: false,
     });
+    const shade = new SessionShadePrimitive();
+    series.attachPrimitive(shade);
     chartRef.current = chart;
     seriesRef.current = series;
     volumeRef.current = volume;
     vwapRef.current = vwap;
+    shadeRef.current = shade;
 
     const ro = new ResizeObserver(() => {
       if (!hostRef.current || !chartRef.current) return;
@@ -203,6 +208,7 @@ export function CandleChart(props: {
       seriesRef.current = null;
       volumeRef.current = null;
       vwapRef.current = null;
+      shadeRef.current = null;
       linesRef.current = [];
     };
   }, []);
@@ -228,6 +234,7 @@ export function CandleChart(props: {
       series.setData([]);
       volume.setData([]);
       vwap.setData([]);
+      shadeRef.current?.setBands([]);
       return;
     }
 
@@ -278,6 +285,7 @@ export function CandleChart(props: {
         .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
         .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
       vwap.setData(vwapPts);
+      shadeRef.current?.setBands(sessionBands(aligned, props.timeframe));
 
       chartRef.current?.applyOptions({
         localization: chartEtLocalization,
@@ -391,8 +399,8 @@ export function CandleChart(props: {
               {fullscreen ? "Exit" : "Full"}
             </button>
           </div>
-          <span className="badge muted-axis" title="Candle times use US Eastern, same as the top bar clock">
-            AXIS · ET{lastBarEt ? ` · last ${lastBarEt}` : ""}
+          <span className="badge muted-axis" title="Regular session only, 09:30–16:00 US Eastern. No after-hours candles.">
+            RTH · ET{lastBarEt ? ` · last ${lastBarEt}` : ""}
           </span>
           <span className="badge hide-sm" title="Setup levels are indicative — not broker orders">
             LEVELS = SETUP (NOT ORDERS)

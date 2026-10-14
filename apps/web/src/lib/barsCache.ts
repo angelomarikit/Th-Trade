@@ -1,6 +1,6 @@
 import type { BarsResponse } from "./api";
 
-const PREFIX = "wulu:bars:v1:";
+const PREFIX = "wulu:bars:v2:";
 const TTL_MS = 45_000;
 
 function key(symbol: string, timeframe: string): string {

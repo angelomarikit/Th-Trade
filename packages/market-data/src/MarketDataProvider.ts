@@ -4,6 +4,8 @@ export interface BarsQuery {
   symbol: string;
   timeframe: Bar["timeframe"];
   limit?: number;
+  /** Drop premarket and after-hours. Daily bars are already one session. */
+  regularHoursOnly?: boolean;
   /** If true, mark in-progress bar as incomplete */
   feed?: "iex" | "sip";
 }
