@@ -3,6 +3,7 @@ import type { TradeSide } from "@wulu/domain";
 import type { MarketDataProvider, MarketSnapshot } from "@wulu/market-data";
 import {
   buildWhyMoving,
+  emptyWhyMoving,
   selectPrimaryCatalystForTicker,
   type CatalystEvent,
   type MarketReactionContext,
@@ -110,7 +111,11 @@ export class SetupScanner {
 
     const catalystPromise = request.preloadedCatalyst
       ? Promise.resolve(request.preloadedCatalyst)
-      : this.news.getCatalystForTicker(symbol, reaction);
+      : this.news.getCatalystForTicker(symbol, reaction).catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(`[news] ${symbol}: ${message.slice(0, 160)}`);
+          return { event: null, why: emptyWhyMoving() };
+        });
 
     const [{ why, event }, regimeCtx] = await Promise.all([
       catalystPromise,

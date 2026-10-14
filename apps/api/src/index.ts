@@ -21,7 +21,7 @@ import {
   loadAlpacaCredentials,
   withAlpacaPriority,
 } from "@wulu/market-data";
-import { createNewsServiceFromEnv } from "@wulu/news";
+import { createNewsServiceFromEnv, emptyWhyMoving } from "@wulu/news";
 import { searchSymbols } from "@wulu/regime";
 import { listStrategies } from "@wulu/strategies";
 import { summarizeJournal } from "@wulu/journal";
@@ -528,7 +528,17 @@ async function main() {
         if (!ticker) {
           return json(res, 400, { error: "ticker query required" });
         }
-        const { event, why } = await news.getCatalystForTicker(ticker);
+        let catalyst: Awaited<ReturnType<typeof news.getCatalystForTicker>> = {
+          event: null,
+          why: emptyWhyMoving(),
+        };
+        try {
+          catalyst = await news.getCatalystForTicker(ticker);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(`[news] catalyst ${ticker}: ${message.slice(0, 160)}`);
+        }
+        const { event, why } = catalyst;
         return json(res, 200, {
           ticker: ticker.toUpperCase(),
           why,

@@ -2182,3 +2182,82 @@ a {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+.watch-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.7rem 0.8rem;
+}
+
+.watch-card-main {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.watch-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.watch-card-symbol {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+}
+
+.watch-card-side {
+  margin-left: 0.4rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.watch-card-price {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.watch-card-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.watch-card-levels b {
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 0.28rem;
+}
+
+.watch-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.watch-card-detail {
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.watch-card-detail p {
+  margin: 0.25rem 0 0;
+}
+
+.watch-card-error {
+  color: var(--danger, #c44);
+}

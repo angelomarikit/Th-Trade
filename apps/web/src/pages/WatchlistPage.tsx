@@ -228,6 +228,18 @@ export function WatchlistPage() {
   );
 }
 
+function customerTradeStatus(status: string): "LONG" | "SHORT" | "WAIT" | "NO TRADE" {
+  const u = status.toUpperCase();
+  if (u.includes("ENTRY_ACTIVE_LONG") || u.includes("ENTRY ACTIVE — LONG") || u.includes("ENTRY ACTIVE - LONG")) {
+    return "LONG";
+  }
+  if (u.includes("ENTRY_ACTIVE_SHORT") || u.includes("ENTRY ACTIVE — SHORT") || u.includes("ENTRY ACTIVE - SHORT")) {
+    return "SHORT";
+  }
+  if (u.includes("WAIT") || u.includes("NEAR")) return "WAIT";
+  return "NO TRADE";
+}
+
 function MonitorCard({
   row,
   onOpen,
@@ -239,80 +251,72 @@ function MonitorCard({
   onRemove: () => void;
   busy: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const status = customerTradeStatus(row.status);
+  const entry = row.entryZone
+    ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
+    : "—";
+
   return (
-    <article
-      className="panel"
-      style={{ cursor: "pointer", margin: 0, padding: "0.75rem 0.9rem" }}
-      onClick={onOpen}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
-        <strong style={{ fontFamily: "var(--mono)" }}>
-          {row.symbol} — {row.side}
-        </strong>
-        <StatusBadge status={row.status} />
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: "0.35rem 0.75rem",
-          marginTop: "0.55rem",
-          fontSize: "0.82rem",
-          fontFamily: "var(--mono)",
-        }}
-      >
-        <span>Price: {fmtPrice(row.lastPrice)}</span>
-        <span>Chg: {fmtPct(row.pctChange)}</span>
-        <span>Trigger: {fmtPrice(row.alertAt)}</span>
-        <span>
-          Entry:{" "}
-          {row.entryZone
-            ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
-            : "—"}
-        </span>
-        <span>Stop: {fmtPrice(row.stop)}</span>
-        <span>Target 1: {fmtPrice(row.t1)}</span>
-        <span>Target 2: {fmtPrice(row.t2)}</span>
-        <span>
-          Reward / risk:{" "}
-          {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
-        </span>
-        <span>Volume: {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}</span>
-        {!row.dataFresh ? <span>Price check: not verified</span> : null}
-      </div>
-      {row.actionHint ? (
-        <p style={{ margin: "0.45rem 0 0", fontSize: "0.82rem", fontWeight: 600 }}>
-          Action: {row.actionHint}
-        </p>
-      ) : null}
-      {!row.dataFresh ? (
-        <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
-          DATA NOT VERIFIED — no trade. This is the freshness rule: the quote is older than this session allows (market closed, after hours, or a stale quote). The row is not a failed download.
-        </p>
-      ) : null}
-      {row.waitingFor.length > 0 ? (
-        <p style={{ margin: "0.45rem 0 0", fontSize: "0.8rem", opacity: 0.85 }}>
-          Waiting: {row.waitingFor.slice(0, 3).join(" · ")}
-        </p>
-      ) : null}
-      {row.error ? (
-        <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "var(--danger, #c44)" }}>
-          {row.error}
-        </p>
-      ) : null}
-      <div style={{ marginTop: "0.5rem" }}>
+    <article className="watch-card">
+      <button type="button" className="watch-card-main" onClick={onOpen}>
+        <div className="watch-card-top">
+          <strong className="watch-card-symbol">
+            {row.symbol}
+            <span className="watch-card-side">Watching {row.side}</span>
+          </strong>
+          <StatusBadge status={status} />
+        </div>
+        <div className="watch-card-price">{fmtPrice(row.lastPrice)}</div>
+        <div className="watch-card-levels">
+          <span>
+            <b>Entry</b>
+            {entry}
+          </span>
+          <span>
+            <b>Stop</b>
+            {fmtPrice(row.stop)}
+          </span>
+          <span>
+            <b>T1</b>
+            {fmtPrice(row.t1)}
+          </span>
+        </div>
+      </button>
+      <div className="watch-card-actions">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          {open ? "Hide details" : "Details"}
+        </button>
         <button
           type="button"
           className="btn"
           disabled={busy}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
+          onClick={() => onRemove()}
         >
           Remove
         </button>
       </div>
+      {open ? (
+        <div className="watch-card-detail">
+          <p>Change {fmtPct(row.pctChange)} · Trigger {fmtPrice(row.alertAt)} · T2 {fmtPrice(row.t2)}</p>
+          <p>
+            Reward / risk {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
+            {" · "}
+            Volume {row.rvol != null ? `${row.rvol.toFixed(2)}x` : "—"}
+          </p>
+          {row.actionHint ? <p>Action: {row.actionHint}</p> : null}
+          {!row.dataFresh ? (
+            <p>Price is not fresh enough for a trade in this session. Candles are still the bars received.</p>
+          ) : null}
+          {row.waitingFor.length > 0 ? <p>Waiting: {row.waitingFor.slice(0, 3).join(" · ")}</p> : null}
+          {row.error ? <p className="watch-card-error">{row.error}</p> : null}
+        </div>
+      ) : null}
     </article>
   );
 }

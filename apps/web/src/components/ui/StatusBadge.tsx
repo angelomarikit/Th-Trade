@@ -27,7 +27,8 @@ export function normalizeStatus(status: string): string {
 
 function toneFor(status: string): string {
   const u = status.toUpperCase();
-  if (u.includes("ENTRY ACTIVE") || u.includes("SETUP")) return "green";
+  if (u === "LONG" || u.includes("ENTRY ACTIVE") || u.includes("SETUP")) return "green";
+  if (u === "SHORT") return "red";
   if (u.includes("NEAR ACTIVE") || u.includes("WAIT") || u.includes("WATCH")) return "amber";
   if (u.includes("MISSED") || u.includes("INVALIDATED") || u.includes("NO TRADE") || u.includes("STOP"))
     return "red";
