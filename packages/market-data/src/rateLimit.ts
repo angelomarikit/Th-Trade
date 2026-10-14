@@ -155,12 +155,16 @@ export async function fetchAlpacaWithRetry(
 
   const lane = laneFromStore();
   if (lane === "interactive") touchInteractiveAlpaca();
-  // Chart/setup calls fail once and free the queue. Background monitor keeps full retries.
-  const attempts = lane === "interactive" ? Math.min(maxRetries, 1) : maxRetries;
+  // Chart/setup calls fail once and free the queue.
+  // Background scans use a shorter timeout and fewer retries so a stuck symbol
+  // cannot hold the shared Alpaca gate in front of an interactive chart.
+  const attempts = lane === "interactive" ? Math.min(maxRetries, 1) : Math.min(maxRetries, 2);
+  const laneTimeoutMs =
+    lane === "background" ? Math.min(Number.isFinite(timeoutMs) ? timeoutMs : 12_000, 5_000) : timeoutMs;
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= attempts; attempt++) {
     const res = await gate.schedule(
-      () => dedupedGet(fetchImpl, url, init, Number.isFinite(timeoutMs) ? timeoutMs : 12_000),
+      () => dedupedGet(fetchImpl, url, init, Number.isFinite(laneTimeoutMs) ? laneTimeoutMs : 12_000),
       lane,
     );
     if (res.status !== 429 && res.status !== 503) {

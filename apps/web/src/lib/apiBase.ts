@@ -1,14 +1,21 @@
 /**
  * Shared API origin for web fetches.
- * Preview builds must bake the same Railway URL as production; empty base causes
- * same-origin SPA HTML responses and Safari "string did not match the expected pattern".
+ * Production stays on the production Railway service.
+ * The isolated Vercel preview host calls the preview API only.
  */
 const FALLBACK_PROD_API = "https://th-trade-production.up.railway.app";
+const PREVIEW_API = "https://th-trade-preview.up.railway.app";
+
+function isolatedPreviewHost(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.includes("phase7-scanner-v2-preview");
+}
 
 const raw = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/+$/, "");
 
-export const API_BASE =
-  raw || (import.meta.env.PROD ? FALLBACK_PROD_API : "");
+export const API_BASE = isolatedPreviewHost()
+  ? PREVIEW_API
+  : raw || (import.meta.env.PROD ? FALLBACK_PROD_API : "");
 
 export function apiUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;

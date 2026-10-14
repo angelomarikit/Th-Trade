@@ -29,11 +29,11 @@ export function SymbolSearch(props: {
   }, [props.initial]);
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
+    function onDoc(e: Event) {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc);
+    return () => document.removeEventListener("pointerdown", onDoc);
   }, []);
 
   useEffect(() => {
@@ -130,7 +130,10 @@ export function SymbolSearch(props: {
                 type="button"
                 className={i === active ? "active" : undefined}
                 onMouseEnter={() => setActive(i)}
-                onClick={() => commit(h.symbol)}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  commit(h.symbol);
+                }}
               >
                 <strong>{h.symbol}</strong>
                 <span>{h.name}</span>

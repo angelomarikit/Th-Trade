@@ -16,6 +16,7 @@ import {
 import { Maximize2, Minimize2, Radio } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartBar } from "../../lib/api";
+import { fmtPrice } from "../../lib/format";
 import {
   chartEtLocalization,
   formatEtChartTick,
@@ -119,7 +120,7 @@ export function CandleChart(props: {
         background: { type: ColorType.Solid, color: "#080D14" },
         textColor: "#9AA8BA",
         fontFamily: "JetBrains Mono, ui-monospace, monospace",
-        fontSize: 12,
+        fontSize: (hostRef.current?.clientWidth ?? 999) < 768 ? 13 : 12,
       },
       grid: {
         vertLines: { color: "#15202c" },
@@ -354,6 +355,12 @@ export function CandleChart(props: {
     props.bars?.length && props.bars.at(-1)?.time
       ? formatLastBarEtLabel(props.bars.at(-1)!.time)
       : null;
+  const levelsForSymbol =
+    props.levels != null &&
+    (!props.levels.forSymbol ||
+      props.levels.forSymbol.toUpperCase() === props.symbol.toUpperCase())
+      ? props.levels
+      : null;
 
   return (
     <div
@@ -374,12 +381,19 @@ export function CandleChart(props: {
           ))}
         </div>
         <div className="chart-toolbar-right">
-          <div className="chart-legend" aria-hidden="true">
+          <div className="chart-legend">
             <span className="leg vwap">VWAP</span>
-            <span className="leg entry">Entry</span>
-            <span className="leg stop">Stop</span>
-            <span className="leg t1">T1</span>
-            <span className="leg t2">T2</span>
+            <span className="leg entry">
+              Entry{" "}
+              {levelsForSymbol
+                ? fmtPrice((levelsForSymbol.zoneLow + levelsForSymbol.zoneHigh) / 2)
+                : ""}
+            </span>
+            <span className="leg stop">
+              Stop {levelsForSymbol ? fmtPrice(levelsForSymbol.stop) : ""}
+            </span>
+            <span className="leg t1">T1 {levelsForSymbol ? fmtPrice(levelsForSymbol.t1) : ""}</span>
+            <span className="leg t2">T2 {levelsForSymbol ? fmtPrice(levelsForSymbol.t2) : ""}</span>
           </div>
           <button
             type="button"
