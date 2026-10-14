@@ -98,6 +98,10 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const leftZone = wasNearOrActive && !built.zoneExecutable;
   const structureRow = built.matrix.rows.find((r) => r.id === "STRUCTURE");
   const structureInvalidated = wasNearOrActive && structureRow?.status === "FAIL";
+  const stopBreached =
+    input.side === "LONG"
+      ? input.snapshot.lastPrice < levels.stop
+      : input.snapshot.lastPrice > levels.stop;
   const fakeBreakoutInvalidated =
     wasNearOrActive &&
     fakeWarnings.some(
@@ -113,7 +117,8 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     zoneExecutable: built.zoneExecutable,
     previousState: input.previousState,
     leftExecutableZone: leftZone,
-    structureInvalidated: structureInvalidated || fakeBreakoutInvalidated,
+    structureInvalidated:
+      structureInvalidated || fakeBreakoutInvalidated || stopBreached,
   });
 
   assertEntryNotFromNewsAlone(state, built.matrix);

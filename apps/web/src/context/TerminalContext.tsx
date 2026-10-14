@@ -328,7 +328,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (opts?.refreshBars) {
           void loadBars(t, chartTfRef.current, { soft: true, limit: historyLimit(chartTfRef.current) });
         }
-        if (setupInflightRef.current) return;
       } else {
         abortRef.current?.abort();
       }

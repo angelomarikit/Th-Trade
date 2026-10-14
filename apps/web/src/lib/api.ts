@@ -59,7 +59,17 @@ export interface SetupResponse {
     stop: number;
     t1: number;
     t2: number;
+    t3?: number | null;
     lastPrice?: number;
+    qualityScore10?: number | null;
+    qualityScore10Disclaimer?: string | null;
+    matrixChecklist?: Array<{
+      id: string;
+      label: string;
+      status: string;
+      requiredForEntry: boolean;
+      reason: string;
+    }>;
     rewardToRisk?: number;
     dataFresh?: boolean;
     evaluatedAt?: string;

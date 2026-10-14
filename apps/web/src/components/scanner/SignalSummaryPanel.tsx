@@ -2,103 +2,91 @@ import { useState } from "react";
 import { StatusBadge, normalizeStatus } from "../ui/StatusBadge";
 import { useTerminal } from "../../context/TerminalContext";
 import { fmtPct, fmtPrice } from "../../lib/format";
+import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
 /**
- * Chart-first companion: direction, status, levels, R:R, plain-English wait reason.
- * Details stay collapsed. Does not change confirmation gates.
+ * Primary trading assistant panel — same setup card as chart levels and monitor.
  */
 export function SignalSummaryPanel() {
-  const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist } = useTerminal();
+  const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist, displayPrice } =
+    useTerminal();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const lc = data?.liveCard;
-  const rec = data?.signalRecommendation;
   const starred = watchlist.includes(symbol);
-  const tradeAction = rec?.action ?? "WAIT";
-  const actionClass =
-    tradeAction === "BUY" ? "buy" : tradeAction === "SELL" ? "sell" : "wait";
-  const actionLabel =
-    tradeAction === "BUY"
-      ? side === "SHORT"
-        ? "SELL"
-        : "LONG"
-      : tradeAction === "SELL"
-        ? "SHORT"
-        : "WAIT";
 
   if (!lc) {
     return (
       <aside className="signal-panel panel">
         <p className="muted" style={{ margin: 0 }}>
-          {loading ? "Loading setup…" : "Search a symbol to load chart and analysis."}
+          {loading ? "Loading setup…" : "Search a symbol to load chart and trading recommendation."}
         </p>
       </aside>
     );
   }
 
   const status = normalizeStatus(lc.status);
-  const waiting =
-    lc.nearActive?.stillWaitingFor?.length
-      ? lc.nearActive.stillWaitingFor
-      : lc.waitingFor ?? [];
-  const whyWait =
-    status.includes("WAIT") || status.includes("NO TRADE") || status.includes("NEAR")
-      ? waiting[0] ??
-        lc.nearActive?.confirmationRequirement ??
-        "Waiting for confirmation conditions to clear."
-      : status.includes("ENTRY")
-        ? "Entry conditions are active on this setup — still not an automatic order."
-        : waiting[0] ?? lc.nearActive?.confirmationRequirement ?? "See details for checklist.";
-
   const rr = lc.rewardToRisk;
-  const score = lc.setupScoreValue ?? "—";
-  const session = lc.session?.session ?? "—";
+  const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
+  const strat = primaryStrategyName(lc);
+  const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
 
   return (
-    <aside className="signal-panel panel">
+    <aside className="signal-panel panel" aria-label="Trading recommendation">
       <div className="signal-panel-market">
-        <span className="badge">{session}</span>
+        <span className="badge">{lc.session?.session ?? "—"}</span>
         <span className={`badge ${lc.dataFresh ? "green" : "amber"}`}>
-          DATA {lc.dataFresh ? "FRESH" : "STALE"}
+          {lc.dataFresh ? "Verified data" : "Not verified"}
         </span>
-      </div>
-
-      <div className={`signal-action-hero ${actionClass}`}>
-        <p className="action-label">Signal recommendation</p>
-        <p className="action-value">{actionLabel}</p>
-        {rr != null && Number.isFinite(rr) && (
-          <p className="action-label" style={{ marginTop: "0.15rem" }}>
-            Reward : risk {rr.toFixed(2)}R · score {score}/100
-          </p>
-        )}
-      </div>
-
-      <div className="signal-panel-dir">
-        <div className="side-toggle" role="group" aria-label="Direction">
-          <button
-            type="button"
-            className={`buy ${side === "LONG" ? "active" : ""}`}
-            onClick={() => {
-              setSide("LONG");
-              void scan({ ticker: symbol, side: "LONG", brief: false });
-            }}
-          >
-            LONG
-          </button>
-          <button
-            type="button"
-            className={`sell ${side === "SHORT" ? "active" : ""}`}
-            onClick={() => {
-              setSide("SHORT");
-              void scan({ ticker: symbol, side: "SHORT", brief: false });
-            }}
-          >
-            SHORT
-          </button>
-        </div>
         <StatusBadge status={status} className="signal-status" />
       </div>
 
+      <div className="signal-action-hero wait">
+        <p className="action-label">Direction</p>
+        <div className="signal-panel-dir" style={{ margin: 0 }}>
+          <div className="side-toggle" role="group" aria-label="Direction">
+            <button
+              type="button"
+              className={`buy ${side === "LONG" ? "active" : ""}`}
+              onClick={() => {
+                setSide("LONG");
+                void scan({ ticker: symbol, side: "LONG", brief: false });
+              }}
+            >
+              LONG
+            </button>
+            <button
+              type="button"
+              className={`sell ${side === "SHORT" ? "active" : ""}`}
+              onClick={() => {
+                setSide("SHORT");
+                void scan({ ticker: symbol, side: "SHORT", brief: false });
+              }}
+            >
+              SHORT
+            </button>
+          </div>
+        </div>
+        <p className="action-value" style={{ marginTop: "0.35rem" }}>
+          {status}
+        </p>
+        <p className="action-label">
+          Setup score {score10 != null ? `${score10}/10` : "—"}
+          {rr != null && Number.isFinite(rr) ? ` · ${rr.toFixed(2)}R to T1` : ""}
+        </p>
+        {strat ? <p className="action-label">Strategy: {strat}</p> : null}
+      </div>
+
+      <div className="signal-brief" role="status">
+        {briefLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+
       <dl className="signal-levels">
+        <div>
+          <dt>Trigger</dt>
+          <dd>{fmtPrice(lc.alertAt)}</dd>
+        </div>
         <div className="signal-entry-zone">
           <dt>Entry zone</dt>
           <dd>
@@ -106,71 +94,60 @@ export function SignalSummaryPanel() {
           </dd>
         </div>
         <div>
-          <dt>Trigger</dt>
-          <dd>{fmtPrice(lc.alertAt)}</dd>
-        </div>
-        <div>
-          <dt>Stop loss</dt>
+          <dt>Stop</dt>
           <dd className="level-stop">{fmtPrice(lc.stop)}</dd>
         </div>
         <div>
-          <dt>Target 1</dt>
+          <dt>T1</dt>
           <dd className="level-t1">{fmtPrice(lc.t1)}</dd>
         </div>
         <div>
-          <dt>Target 2</dt>
+          <dt>T2</dt>
           <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
         </div>
-        <div>
-          <dt>Reward : risk</dt>
-          <dd>{rr != null && Number.isFinite(rr) ? `${rr.toFixed(2)}R` : "—"}</dd>
-        </div>
+        {lc.t3 != null && (
+          <div>
+            <dt>T3</dt>
+            <dd>{fmtPrice(lc.t3)}</dd>
+          </div>
+        )}
       </dl>
 
-      <div className="signal-why">
-        <h3>Why WULU says {status.includes("ENTRY") ? "ENTRY" : status.includes("NO") ? "NO TRADE" : "WAIT"}</h3>
-        <p>{whyWait}</p>
-        <p className="disclaimer">
-          Signals only — automatic trading disabled. Min ~2R and confirmation gates unchanged.
-        </p>
-      </div>
+      <p className="disclaimer">
+        Signals only — no orders sent. Entry requires completed 5m confirmation, ~2R, fresh data, and
+        full checklist. News never authorizes entry alone.
+      </p>
 
-      <button
-        type="button"
-        className="scan-btn signal-watch-btn"
-        onClick={() => toggleWatchlist(symbol)}
-      >
+      <button type="button" className="scan-btn signal-watch-btn" onClick={() => toggleWatchlist(symbol)}>
         {starred ? "Remove from watchlist" : "Add to watchlist"}
       </button>
 
-      <button
-        type="button"
-        className="decision-section-toggle"
-        onClick={() => setDetailsOpen((v) => !v)}
-      >
-        {detailsOpen ? "▾" : "▸"} Confirmation details
+      <button type="button" className="decision-section-toggle" onClick={() => setDetailsOpen((v) => !v)}>
+        {detailsOpen ? "▾" : "▸"} Indicator checklist ({lc.conditionsPassed ?? "—"} /{" "}
+        {lc.conditionsTotal ?? "—"})
       </button>
       {detailsOpen && (
         <div className="decision-section-body">
-          <p>
-            Checklist {lc.conditionsPassed ?? "—"} / {lc.conditionsTotal ?? "—"}
-          </p>
-          <ul>
-            {waiting.slice(0, 8).map((w) => (
-              <li key={w}>{w}</li>
+          <ul className="signal-checklist">
+            {(lc.matrixChecklist ?? []).map((row) => (
+              <li key={row.id} className={`check-${row.status.toLowerCase()}`}>
+                <strong>{row.label}</strong>
+                <span>{row.status}</span>
+                <p>{row.reason}</p>
+              </li>
             ))}
-            {waiting.length === 0 && <li>No open waiting conditions.</li>}
+            {!lc.matrixChecklist?.length &&
+              (lc.waitingFor ?? []).map((w) => <li key={w}>{w}</li>)}
           </ul>
           {lc.relativeMomentum && (
             <p className="muted">
-              RVOL{" "}
-              {lc.relativeMomentum.rvol != null
-                ? `${lc.relativeMomentum.rvol.toFixed(2)}x`
-                : "—"}{" "}
-              · vs SPY {fmtPct(lc.relativeMomentum.vsSpyPct)} · VWAP{" "}
-              {lc.relativeMomentum.vwapLocation}
+              RVOL {lc.relativeMomentum.rvol != null ? `${lc.relativeMomentum.rvol.toFixed(2)}x` : "—"} ·
+              vs SPY {fmtPct(lc.relativeMomentum.vsSpyPct)} · VWAP {lc.relativeMomentum.vwapLocation}
             </p>
           )}
+          {lc.qualityScore10Disclaimer ? (
+            <p className="muted">{lc.qualityScore10Disclaimer}</p>
+          ) : null}
         </div>
       )}
     </aside>

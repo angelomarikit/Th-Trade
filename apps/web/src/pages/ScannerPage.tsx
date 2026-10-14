@@ -41,18 +41,27 @@ export function ScannerPage() {
   }, [setInspectorOpen]);
 
   const lc = data?.liveCard;
-  // data is cleared on symbol switch; when present it belongs to current scan.
-  const levels = lc
-    ? {
-        trigger: lc.alertAt,
-        zoneLow: lc.entryZone.low,
-        zoneHigh: lc.entryZone.high,
-        stop: lc.stop,
-        t1: lc.t1,
-        t2: lc.t2,
-        forSymbol: symbol,
-      }
-    : null;
+  const setupPx = lc?.lastPrice;
+  const chartClose = bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
+  const setupStale =
+    setupPx != null &&
+    chartClose != null &&
+    Number.isFinite(setupPx) &&
+    Number.isFinite(chartClose) &&
+    Math.abs(setupPx - chartClose) / Math.max(chartClose, 1e-6) > 0.008;
+  // Chart lines must match the same setup evaluation as the recommendation panel.
+  const levels =
+    lc && !setupStale
+      ? {
+          trigger: lc.alertAt,
+          zoneLow: lc.entryZone.low,
+          zoneHigh: lc.entryZone.high,
+          stop: lc.stop,
+          t1: lc.t1,
+          t2: lc.t2,
+          forSymbol: symbol,
+        }
+      : null;
 
   const last = displayPrice;
   const sessionLabel = lc?.session?.session ?? data?.card.session?.session;
@@ -80,6 +89,11 @@ export function ScannerPage() {
         <p className="banner warn" role="status">
           Market API is on an older deploy — charts may load slowly until Railway redeploys the latest
           backend (check /health for supportsFastSetup).
+        </p>
+      )}
+      {setupStale && (
+        <p className="banner warn" role="status">
+          Updating setup levels to match the latest candle — lines hidden until the next scan completes.
         </p>
       )}
       {data && (data.liveCard.dataFresh === false || data.card.dataFresh === false) && (

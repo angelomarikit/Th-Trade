@@ -228,18 +228,6 @@ export function WatchlistPage() {
   );
 }
 
-function customerTradeStatus(status: string): "LONG" | "SHORT" | "WAIT" | "NO TRADE" {
-  const u = status.toUpperCase();
-  if (u.includes("ENTRY_ACTIVE_LONG") || u.includes("ENTRY ACTIVE — LONG") || u.includes("ENTRY ACTIVE - LONG")) {
-    return "LONG";
-  }
-  if (u.includes("ENTRY_ACTIVE_SHORT") || u.includes("ENTRY ACTIVE — SHORT") || u.includes("ENTRY ACTIVE - SHORT")) {
-    return "SHORT";
-  }
-  if (u.includes("WAIT") || u.includes("NEAR")) return "WAIT";
-  return "NO TRADE";
-}
-
 function MonitorCard({
   row,
   onOpen,
@@ -252,7 +240,6 @@ function MonitorCard({
   busy: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const status = customerTradeStatus(row.status);
   const entry = row.entryZone
     ? `${fmtPrice(row.entryZone.low)}–${fmtPrice(row.entryZone.high)}`
     : "—";
@@ -265,7 +252,7 @@ function MonitorCard({
             {row.symbol}
             <span className="watch-card-side">Watching {row.side}</span>
           </strong>
-          <StatusBadge status={status} />
+          <StatusBadge status={row.status} />
         </div>
         <div className="watch-card-price">{fmtPrice(row.lastPrice)}</div>
         <div className="watch-card-levels">
