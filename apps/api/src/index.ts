@@ -39,6 +39,7 @@ import {
   DEFAULT_MONITOR_WATCHLIST,
   MonitorHub,
   MonitorLimitError,
+  normalizeTicker,
   type MonitorSymbolConfig,
 } from "@wulu/scanner";
 import { getPlan, PAID_TIERS, PLANS, type PlanTier } from "./billing/plans.js";
@@ -616,10 +617,18 @@ async function main() {
 
       if (url.pathname === "/v1/setup" && req.method === "GET") {
         return withAlpacaPriority("interactive", async () => {
+        try {
         const ticker = url.searchParams.get("ticker");
         const sideParam = (url.searchParams.get("side") ?? "LONG").toUpperCase();
         if (!ticker) {
           return json(res, 400, { error: "ticker query required" });
+        }
+        const sym = normalizeTicker(ticker);
+        if (!sym) {
+          return json(res, 400, {
+            error: "Invalid ticker symbol. Use 1–10 letters (e.g. AAPL).",
+            automaticOrders: false,
+          });
         }
         if (sideParam !== "LONG" && sideParam !== "SHORT") {
           return json(res, 400, { error: "side must be LONG or SHORT" });
@@ -630,7 +639,6 @@ async function main() {
         let card: Awaited<ReturnType<typeof scanner.scanWithJournal>>["card"];
         let journalEntry: Awaited<ReturnType<typeof scanner.scanWithJournal>>["journalEntry"];
         if (useFastSnapshot) {
-          const sym = ticker.toUpperCase();
           const [bars5m, quote] = await Promise.all([
             marketData.getBars({ symbol: sym, timeframe: "5Min", limit: 45, regularHoursOnly: true }),
             marketData.getQuote(sym),
@@ -666,7 +674,6 @@ async function main() {
           }));
           interactiveSetupState.set(stateKey, card.state);
         } else {
-          const sym = ticker.toUpperCase();
           const stateKey = setupStateKey(sym, side);
           ({ card, journalEntry } = await scanner.scanWithJournal({
             symbol: sym,
@@ -855,6 +862,16 @@ async function main() {
             alpacaRole: EXECUTION_POLICY.alpacaRole,
           },
         });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn("[setup] scan failed:", message.slice(0, 200));
+          return json(res, 502, {
+            error:
+              "Could not complete scan for this symbol. Check the ticker or try again in a moment.",
+            detail: message.slice(0, 240),
+            automaticOrders: false,
+          });
+        }
         });
       }
 
@@ -925,10 +942,14 @@ async function main() {
             side?: string;
             replace?: string;
           };
-          const symbol = (body.symbol ?? "").trim().toUpperCase();
-          if (!symbol) return json(res, 400, { error: "symbol required" });
+          const symbol = normalizeTicker(body.symbol ?? "");
+          if (!symbol) {
+            return json(res, 400, {
+              error: "Invalid or missing symbol. Use 1–10 letters (e.g. AAPL).",
+            });
+          }
           const side = (body.side === "SHORT" ? "SHORT" : "LONG") as TradeSide;
-          const replace = (body.replace ?? "").trim().toUpperCase();
+          const replace = normalizeTicker(body.replace ?? "");
           let planMax = resolveWatchlistPlanMax(null);
           if (sessionId !== "default" && supabaseReady) {
             const user = await requireUser(req.headers.authorization);
