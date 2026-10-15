@@ -64,6 +64,29 @@ function tslaCard(partial: Partial<LiveSetupCard> & Pick<LiveSetupCard, "state">
   } as LiveSetupCard;
 }
 
+describe("deriveTradingAction", () => {
+  it("NO TRADE with fresh data stays WAIT (watching), MISSED is SKIP", () => {
+    expect(
+      deriveTradingAction({
+        state: "NO_TRADE",
+        statusLabel: "NO TRADE",
+        userStatus: "NO TRADE",
+        dataFresh: true,
+        entryExecutable: false,
+      }),
+    ).toBe("WAIT");
+    expect(
+      deriveTradingAction({
+        state: "MISSED",
+        statusLabel: "MISSED",
+        userStatus: "MISSED",
+        dataFresh: true,
+        entryExecutable: false,
+      }),
+    ).toBe("SKIP");
+  });
+});
+
 describe("lifecycle demo (TSLA simulation)", () => {
   it("WAIT → ENTRY ACTIVE → TARGET HIT (T1) with alerts-worthy statuses", () => {
     const tracker = new SignalOutcomeTracker();

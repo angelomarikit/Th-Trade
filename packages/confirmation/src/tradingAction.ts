@@ -56,7 +56,8 @@ export function deriveTradingAction(input: {
   if (!input.dataFresh || u.includes("DATA NOT VERIFIED")) return "WAIT";
   if (u.includes("STOP HIT") || u.includes("INVALIDATED")) return "INVALIDATED";
   if (u.includes("TARGET HIT")) return "SKIP";
-  if (u.includes("MISSED") || u.includes("NO TRADE")) return "SKIP";
+  if (u.includes("MISSED")) return "SKIP";
+  if (u.includes("NO TRADE") || u.includes("NO_TRADE")) return "WAIT";
   if (
     (u.includes("ENTRY ACTIVE") || u.includes("ENTRY_ACTIVE")) &&
     input.entryExecutable
