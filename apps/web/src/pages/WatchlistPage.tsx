@@ -14,6 +14,11 @@ import {
   type MonitorSymbolState,
 } from "../lib/api";
 import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
+
+function fmtDataTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return formatEtTime(iso);
+}
 import { buildWatchlistBrief } from "../lib/tradingRecommendation";
 
 export function WatchlistPage() {
@@ -241,19 +246,32 @@ function MonitorCard({
 }) {
   const [open, setOpen] = useState(false);
   const brief = buildWatchlistBrief(row);
-  const showLevels = row.dataFresh && !row.error;
+  const indicators = row.indicatorChecklist ?? [];
+  const action = row.tradingAction ?? "WAIT";
 
   return (
-    <article className="watch-card">
+    <article className={`watch-card ${row.dataFresh ? "" : "watch-card-stale"}`}>
       <div className="watch-card-top">
         <strong className="watch-card-symbol">
           {row.symbol}
-          <span className="watch-card-side">{row.side} watch</span>
+          <span className="watch-card-side">{row.side}</span>
         </strong>
-        <span className="badge">{row.tradingAction ?? "WAIT"}</span>
+        <span className={`badge action-${action.toLowerCase()}`}>{action}</span>
         <StatusBadge status={row.statusLabel || row.status} />
       </div>
+      <p className="watch-card-price-line">
+        Price {fmtPrice(row.lastPrice)}
+        {row.dataFresh ? " · verified" : " · not verified"}
+        {" · "}
+        Data {fmtDataTime(row.marketDataAt ?? row.evaluatedAt)}
+        {row.feed ? ` · ${row.feed.toUpperCase()}` : ""}
+      </p>
       {row.watchingSummary ? <p className="watch-card-watching">{row.watchingSummary}</p> : null}
+      {row.waitingFor[0] ? (
+        <p className="watch-card-waiting">
+          <b>Waiting for:</b> {row.waitingFor.slice(0, 3).join(" · ")}
+        </p>
+      ) : null}
 
       <div className="watch-card-brief" role="status">
         {brief.map((line) => (
@@ -261,8 +279,16 @@ function MonitorCard({
         ))}
       </div>
 
-      {showLevels ? (
+      {!row.error ? (
         <div className="watch-card-levels watch-card-levels-full">
+          <span>
+            <b>R:R</b>
+            {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
+          </span>
+          <span>
+            <b>Score</b>
+            {row.qualityScore10 ?? row.setupScore ?? "—"}/10
+          </span>
           <span>
             <b>Trigger</b>
             {fmtPrice(row.alertAt)}
@@ -292,6 +318,16 @@ function MonitorCard({
         </div>
       ) : null}
 
+      {indicators.length > 0 ? (
+        <ul className="watch-card-indicators-compact" aria-label="Indicator checklist">
+          {indicators.map((ind) => (
+            <li key={ind.id}>
+              {ind.label}: <strong>{ind.bias}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <div className="watch-card-actions">
         <button type="button" className="btn primary" onClick={onOpen}>
           Open chart
@@ -302,7 +338,7 @@ function MonitorCard({
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
-          {open ? "Hide indicators" : "Indicators"}
+          {open ? "Hide detail" : "More detail"}
         </button>
         <button type="button" className="btn" disabled={busy} onClick={() => onRemove()}>
           Remove

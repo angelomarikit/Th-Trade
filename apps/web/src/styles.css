@@ -2386,6 +2386,54 @@ a {
   color: var(--muted);
 }
 
+.watch-card-stale {
+  border-color: color-mix(in srgb, #d4a017 45%, var(--border));
+}
+
+.watch-card-price-line {
+  margin: 0.25rem 0.75rem 0;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+}
+
+.watch-card-waiting {
+  margin: 0.35rem 0.75rem 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.watch-card-indicators-compact {
+  list-style: none;
+  margin: 0.5rem 0.75rem 0;
+  padding: 0.45rem 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.badge.action-enter {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}
+
+.badge.action-invalidated {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--red);
+}
+
+.badge.action-skip {
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.badge.action-wait {
+  background: color-mix(in srgb, #d4a017 18%, transparent);
+  color: #b8860b;
+}
+
 .watch-card-levels-full {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

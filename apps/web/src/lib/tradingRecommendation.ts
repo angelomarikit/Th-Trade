@@ -85,7 +85,6 @@ export function buildWatchlistBrief(row: MonitorSymbolState): string[] {
 
   if (!row.dataFresh) {
     lines.push("Do not act on entry levels until data is verified.");
-    return lines;
   }
 
   lines.push(`Trigger ${fmtPrice(row.alertAt)} · Entry ${fmtPrice(row.entryZone?.low)}–${fmtPrice(row.entryZone?.high)}`);
