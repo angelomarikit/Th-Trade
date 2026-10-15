@@ -266,6 +266,9 @@ function MonitorCard({
         Data {fmtDataTime(row.marketDataAt ?? row.evaluatedAt)}
         {row.feed ? ` · ${row.feed.toUpperCase()}` : ""}
       </p>
+      {!row.dataFresh && row.dataFreshReason ? (
+        <p className="watch-card-fresh-reason">{row.dataFreshReason}</p>
+      ) : null}
       {row.watchingSummary ? <p className="watch-card-watching">{row.watchingSummary}</p> : null}
       {row.waitingFor[0] ? (
         <p className="watch-card-waiting">

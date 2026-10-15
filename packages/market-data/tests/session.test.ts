@@ -13,7 +13,7 @@ describe("US equity session + RTH tightening", () => {
     const s = classifyUsEquitySession(now);
     expect(s.session).toBe("RTH");
     expect(s.tightenConfirmation).toBe(true);
-    expect(s.maxDataAgeMs).toBe(45_000);
+    expect(s.maxDataAgeMs).toBe(90_000);
 
     const profile = confirmationProfileForSession(s);
     expect(profile.minRelativeVolume).toBe(1.5);

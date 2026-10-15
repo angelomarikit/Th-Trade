@@ -54,6 +54,8 @@ export interface LiveSetupCard {
   } | null;
   rewardToRisk: number;
   dataFresh: boolean;
+  /** Why data is or is not verified (session, stale age, missing timestamp). */
+  dataFreshReason?: string;
   evaluatedAt: string;
   setupId: string;
   session: {

@@ -83,6 +83,7 @@ export interface SetupResponse {
     outcomeR?: number | null;
     marketDataAt?: string | null;
     dataFeed?: string | null;
+    dataFreshReason?: string | null;
     rewardToRisk?: number;
     dataFresh?: boolean;
     evaluatedAt?: string;
@@ -661,6 +662,7 @@ export interface MonitorSymbolState {
   watchingSummary: string | null;
   outcomeDetail: string | null;
   outcomeR: number | null;
+  dataFreshReason?: string | null;
   error: string | null;
   updatedAt: string;
 }

@@ -1,6 +1,7 @@
 import type { MarketDataProvider } from "../MarketDataProvider.js";
 import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "../types.js";
 import { loadAlpacaCredentials } from "../credentials.js";
+import { barEffectiveEndTime } from "../freshness.js";
 import { isRegularSessionBarStart } from "../regularSession.js";
 import {
   fetchAlpacaWithRetry,
@@ -177,7 +178,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const marketTimestamp =
       quote?.timestamp ??
       trade?.timestamp ??
-      lastBar?.timestamp ??
+      (lastBar ? barEffectiveEndTime(lastBar) : null) ??
       null;
 
     return {
@@ -269,7 +270,10 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         bars5m,
         receivedAt: now,
         marketTimestamp:
-          meta?.quote?.timestamp ?? meta?.tradeTs ?? lastBar?.timestamp ?? null,
+          meta?.quote?.timestamp ??
+          meta?.tradeTs ??
+          (lastBar ? barEffectiveEndTime(lastBar) : null) ??
+          null,
       });
     }
     return out;

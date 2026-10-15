@@ -79,6 +79,9 @@ export function SignalSummaryPanel() {
             Data {lc.dataFeed?.toUpperCase() ?? "IEX"} · {formatEtTime(lc.marketDataAt)}
           </p>
         ) : null}
+        {lc.dataFresh === false && lc.dataFreshReason ? (
+          <p className="action-label muted">{lc.dataFreshReason}</p>
+        ) : null}
         <p className="action-label" style={{ marginTop: "0.5rem" }}>
           Direction
         </p>

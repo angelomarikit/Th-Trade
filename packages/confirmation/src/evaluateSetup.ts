@@ -206,6 +206,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     })(),
     rewardToRisk: built.rewardToRisk,
     dataFresh: freshness.ok,
+    dataFreshReason: freshness.reason,
     evaluatedAt,
     setupId,
     relativeMomentum: input.relativeMomentum ?? null,

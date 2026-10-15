@@ -44,8 +44,8 @@ export function classifyUsEquitySession(now: Date = new Date()): SessionSnapshot
       etLabel,
       isRegularHours: true,
       tightenConfirmation: true,
-      maxDataAgeMs: 45_000,
-      reason: "Regular trading hours — tightened confirmation + 45s freshness",
+      maxDataAgeMs: 90_000,
+      reason: "Regular trading hours — IEX-aligned ~90s freshness on quote or last 1m bar close",
     };
   }
 

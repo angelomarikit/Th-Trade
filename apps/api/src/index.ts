@@ -20,6 +20,7 @@ import {
   type TradeSide,
 } from "@wulu/domain";
 import {
+  barEffectiveEndTime,
   EXECUTION_POLICY,
   hasAlpacaCredentials,
   loadAlpacaCredentials,
@@ -636,14 +637,22 @@ async function main() {
             quote && quote.bid > 0 && quote.ask > 0
               ? (quote.bid + quote.ask) / 2
               : (lastBar?.close ?? 0);
+          const bars1m = await marketData.getBars({
+            symbol: sym,
+            timeframe: "1Min",
+            limit: 30,
+            regularHoursOnly: true,
+          });
+          const last1m = bars1m.at(-1) ?? lastBar;
           const snapshot = {
             symbol: sym,
             lastPrice,
             quote,
-            bars1m: bars5m.length >= 20 ? bars5m.slice(-30) : bars5m,
+            bars1m: bars1m.length ? bars1m : bars5m,
             bars5m,
             receivedAt: new Date(),
-            marketTimestamp: quote?.timestamp ?? lastBar?.timestamp ?? null,
+            marketTimestamp:
+              quote?.timestamp ?? (last1m ? barEffectiveEndTime(last1m) : null),
           };
           const stateKey = setupStateKey(sym, side);
           ({ card, journalEntry } = await scanner.scanWithJournal({
@@ -801,6 +810,7 @@ async function main() {
             indicatorChecklist: card.indicatorChecklist,
             rewardToRisk: card.rewardToRisk,
             dataFresh: card.dataFresh,
+            dataFreshReason: card.dataFreshReason ?? null,
             evaluatedAt: card.evaluatedAt,
             setupScore: `${card.setupScore.total} / 100`,
             setupScoreValue: card.setupScore.total,

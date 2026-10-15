@@ -80,6 +80,7 @@ export interface MonitoredSymbolState {
   watchingSummary: string | null;
   outcomeDetail: string | null;
   outcomeR: number | null;
+  dataFreshReason: string | null;
   error: string | null;
   updatedAt: string;
 }
@@ -280,6 +281,7 @@ export class WatchMonitor {
       })(),
       outcomeDetail: null,
       outcomeR: null,
+      dataFreshReason: card.dataFreshReason ?? null,
       error: null,
       updatedAt,
     };
@@ -417,6 +419,7 @@ export class WatchMonitor {
       watchingSummary: prev?.watchingSummary ?? null,
       outcomeDetail: prev?.outcomeDetail ?? null,
       outcomeR: prev?.outcomeR ?? null,
+      dataFreshReason: prev?.dataFreshReason ?? null,
       error: readable,
       updatedAt,
     };
