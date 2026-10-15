@@ -52,7 +52,7 @@ import {
   getSupabaseAdmin,
 } from "./billing/supabaseAdmin.js";
 import { HybridAlertEventStore } from "./monitor/alertStore.js";
-import { resolveWatchlistPlanMax } from "./monitor/planCap.js";
+import { isPreviewDevWatchlist, resolveWatchlistPlanMax } from "./monitor/planCap.js";
 import {
   loadAllMonitorWatchlists,
   loadMonitorWatchlist,
@@ -357,6 +357,8 @@ async function main() {
             maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 12),
             intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
             automaticOrders: false,
+            previewDevWatchlist: isPreviewDevWatchlist(),
+            effectiveWatchlistMax: resolveWatchlistPlanMax(null),
           },
         });
       }
