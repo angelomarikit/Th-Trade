@@ -157,6 +157,11 @@ export class WatchMonitor {
     for (const sym of [...this.states.keys()]) {
       if (!this.configs.has(sym)) this.states.delete(sym);
     }
+    for (const c of cleaned) {
+      if (!this.states.has(c.symbol)) {
+        this.states.set(c.symbol, createPendingScanState(c));
+      }
+    }
     return this.list();
   }
 
@@ -169,6 +174,9 @@ export class WatchMonitor {
       );
     }
     this.configs.set(sym, { symbol: sym, side });
+    if (!this.states.has(sym)) {
+      this.states.set(sym, createPendingScanState({ symbol: sym, side }));
+    }
     return this.list();
   }
 
@@ -192,7 +200,9 @@ export class WatchMonitor {
     const cfg = this.configs.get(oldSym)!;
     this.configs.delete(oldSym);
     this.states.delete(oldSym);
-    this.configs.set(newSym, { symbol: newSym, side: side ?? cfg.side });
+    const nextSide = side ?? cfg.side;
+    this.configs.set(newSym, { symbol: newSym, side: nextSide });
+    this.states.set(newSym, createPendingScanState({ symbol: newSym, side: nextSide }));
     return this.list();
   }
 
@@ -301,7 +311,7 @@ export class WatchMonitor {
         target1: next.t1,
         target2: next.t2,
         dataFresh: next.dataFresh,
-        reason: `Status ${prev.status} → ${next.status}`,
+        reason: buildMonitorTransitionReason(prev, next, card),
         confirmationDetails: next.waitingFor,
       });
     }
@@ -452,7 +462,9 @@ export class WatchMonitor {
   }
 
   snapshot(intervalMs: number, hubRunning: boolean, feed: string): MonitorSnapshot {
-    const states = [...this.states.values()];
+    const states = this.list().map(
+      (cfg) => this.states.get(cfg.symbol) ?? createPendingScanState(cfg),
+    );
     const ranked = [...states]
       .map((s) => ({
         symbol: s.symbol,
@@ -570,7 +582,7 @@ export class MonitorHub {
     mon.setWatchlist(items);
     await this.persist(sessionId, mon.list());
     this.ensureTimer();
-    await this.tick();
+    await this.tick({ force: true });
     return mon.snapshot(this.intervalMs, this.timer != null, this.feed);
   }
 
@@ -583,7 +595,7 @@ export class MonitorHub {
     mon.add(symbol, side);
     await this.persist(sessionId, mon.list());
     this.ensureTimer();
-    await this.tick();
+    await this.tick({ force: true });
     return mon.snapshot(this.intervalMs, this.timer != null, this.feed);
   }
 
@@ -592,7 +604,7 @@ export class MonitorHub {
     mon.remove(symbol);
     await this.persist(sessionId, mon.list());
     if (this.totalSymbols() === 0) this.stop();
-    else await this.tick();
+    else await this.tick({ force: true });
     return mon.snapshot(this.intervalMs, this.timer != null, this.feed);
   }
 
@@ -606,7 +618,7 @@ export class MonitorHub {
     mon.replace(from, to, side);
     await this.persist(sessionId, mon.list());
     this.ensureTimer();
-    await this.tick();
+    await this.tick({ force: true });
     return mon.snapshot(this.intervalMs, this.timer != null, this.feed);
   }
 
@@ -642,9 +654,12 @@ export class MonitorHub {
     this.stop();
   }
 
-  async tick(): Promise<void> {
-    if (this.ticking) return;
-    if (backgroundAlpacaShouldWait()) return;
+  async tick(opts?: { force?: boolean }): Promise<void> {
+    if (this.ticking) {
+      if (opts?.force) await this.waitForTickComplete();
+      else return;
+    }
+    if (!opts?.force && backgroundAlpacaShouldWait()) return;
     this.ticking = true;
     const started = Date.now();
     let failed = 0;
@@ -738,6 +753,110 @@ export class MonitorHub {
       );
     }
   }
+
+  private async waitForTickComplete(maxMs = 120_000): Promise<void> {
+    const start = Date.now();
+    while (this.ticking && Date.now() - start < maxMs) {
+      await new Promise((r) => setTimeout(r, 40));
+    }
+  }
+}
+
+/** Placeholder row shown immediately after add — before the first monitor scan completes. */
+export function createPendingScanState(cfg: MonitorSymbolConfig): MonitoredSymbolState {
+  const updatedAt = new Date().toISOString();
+  return {
+    symbol: cfg.symbol,
+    side: cfg.side,
+    status: "SCANNING",
+    state: "PENDING",
+    lastPrice: null,
+    pctChange: null,
+    alertAt: null,
+    distanceToTriggerPct: null,
+    distanceLabel: null,
+    entryZone: null,
+    stop: null,
+    t1: null,
+    t2: null,
+    rewardToRisk: null,
+    conditionsPassed: 0,
+    conditionsTotal: 0,
+    setupScore: null,
+    waitingFor: ["Running full setup scan (price, candles, indicators, confirmation rules)…"],
+    dataFresh: false,
+    session: null,
+    nearActive: false,
+    signalAction: null,
+    rankScore: null,
+    vsSpyPct: null,
+    vwapStatus: null,
+    vwapLocation: null,
+    rvol: null,
+    fiveMinStatus: null,
+    feed: null,
+    feedLimitation: null,
+    marketDataAt: null,
+    evaluatedAt: null,
+    qualityScore10: null,
+    falseBreakoutRisk: null,
+    actionHint: null,
+    retestPhase: null,
+    retestRequired: false,
+    target3: null,
+    invalidation: null,
+    setupId: null,
+    statusLabel: "SCANNING",
+    strategyName: null,
+    indicatorChecklist: [],
+    tradingAction: "WAIT",
+    watchingSummary: `Scanning ${cfg.symbol} ${cfg.side} — loading live price, indicators, and recommendation…`,
+    outcomeDetail: null,
+    outcomeR: null,
+    dataFreshReason: "Scan in progress — wait for this card to finish before trading.",
+    error: null,
+    updatedAt,
+  };
+}
+
+function buildMonitorTransitionReason(
+  prev: MonitoredSymbolState,
+  next: MonitoredSymbolState,
+  card: LiveSetupCard,
+): string {
+  const family = normalizeStatusFamily(next.status);
+  if (family === "INVALIDATED") {
+    if (card.invalidation != null && Number.isFinite(card.invalidation)) {
+      return `Setup invalidated — structure broke (invalidation ${card.invalidation.toFixed(2)}).`;
+    }
+    return next.waitingFor[0] ?? "Structure, stop, or confirmation failed — do not enter.";
+  }
+  if (family === "MISSED") {
+    return next.waitingFor[0] ?? "Price moved past the entry zone — do not chase.";
+  }
+  if (family === "ENTRY ACTIVE") {
+    return "Entry conditions met on completed bars — verify live before acting.";
+  }
+  if (family.includes("TARGET HIT") || family.includes("STOP HIT")) {
+    return next.watchingSummary ?? next.status;
+  }
+  const wait = next.waitingFor[0];
+  if (wait) return wait;
+  if (prev.status !== next.status) {
+    return `Setup moved from ${prev.status} to ${next.status}.`;
+  }
+  return next.watchingSummary ?? next.status;
+}
+
+function normalizeStatusFamily(status: string): string {
+  const u = status.toUpperCase();
+  if (u.includes("INVALIDATED")) return "INVALIDATED";
+  if (u.includes("MISSED")) return "MISSED";
+  if (u.includes("ENTRY ACTIVE")) return "ENTRY ACTIVE";
+  if (u.includes("TARGET HIT")) return "TARGET HIT";
+  if (u.includes("STOP HIT")) return "STOP HIT";
+  if (u.includes("NO TRADE")) return "NO TRADE";
+  return u || "WAIT";
 }
 
 export function normalizeTicker(symbol: string): string {

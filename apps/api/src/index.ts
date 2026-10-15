@@ -52,6 +52,7 @@ import {
   getSupabaseAdmin,
 } from "./billing/supabaseAdmin.js";
 import { HybridAlertEventStore } from "./monitor/alertStore.js";
+import { resolveWatchlistPlanMax } from "./monitor/planCap.js";
 import {
   loadAllMonitorWatchlists,
   loadMonitorWatchlist,
@@ -889,11 +890,11 @@ async function main() {
             symbol: (s.symbol ?? "").trim().toUpperCase(),
             side: (s.side === "SHORT" ? "SHORT" : "LONG") as TradeSide,
           }));
-          let planMax = Number(process.env.MONITOR_MAX_SYMBOLS ?? 12);
+          let planMax = resolveWatchlistPlanMax(null);
           if (sessionId !== "default" && supabaseReady) {
             const user = await requireUser(req.headers.authorization);
             const profile = await getOrCreateProfile(user);
-            planMax = Math.min(getPlan(profile.plan_tier).maxWatchlist, planMax);
+            planMax = resolveWatchlistPlanMax(profile.plan_tier);
           }
           if (items.filter((i) => i.symbol).length > planMax) {
             return json(res, 400, {
@@ -926,10 +927,25 @@ async function main() {
           if (!symbol) return json(res, 400, { error: "symbol required" });
           const side = (body.side === "SHORT" ? "SHORT" : "LONG") as TradeSide;
           const replace = (body.replace ?? "").trim().toUpperCase();
+          let planMax = resolveWatchlistPlanMax(null);
+          if (sessionId !== "default" && supabaseReady) {
+            const user = await requireUser(req.headers.authorization);
+            const profile = await getOrCreateProfile(user);
+            planMax = resolveWatchlistPlanMax(profile.plan_tier);
+          }
+          const mon = monitorHub.get(sessionId);
+          const onList = mon.list().some((s) => s.symbol === symbol);
+          if (!replace && !onList && mon.list().length >= planMax) {
+            return json(res, 400, {
+              error: `Plan limit: max ${planMax} monitored symbols. Remove one or upgrade your plan.`,
+              planMax,
+              automaticOrders: false,
+            });
+          }
           const snap = replace
             ? await monitorHub.replaceSymbol(sessionId, replace, symbol, side)
             : await monitorHub.addSymbol(sessionId, symbol, side);
-          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
+          return json(res, 200, { ...snap, hub: monitorHub.metrics(), planMax });
         } catch (err) {
           if (err instanceof MonitorLimitError) {
             return json(res, 400, { error: err.message });
@@ -958,7 +974,7 @@ async function main() {
       }
 
       if (url.pathname === "/v1/monitor/tick" && req.method === "POST") {
-        await monitorHub.tick();
+        await monitorHub.tick({ force: true });
         const sessionId = await resolveMonitorSession(req.headers.authorization);
         return json(res, 200, {
           ...monitorHub.snapshot(sessionId),
@@ -1035,8 +1051,24 @@ async function main() {
           const sessionId = await resolveMonitorSession(req.headers.authorization, {
             requireAuth: supabaseReady,
           });
-          const snap = await monitorHub.setWatchlist(sessionId, DEFAULT_MONITOR_WATCHLIST);
-          return json(res, 200, { ...snap, hub: monitorHub.metrics() });
+          let planMax = resolveWatchlistPlanMax(null);
+          if (sessionId !== "default" && supabaseReady) {
+            const user = await requireUser(req.headers.authorization);
+            const profile = await getOrCreateProfile(user);
+            planMax = resolveWatchlistPlanMax(profile.plan_tier);
+          }
+          const starter = DEFAULT_MONITOR_WATCHLIST.slice(0, planMax);
+          const snap = await monitorHub.setWatchlist(sessionId, starter);
+          const capNote =
+            starter.length < DEFAULT_MONITOR_WATCHLIST.length
+              ? `Loaded ${starter.length} starter symbols (your plan allows ${planMax}).`
+              : "Loaded default six starter symbols.";
+          return json(res, 200, {
+            ...snap,
+            hub: monitorHub.metrics(),
+            planMax,
+            note: capNote,
+          });
         } catch (err) {
           if (err instanceof MonitorLimitError) {
             return json(res, 400, { error: err.message });
@@ -1230,13 +1262,13 @@ async function main() {
           }
 
           // Phase 7: enforce plan watchlist cap (in addition to hub MONITOR_MAX_SYMBOLS)
-          let planMax = Number(process.env.MONITOR_MAX_SYMBOLS ?? 12);
+          let planMax = resolveWatchlistPlanMax(null);
           let planTier = "hub";
           if (sessionId !== "default" && supabaseReady) {
             const user = await requireUser(req.headers.authorization);
             const profile = await getOrCreateProfile(user);
             const plan = getPlan(profile.plan_tier);
-            planMax = Math.min(plan.maxWatchlist, planMax);
+            planMax = resolveWatchlistPlanMax(profile.plan_tier);
             planTier = plan.id;
           }
           const existing = new Set(

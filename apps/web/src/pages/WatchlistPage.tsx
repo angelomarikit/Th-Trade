@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
+import { mergeMonitorRows } from "../lib/mergeMonitorRows";
+import {
+  formatMonitorEventChange,
+  formatMonitorEventReason,
+} from "../lib/monitorDisplay";
 import {
   addMonitorSymbol,
   fetchMonitor,
@@ -19,12 +25,11 @@ function fmtDataTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   return formatEtTime(iso);
 }
-import { buildWatchlistBrief } from "../lib/tradingRecommendation";
-
 export function WatchlistPage() {
-  const { session } = useAuth();
+  const { session, configured, plan } = useAuth();
   const openSymbol = useOpenSymbol();
   const token = session?.access_token ?? null;
+  const signedIn = !!session?.access_token;
 
   const [snap, setSnap] = useState<MonitorSnapshot | null>(null);
   const [events, setEvents] = useState<
@@ -115,17 +120,18 @@ export function WatchlistPage() {
     }
   }
 
-  const statesBySymbol = new Map((snap?.states ?? []).map((s) => [s.symbol, s]));
-  const ordered: MonitorSymbolState[] =
-    snap?.ranked.map((r) => statesBySymbol.get(r.symbol)).filter((s): s is MonitorSymbolState => !!s) ??
-    snap?.states ??
-    [];
+  const ordered = mergeMonitorRows(snap);
+  const planCap = plan?.maxWatchlist ?? snap?.maxSymbols ?? 6;
+  const planNote =
+    signedIn && ordered.length >= planCap
+      ? `Watchlist full (${planCap} symbols on your plan). Remove one to add another.`
+      : null;
 
   return (
     <div className="page">
       <PageHeader
         title="Watchlist"
-        subtitle="Live trading recommendations for monitored symbols. Signals only — nothing is sent to a broker."
+        subtitle="Live monitor — each card is a full scan (price, indicators, levels, action). Signals only."
         actions={
           <>
             <span className="badge">{snap?.running ? "Watching" : "Paused"}</span>
@@ -141,6 +147,19 @@ export function WatchlistPage() {
           </>
         }
       />
+
+      {configured && !signedIn ? (
+        <p className="banner warn" role="status" style={{ marginBottom: "0.75rem" }}>
+          Sign in to save and scan your watchlist. Without an account, adds will not persist.{" "}
+          <Link to="/login">Sign in</Link>
+        </p>
+      ) : null}
+
+      {planNote ? (
+        <p className="muted" style={{ margin: "0 0 0.65rem", fontSize: "0.88rem" }}>
+          {planNote}
+        </p>
+      ) : null}
 
       <form className="scan-controls" onSubmit={onAdd} style={{ marginBottom: "0.85rem" }}>
         <input
@@ -219,10 +238,10 @@ export function WatchlistPage() {
                 <tr key={ev.id}>
                   <td>{formatEtTime(ev.eventAt)}</td>
                   <td>{ev.symbol}</td>
+                  <td>{formatMonitorEventChange(ev.previousStatus, ev.newStatus)}</td>
                   <td>
-                    {ev.previousStatus} → {ev.newStatus}
+                    {formatMonitorEventReason(ev.previousStatus, ev.newStatus, ev.reason)}
                   </td>
-                  <td>{ev.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -245,12 +264,14 @@ function MonitorCard({
   busy: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const brief = buildWatchlistBrief(row);
+  const scanning = row.statusLabel === "SCANNING" || row.status === "SCANNING";
   const indicators = row.indicatorChecklist ?? [];
-  const action = row.tradingAction ?? "WAIT";
+  const action = scanning ? "WAIT" : (row.tradingAction ?? "WAIT");
 
   return (
-    <article className={`watch-card ${row.dataFresh ? "" : "watch-card-stale"}`}>
+    <article
+      className={`watch-card ${row.dataFresh && !scanning ? "" : "watch-card-stale"}`}
+    >
       <div className="watch-card-top">
         <strong className="watch-card-symbol">
           {row.symbol}
@@ -269,20 +290,17 @@ function MonitorCard({
       {!row.dataFresh && row.dataFreshReason ? (
         <p className="watch-card-fresh-reason">{row.dataFreshReason}</p>
       ) : null}
-      {row.watchingSummary ? <p className="watch-card-watching">{row.watchingSummary}</p> : null}
-      {row.waitingFor[0] ? (
+      {row.watchingSummary ? (
+        <p className="watch-card-watching watch-card-lead">{row.watchingSummary}</p>
+      ) : null}
+      {!scanning && row.waitingFor[0] ? (
         <p className="watch-card-waiting">
-          <b>Waiting for:</b> {row.waitingFor.slice(0, 3).join(" · ")}
+          <b>Still need:</b> {row.waitingFor.slice(0, 3).join(" · ")}
         </p>
       ) : null}
+      {row.error ? <p className="watch-card-error">{row.error}</p> : null}
 
-      <div className="watch-card-brief" role="status">
-        {brief.map((line) => (
-          <p key={line}>{line}</p>
-        ))}
-      </div>
-
-      {!row.error ? (
+      {!row.error && !scanning ? (
         <div className="watch-card-levels watch-card-levels-full">
           <span>
             <b>R:R</b>
@@ -364,7 +382,6 @@ function MonitorCard({
               <li>Indicator checklist will appear after the next monitor scan.</li>
             )}
           </ul>
-          {row.error ? <p className="watch-card-error">{row.error}</p> : null}
         </div>
       ) : null}
     </article>

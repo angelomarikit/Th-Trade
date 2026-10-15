@@ -24,6 +24,7 @@ export function normalizeStatus(status: string): string {
   if (u.includes("SETUP")) return "SETUP";
   if (u.includes("WATCH")) return "WATCH";
   if (u.includes("WAIT")) return "WAIT";
+  if (u.includes("SCANNING")) return "SCANNING";
   return status || "—";
 }
 

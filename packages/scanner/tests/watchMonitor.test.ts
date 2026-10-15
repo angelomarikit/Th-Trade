@@ -163,6 +163,15 @@ describe("WatchMonitor / MonitorHub Phase 2", () => {
     hub.stopAll();
   });
 
+  it("shows SCANNING placeholder immediately after add", () => {
+    const mon = new WatchMonitor("desk", { maxSymbols: 6 });
+    mon.add("AAPL", "LONG");
+    const snap = mon.snapshot(20_000, true, "iex");
+    expect(snap.states).toHaveLength(1);
+    expect(snap.states[0]?.status).toBe("SCANNING");
+    expect(snap.states[0]?.watchingSummary).toContain("AAPL");
+  });
+
   it("rejects duplicate symbols and invalid tickers", () => {
     const mon = new WatchMonitor("desk", { maxSymbols: 6 });
     mon.setWatchlist([

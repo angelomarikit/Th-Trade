@@ -1,6 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { StatusBadge, normalizeStatus } from "../ui/StatusBadge";
+import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
+import { addMonitorSymbol } from "../../lib/api";
+import { friendlyApiError } from "../../lib/apiBase";
 import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
@@ -10,7 +14,11 @@ import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecomme
 export function SignalSummaryPanel() {
   const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist, displayPrice, bars } =
     useTerminal();
+  const { session, configured } = useAuth();
+  const navigate = useNavigate();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [watchMsg, setWatchMsg] = useState<string | null>(null);
+  const [watchBusy, setWatchBusy] = useState(false);
   const lc = data?.liveCard;
   const starred = watchlist.includes(symbol);
 
@@ -171,9 +179,39 @@ export function SignalSummaryPanel() {
         full checklist. News never authorizes entry alone.
       </p>
 
-      <button type="button" className="scan-btn signal-watch-btn" onClick={() => toggleWatchlist(symbol)}>
-        {starred ? "Remove from watchlist" : "Add to watchlist"}
+      <button
+        type="button"
+        className="scan-btn signal-watch-btn"
+        disabled={watchBusy}
+        onClick={() => {
+          void (async () => {
+            if (configured && !session?.access_token) {
+              navigate("/login");
+              return;
+            }
+            setWatchBusy(true);
+            setWatchMsg(null);
+            try {
+              if (session?.access_token) {
+                await addMonitorSymbol(symbol, side, session.access_token);
+                setWatchMsg(`Added ${symbol} to your live Watchlist monitor. Open Watchlist to see all cards.`);
+              }
+              toggleWatchlist(symbol);
+            } catch (err) {
+              setWatchMsg(friendlyApiError(err));
+            } finally {
+              setWatchBusy(false);
+            }
+          })();
+        }}
+      >
+        {watchBusy ? "Adding…" : starred ? "On watchlist" : "Add to live watchlist"}
       </button>
+      {watchMsg ? (
+        <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
+          {watchMsg}
+        </p>
+      ) : null}
 
       <button type="button" className="decision-section-toggle" onClick={() => setDetailsOpen((v) => !v)}>
         {detailsOpen ? "▾" : "▸"} Indicator checklist ({lc.conditionsPassed ?? "—"} /{" "}
