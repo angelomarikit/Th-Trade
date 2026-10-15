@@ -109,14 +109,23 @@ export function ScannerPage() {
         <aside className="scanner-recents panel" aria-label="Recent symbols">
           <h3>Recent</h3>
           <ul>
-            {recentScans.slice(0, 10).map((r) => (
+            {recentScans.slice(0, 10).map((r) => {
+              const ageMin = Math.floor((Date.now() - r.at) / 60_000);
+              const staleScan = ageMin >= 3;
+              const unverified = r.dataFresh === false;
+              return (
               <li key={`${r.symbol}-${r.at}`}>
                 <button type="button" onClick={() => openSymbol(r.symbol, { brief: false })}>
                   <strong>{r.symbol}</strong>
-                  <span className="muted">{r.status}</span>
+                  <span className={unverified || staleScan ? "recent-stale-label" : "muted"}>
+                    {r.status}
+                    {staleScan ? ` · scan ${ageMin}m ago` : ""}
+                    {unverified ? " · tap to refresh" : ""}
+                  </span>
                 </button>
               </li>
-            ))}
+            );
+            })}
             {recentScans.length === 0 && (
               <li className="muted" style={{ padding: "0.5rem 0.65rem" }}>
                 Search a ticker to begin
