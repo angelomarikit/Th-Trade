@@ -1887,7 +1887,7 @@ a {
 .chart-wrap-hero .chart-host {
   flex: 1;
   height: auto;
-  min-height: 360px;
+  min-height: 420px;
 }
 
 .chart-legend {
@@ -1909,6 +1909,15 @@ a {
 }
 .chart-legend .vwap::before {
   background: #60a5fa;
+}
+.chart-legend .ema9::before {
+  background: #fbbf24;
+}
+.chart-legend .bb::before {
+  background: #22d3ee;
+}
+.chart-legend .rsi::before {
+  background: #e2e8f0;
 }
 .chart-legend .entry::before {
   background: #2dd4bf;

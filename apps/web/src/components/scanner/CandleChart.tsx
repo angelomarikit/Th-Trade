@@ -4,7 +4,9 @@ import {
   createChart,
   HistogramSeries,
   LineSeries,
+  LineStyle,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type CandlestickData,
   type HistogramData,
@@ -22,6 +24,7 @@ import {
   formatEtChartTick,
   formatLastBarEtLabel,
 } from "../../lib/chartEtTime";
+import { studiesFromBars } from "../../lib/chartStudies";
 import { SessionShadePrimitive, sessionBands } from "./sessionShade";
 
 const TFS = [
@@ -52,6 +55,12 @@ export function CandleChart(props: {
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const emaRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbUpperRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbMidRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbLowerRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const rsiRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const rsiLinesRef = useRef<IPriceLine[]>([]);
   const shadeRef = useRef<SessionShadePrimitive | null>(null);
   const fitKeyRef = useRef<string>("");
   const structureKeyRef = useRef<string>("");
@@ -124,7 +133,7 @@ export function CandleChart(props: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.2 } },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.04, bottom: 0.42 } },
       localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
@@ -165,21 +174,66 @@ export function CandleChart(props: {
       priceScaleId: "vol",
     });
     chart.priceScale("vol").applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0.02 },
+      scaleMargins: { top: 0.58, bottom: 0.24 },
+      borderVisible: false,
     });
+    chart.priceScale("rsi").applyOptions({
+      scaleMargins: { top: 0.78, bottom: 0.03 },
+      borderVisible: false,
+    });
+    const lineCommon = {
+      priceLineVisible: false as const,
+      lastValueVisible: true as const,
+      crosshairMarkerVisible: false as const,
+    };
     const vwap = chart.addSeries(LineSeries, {
+      ...lineCommon,
       color: "#60A5FA",
       lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
     });
+    const ema = chart.addSeries(LineSeries, {
+      ...lineCommon,
+      color: "#FBBF24",
+      lineWidth: 2,
+    });
+    const bbUpper = chart.addSeries(LineSeries, {
+      ...lineCommon,
+      color: "#F87171",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+    });
+    const bbMid = chart.addSeries(LineSeries, {
+      ...lineCommon,
+      color: "#22D3EE",
+      lineWidth: 1,
+    });
+    const bbLower = chart.addSeries(LineSeries, {
+      ...lineCommon,
+      color: "#C084FC",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+    });
+    const rsi = chart.addSeries(LineSeries, {
+      ...lineCommon,
+      color: "#E2E8F0",
+      lineWidth: 2,
+      priceScaleId: "rsi",
+    });
+    rsiLinesRef.current = [
+      rsi.createPriceLine({ price: 70, color: "#F87171", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false }),
+      rsi.createPriceLine({ price: 30, color: "#35C89A", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false }),
+    ];
     const shade = new SessionShadePrimitive();
     series.attachPrimitive(shade);
     chartRef.current = chart;
     seriesRef.current = series;
     volumeRef.current = volume;
     vwapRef.current = vwap;
+    emaRef.current = ema;
+    bbUpperRef.current = bbUpper;
+    bbMidRef.current = bbMid;
+    bbLowerRef.current = bbLower;
+    rsiRef.current = rsi;
     shadeRef.current = shade;
 
     const ro = new ResizeObserver(() => {
@@ -230,8 +284,35 @@ export function CandleChart(props: {
       seriesRef.current = null;
       volumeRef.current = null;
       vwapRef.current = null;
+      emaRef.current = null;
+      bbUpperRef.current = null;
+      bbMidRef.current = null;
+      bbLowerRef.current = null;
+      for (const ln of rsiLinesRef.current) {
+        try {
+          rsiRef.current?.removePriceLine(ln);
+        } catch {
+          /* removed */
+        }
+      }
+      rsiLinesRef.current = [];
+      rsiRef.current = null;
       shadeRef.current = null;
     };
+  }, []);
+
+  const applyStudyLines = useCallback((aligned: ChartBar[]) => {
+    const { ema9, bb, rsi14 } = studiesFromBars(aligned);
+    const toLine = (values: (number | null)[]): LineData<Time>[] =>
+      aligned.flatMap((b, i) => {
+        const v = values[i];
+        return v != null && Number.isFinite(v) ? [{ time: b.time as Time, value: v }] : [];
+      });
+    emaRef.current?.setData(toLine(ema9));
+    bbUpperRef.current?.setData(toLine(bb.upper));
+    bbMidRef.current?.setData(toLine(bb.mid));
+    bbLowerRef.current?.setData(toLine(bb.lower));
+    rsiRef.current?.setData(toLine(rsi14));
   }, []);
 
   useEffect(() => {
@@ -246,6 +327,11 @@ export function CandleChart(props: {
       series.setData([]);
       volume.setData([]);
       vwap.setData([]);
+      emaRef.current?.setData([]);
+      bbUpperRef.current?.setData([]);
+      bbMidRef.current?.setData([]);
+      bbLowerRef.current?.setData([]);
+      rsiRef.current?.setData([]);
       shadeRef.current?.setBands([]);
       return;
     }
@@ -272,6 +358,7 @@ export function CandleChart(props: {
       if (last.vwap != null && Number.isFinite(last.vwap)) {
         vwap.update({ time: t, value: last.vwap });
       }
+      applyStudyLines(aligned);
       if (followLiveRef.current) {
         requestAnimationFrame(() => applyLiveViewport());
       }
@@ -298,6 +385,7 @@ export function CandleChart(props: {
         .filter((b) => b.vwap != null && Number.isFinite(b.vwap))
         .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
       vwap.setData(vwapPts);
+      applyStudyLines(aligned);
       shadeRef.current?.setBands(sessionBands(aligned, props.timeframe, props.extendedHours === true));
 
       chartRef.current?.applyOptions({
@@ -316,7 +404,7 @@ export function CandleChart(props: {
         }
       }
     }
-  }, [props.bars, props.symbol, props.timeframe, props.extendedHours, goLive, applyLiveViewport]);
+  }, [props.bars, props.symbol, props.timeframe, props.extendedHours, goLive, applyLiveViewport, applyStudyLines]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
@@ -343,7 +431,10 @@ export function CandleChart(props: {
         </div>
         <div className="chart-toolbar-right">
           <div className="chart-legend chart-legend-minimal">
+            <span className="leg ema9">EMA 9</span>
+            <span className="leg bb">BB 20</span>
             <span className="leg vwap">VWAP</span>
+            <span className="leg rsi">RSI 14</span>
             {props.lastPrice != null ? (
               <span className="leg last-px">Last {fmtPrice(props.lastPrice)}</span>
             ) : null}
