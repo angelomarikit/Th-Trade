@@ -33,6 +33,10 @@ export function deriveTradingAction(input: {
   dataFresh: boolean;
   entryExecutable: boolean;
   outcomeDetail?: OutcomeDetail | null;
+  /** Planned R:R to T1 at the conservative entry (card.rewardToRisk). */
+  rewardToRisk?: number | null;
+  /** Minimum allowed R:R (default 2.0). */
+  minRewardToRisk?: number;
 }): TradingAction {
   if (input.outcomeDetail) {
     if (
@@ -54,6 +58,16 @@ export function deriveTradingAction(input: {
 
   const u = `${input.userStatus} ${input.statusLabel} ${input.state}`.toUpperCase();
   if (!input.dataFresh || u.includes("DATA NOT VERIFIED")) return "WAIT";
+  const minRr = input.minRewardToRisk ?? 2;
+  if (
+    input.rewardToRisk != null &&
+    Number.isFinite(input.rewardToRisk) &&
+    input.rewardToRisk > 0 &&
+    input.rewardToRisk < minRr &&
+    !(u.includes("ENTRY ACTIVE") || u.includes("ENTRY_ACTIVE"))
+  ) {
+    return "SKIP";
+  }
   if (u.includes("STOP HIT") || u.includes("INVALIDATED")) return "INVALIDATED";
   if (u.includes("TARGET HIT")) return "SKIP";
   if (u.includes("MISSED")) return "SKIP";
@@ -76,6 +90,7 @@ export function buildWatchingSummary(input: {
   alertAt: number | null;
   waitingFor: string[];
   tradingAction: TradingAction;
+  rewardToRisk?: number | null;
 }): string {
   const strat = input.strategyName ? `${input.strategyName}` : `${input.side} setup`;
   const trigger =
@@ -88,6 +103,15 @@ export function buildWatchingSummary(input: {
   }
   if (input.tradingAction === "INVALIDATED") {
     return `Was watching ${input.symbol} ${strat} — setup no longer valid.`;
+  }
+  if (
+    input.tradingAction === "SKIP" &&
+    input.rewardToRisk != null &&
+    Number.isFinite(input.rewardToRisk) &&
+    input.rewardToRisk > 0 &&
+    input.rewardToRisk < 2
+  ) {
+    return `${input.symbol} ${strat} — SKIP: R:R ${input.rewardToRisk.toFixed(2)} is below the 2.0 minimum at current levels.`;
   }
   if (input.tradingAction === "SKIP") {
     return `${input.symbol} ${strat} — no action (missed, closed, or filters failed).`;

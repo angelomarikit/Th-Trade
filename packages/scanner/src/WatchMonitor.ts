@@ -278,6 +278,7 @@ export class WatchMonitor {
           userStatus: status,
           dataFresh: card.dataFresh,
           entryExecutable: card.entryZone.executable,
+          rewardToRisk: card.rewardToRisk,
         });
         return {
           tradingAction,
@@ -288,6 +289,7 @@ export class WatchMonitor {
             alertAt: card.alertAt,
             waitingFor: card.nearActive.stillWaitingFor.slice(0, 6),
             tradingAction,
+            rewardToRisk: card.rewardToRisk,
           }),
         };
       })(),
