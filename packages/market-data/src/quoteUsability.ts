@@ -28,6 +28,33 @@ export function isQuoteUsableForEntry(
   return true;
 }
 
+/**
+ * Plain-English reason the live quote cannot authorize entry.
+ * Returns null when the quote is usable. Same limits as isQuoteUsableForEntry —
+ * this only names the failing check; it never loosens it.
+ */
+export function describeQuoteBlock(
+  snapshot: MarketSnapshot,
+  maxSpreadPct = 0.35,
+): string | null {
+  const q = snapshot.quote;
+  if (!q) return "QUOTE MISSING — no live bid/ask from the feed";
+  if (q.bid <= 0 || q.ask <= 0) return `QUOTE INVALID — bid ${q.bid} / ask ${q.ask}`;
+  if (q.ask < q.bid) {
+    return `QUOTE CROSSED — bid ${q.bid.toFixed(2)} above ask ${q.ask.toFixed(2)}`;
+  }
+  const spread = spreadPct(q.bid, q.ask);
+  if (spread == null) return "QUOTE INVALID — spread could not be computed";
+  const limit = Math.min(maxSpreadPct, QUOTE_SANITY_SPREAD_PCT);
+  if (spread > limit) {
+    return (
+      `SPREAD TOO WIDE — ${spread.toFixed(2)}% > ${limit}% limit ` +
+      `(bid ${q.bid.toFixed(2)} / ask ${q.ask.toFixed(2)})`
+    );
+  }
+  return null;
+}
+
 export function referencePriceExplanation(source: PriceSource): string {
   switch (source) {
     case "quote_mid":

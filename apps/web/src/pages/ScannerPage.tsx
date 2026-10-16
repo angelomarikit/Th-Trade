@@ -101,6 +101,7 @@ export function ScannerPage() {
           session={data.liveCard.session?.session ?? data.card.session?.session}
           dataFresh={data.liveCard.dataFresh !== false && data.card.dataFresh !== false}
           referencePriceOnly={data.liveCard.quoteTransparency?.referencePriceOnly === true}
+          reason={data.liveCard.dataFreshReason ?? null}
         />
       ) : null}
 

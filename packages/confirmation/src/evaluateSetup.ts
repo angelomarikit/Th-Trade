@@ -4,6 +4,7 @@ import {
   buildMarketDataFreshnessBreakdown,
   classifyUsEquitySession,
   confirmationProfileForSession,
+  describeQuoteBlock,
   isQuoteUsableForEntry,
   lastCompletedBar,
   referencePriceExplanation,
@@ -70,8 +71,10 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       ok: false,
       ageMs: freshness.ageMs,
       maxAgeMs: freshness.maxAgeMs,
-      reason:
-        "Live bid/ask not trustworthy for entry (missing, stale, or spread too wide) — levels use last RTH bar as reference only.",
+      reason: `${
+        describeQuoteBlock(input.snapshot, profile.maxSpreadPct) ??
+        "Live bid/ask not trustworthy for entry"
+      } — ENTER blocked; levels use last RTH bar as reference only.`,
     };
   }
   const levels = deriveLevels(input.snapshot.bars5m, input.side, input.snapshot.lastPrice);

@@ -3,10 +3,13 @@ export function SessionPriceBanner({
   session,
   dataFresh,
   referencePriceOnly,
+  reason,
 }: {
   session: string | null | undefined;
   dataFresh: boolean;
   referencePriceOnly?: boolean;
+  /** Exact failing check from the engine (dataFreshReason) — shown verbatim. */
+  reason?: string | null;
 }) {
   const sess = (session ?? "closed").toUpperCase();
   const isPremarket = sess.includes("PRE") || sess === "PREMARKET";
@@ -39,6 +42,12 @@ export function SessionPriceBanner({
         Chart uses Alpaca bar closes. Recommendation shows{" "}
         <strong>{referencePriceOnly ? "RTH reference price" : "DATA NOT VERIFIED"}</strong> when the
         live quote is stale, wide, or fails confirmation — do not treat candle movement alone as ENTER.
+        {reason ? (
+          <>
+            <br />
+            <strong>Blocking check:</strong> {reason}
+          </>
+        ) : null}
       </p>
     );
   }
