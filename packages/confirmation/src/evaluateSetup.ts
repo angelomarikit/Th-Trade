@@ -1,6 +1,7 @@
 import type { SetupState, TradeSide } from "@wulu/domain";
 import {
   assessFreshness,
+  buildMarketDataFreshnessBreakdown,
   classifyUsEquitySession,
   confirmationProfileForSession,
   isQuoteUsableForEntry,
@@ -238,7 +239,23 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     })(),
     rewardToRisk: built.rewardToRisk,
     dataFresh: freshness.ok,
-    dataFreshReason: freshness.reason,
+    dataFreshReason: (() => {
+      const breakdown = buildMarketDataFreshnessBreakdown(
+        input.snapshot,
+        freshness.ok,
+        freshness.reason,
+        now,
+        session,
+      );
+      return freshness.ok ? freshness.reason : breakdown.summary;
+    })(),
+    marketDataStatus: buildMarketDataFreshnessBreakdown(
+      input.snapshot,
+      freshness.ok,
+      freshness.reason,
+      now,
+      session,
+    ),
     evaluatedAt,
     setupId,
     relativeMomentum: input.relativeMomentum ?? null,

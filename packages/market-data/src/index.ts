@@ -3,6 +3,7 @@ export * from "./types.js";
 export * from "./session.js";
 export * from "./regularSession.js";
 export * from "./freshness.js";
+export * from "./freshnessBreakdown.js";
 export * from "./quoteUsability.js";
 export * from "./rateLimit.js";
 export * from "./MarketDataProvider.js";

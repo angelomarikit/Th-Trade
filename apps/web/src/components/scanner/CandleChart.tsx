@@ -5,11 +5,11 @@ import {
   HistogramSeries,
   LineSeries,
   type IChartApi,
-  type IPriceLine,
   type ISeriesApi,
   type CandlestickData,
   type HistogramData,
   type LineData,
+  type Logical,
   type Time,
   type TickMarkType,
 } from "lightweight-charts";
@@ -24,17 +24,6 @@ import {
 } from "../../lib/chartEtTime";
 import { SessionShadePrimitive, sessionBands } from "./sessionShade";
 
-export interface LevelOverlay {
-  trigger: number;
-  zoneLow: number;
-  zoneHigh: number;
-  stop: number;
-  t1: number;
-  t2: number;
-  /** When set, overlays only apply if this matches the chart symbol. */
-  forSymbol?: string;
-}
-
 const TFS = [
   { id: "1m", label: "1m" },
   { id: "5m", label: "5m" },
@@ -42,8 +31,9 @@ const TFS = [
   { id: "1D", label: "1D" },
 ] as const;
 
-/** Empty “future” space to the right of the last candle (in bars). */
-const DEFAULT_RIGHT_OFFSET = 18;
+/** Small padding after the last candle — not a large empty future gap. */
+const RIGHT_OFFSET_BARS = 3;
+const DEFAULT_VISIBLE_BARS = 72;
 
 export function CandleChart(props: {
   bars: ChartBar[] | null;
@@ -51,11 +41,9 @@ export function CandleChart(props: {
   error: string | null;
   timeframe: string;
   onTimeframe: (tf: string) => void;
-  levels: LevelOverlay | null;
   symbol: string;
   extendedHours?: boolean;
   onExtendedHours?: (on: boolean) => void;
-  /** Latest regular-session close. Candles are not rewritten to match a quote. */
   lastPrice?: number | null;
   onRetry?: () => void;
 }) {
@@ -65,23 +53,33 @@ export function CandleChart(props: {
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
   const shadeRef = useRef<SessionShadePrimitive | null>(null);
-  const linesRef = useRef<IPriceLine[]>([]);
   const fitKeyRef = useRef<string>("");
   const structureKeyRef = useRef<string>("");
-  const levelsKeyRef = useRef<string>("");
   const followLiveRef = useRef(true);
+  const clampRef = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [followLive, setFollowLive] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
-  const goLive = useCallback(() => {
+  const applyLiveViewport = useCallback(() => {
     const chart = chartRef.current;
-    if (!chart) return;
+    const series = seriesRef.current;
+    if (!chart || !series) return;
+    const count = series.data().length;
+    if (count <= 0) return;
+    const visible = Math.min(DEFAULT_VISIBLE_BARS, count);
+    const from = Math.max(0, count - visible);
+    const to = count - 1 + RIGHT_OFFSET_BARS;
+    chart.timeScale().applyOptions({ rightOffset: RIGHT_OFFSET_BARS });
+    chart.timeScale().setVisibleLogicalRange({ from: from as Logical, to: to as Logical });
+  }, []);
+
+  const goLive = useCallback(() => {
     followLiveRef.current = true;
     setFollowLive(true);
-    chart.timeScale().applyOptions({ rightOffset: DEFAULT_RIGHT_OFFSET });
-    chart.timeScale().scrollToRealTime();
-  }, []);
+    applyLiveViewport();
+    chartRef.current?.timeScale().scrollToRealTime();
+  }, [applyLiveViewport]);
 
   useEffect(() => {
     const onFs = () => {
@@ -126,7 +124,7 @@ export function CandleChart(props: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.08, bottom: 0.22 } },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.2 } },
       localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
@@ -134,11 +132,11 @@ export function CandleChart(props: {
         secondsVisible: false,
         tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
           formatEtChartTick(time, tickMarkType),
-        rightOffset: DEFAULT_RIGHT_OFFSET,
-        fixRightEdge: false,
-        fixLeftEdge: false,
-        shiftVisibleRangeOnNewBar: false,
-        barSpacing: 8,
+        rightOffset: RIGHT_OFFSET_BARS,
+        fixRightEdge: true,
+        fixLeftEdge: true,
+        shiftVisibleRangeOnNewBar: true,
+        barSpacing: 7,
         minBarSpacing: 2,
       },
       crosshair: { mode: 1 },
@@ -167,7 +165,7 @@ export function CandleChart(props: {
       priceScaleId: "vol",
     });
     chart.priceScale("vol").applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0 },
+      scaleMargins: { top: 0.82, bottom: 0.02 },
     });
     const vwap = chart.addSeries(LineSeries, {
       color: "#60A5FA",
@@ -194,13 +192,34 @@ export function CandleChart(props: {
     ro.observe(hostRef.current);
 
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (!range) return;
-      const lastIdx = seriesRef.current?.data()?.length ?? 0;
-      if (lastIdx <= 0) return;
-      const atLiveEdge = range.to >= lastIdx - 1.5;
+      if (!range || clampRef.current) return;
+      const count = seriesRef.current?.data()?.length ?? 0;
+      if (count <= 0) return;
+      const maxTo = count - 1 + RIGHT_OFFSET_BARS;
+      let from = Number(range.from);
+      let to = Number(range.to);
+      let changed = false;
+      if (from < 0) {
+        from = 0;
+        changed = true;
+      }
+      if (to > maxTo) {
+        to = maxTo;
+        changed = true;
+      }
+      if (to - from < 8) {
+        to = Math.min(maxTo, from + 8);
+        changed = true;
+      }
+      const atLiveEdge = to >= count - 1.5;
       if (!atLiveEdge && followLiveRef.current) {
         followLiveRef.current = false;
         setFollowLive(false);
+      }
+      if (changed) {
+        clampRef.current = true;
+        chart.timeScale().setVisibleLogicalRange({ from: from as Logical, to: to as Logical });
+        clampRef.current = false;
       }
     });
 
@@ -212,7 +231,6 @@ export function CandleChart(props: {
       volumeRef.current = null;
       vwapRef.current = null;
       shadeRef.current = null;
-      linesRef.current = [];
     };
   }, []);
 
@@ -224,16 +242,7 @@ export function CandleChart(props: {
 
     if (!props.bars?.length) {
       structureKeyRef.current = "";
-      levelsKeyRef.current = "";
       fitKeyRef.current = "";
-      for (const line of linesRef.current) {
-        try {
-          series.removePriceLine(line);
-        } catch {
-          /* cleared */
-        }
-      }
-      linesRef.current = [];
       series.setData([]);
       volume.setData([]);
       vwap.setData([]);
@@ -241,9 +250,7 @@ export function CandleChart(props: {
       return;
     }
 
-    // Candles stay exactly as Alpaca returned them. Do not rewrite the last bar to a quote.
     const aligned = props.bars;
-
     const structureKey = `${props.symbol}|${props.timeframe}|${aligned.length}|${aligned[0]?.time}|${aligned.at(-1)?.time}`;
     const canPatchLast = structureKeyRef.current === structureKey && structureKey.length > 0;
 
@@ -264,6 +271,9 @@ export function CandleChart(props: {
       });
       if (last.vwap != null && Number.isFinite(last.vwap)) {
         vwap.update({ time: t, value: last.vwap });
+      }
+      if (followLiveRef.current) {
+        requestAnimationFrame(() => applyLiveViewport());
       }
     } else {
       structureKeyRef.current = structureKey;
@@ -294,7 +304,7 @@ export function CandleChart(props: {
         localization: chartEtLocalization,
         timeScale: {
           tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
-          formatEtChartTick(time, tickMarkType),
+            formatEtChartTick(time, tickMarkType),
         },
       });
 
@@ -306,60 +316,11 @@ export function CandleChart(props: {
         }
       }
     }
-
-    const levelsOk =
-      props.levels != null &&
-      (!props.levels.forSymbol ||
-        props.levels.forSymbol.toUpperCase() === props.symbol.toUpperCase());
-
-    const levelsKey =
-      levelsOk && props.levels
-        ? `${props.levels.trigger}|${props.levels.stop}|${props.levels.t1}|${props.levels.t2}|${props.levels.zoneLow}|${props.levels.zoneHigh}`
-        : "";
-
-    if (levelsKey !== levelsKeyRef.current) {
-      for (const line of linesRef.current) {
-        try {
-          series.removePriceLine(line);
-        } catch {
-          /* cleared */
-        }
-      }
-      linesRef.current = [];
-      levelsKeyRef.current = levelsKey;
-
-      if (levelsOk && props.levels) {
-        const L = props.levels;
-        const mk = (price: number, color: string, title: string) =>
-          series.createPriceLine({
-            price,
-            color,
-            lineWidth: 1,
-            lineStyle: 2,
-            axisLabelVisible: true,
-            title,
-          });
-        const entryMid = (L.zoneLow + L.zoneHigh) / 2;
-        linesRef.current = [
-          mk(L.trigger, "#93C5FD", "TRIG"),
-          mk(entryMid, "#2DD4BF", "ENTRY"),
-          mk(L.stop, "#F87171", "STOP"),
-          mk(L.t1, "#34D399", "T1"),
-          mk(L.t2, "#A78BFA", "T2"),
-        ];
-      }
-    }
-  }, [props.bars, props.levels, props.symbol, props.timeframe, props.extendedHours, goLive]);
+  }, [props.bars, props.symbol, props.timeframe, props.extendedHours, goLive, applyLiveViewport]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
       ? formatLastBarEtLabel(props.bars.at(-1)!.time)
-      : null;
-  const levelsForSymbol =
-    props.levels != null &&
-    (!props.levels.forSymbol ||
-      props.levels.forSymbol.toUpperCase() === props.symbol.toUpperCase())
-      ? props.levels
       : null;
 
   return (
@@ -381,19 +342,11 @@ export function CandleChart(props: {
           ))}
         </div>
         <div className="chart-toolbar-right">
-          <div className="chart-legend">
+          <div className="chart-legend chart-legend-minimal">
             <span className="leg vwap">VWAP</span>
-            <span className="leg entry">
-              Entry{" "}
-              {levelsForSymbol
-                ? fmtPrice((levelsForSymbol.zoneLow + levelsForSymbol.zoneHigh) / 2)
-                : ""}
-            </span>
-            <span className="leg stop">
-              Stop {levelsForSymbol ? fmtPrice(levelsForSymbol.stop) : ""}
-            </span>
-            <span className="leg t1">T1 {levelsForSymbol ? fmtPrice(levelsForSymbol.t1) : ""}</span>
-            <span className="leg t2">T2 {levelsForSymbol ? fmtPrice(levelsForSymbol.t2) : ""}</span>
+            {props.lastPrice != null ? (
+              <span className="leg last-px">Last {fmtPrice(props.lastPrice)}</span>
+            ) : null}
           </div>
           <button
             type="button"
@@ -407,7 +360,7 @@ export function CandleChart(props: {
             <button
               type="button"
               className={`chart-action-btn${followLive ? " active" : ""}`}
-              title="Jump to latest candle with space for upcoming bars"
+              title="Jump to the latest candles"
               onClick={() => goLive()}
             >
               <Radio size={14} aria-hidden />
@@ -423,12 +376,16 @@ export function CandleChart(props: {
               {fullscreen ? "Exit" : "Full"}
             </button>
           </div>
-          <span className="badge muted-axis" title={props.extendedHours ? "Blue bands are premarket and after-hours. Regular session is still 09:30–16:00 ET." : "Regular session only, 09:30–16:00 US Eastern. No after-hours candles."}>
+          <span
+            className="badge muted-axis"
+            title={
+              props.extendedHours
+                ? "Blue bands are premarket and after-hours. Regular session is still 09:30–16:00 ET."
+                : "Regular session only, 09:30–16:00 US Eastern."
+            }
+          >
             {props.extendedHours ? "EXT · ET" : "RTH · ET"}
             {lastBarEt ? ` · last ${lastBarEt}` : ""}
-          </span>
-          <span className="badge hide-sm" title="Setup levels are indicative — not broker orders">
-            LEVELS = SETUP (NOT ORDERS)
           </span>
         </div>
       </div>
@@ -449,7 +406,9 @@ export function CandleChart(props: {
           <div className="chart-overlay-msg">Loading {props.symbol}…</div>
         )}
         {!props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
-          <div className="chart-overlay-msg">No bar data for {props.symbol} / {props.timeframe}.</div>
+          <div className="chart-overlay-msg">
+            No bar data for {props.symbol} / {props.timeframe}.
+          </div>
         )}
       </div>
     </div>

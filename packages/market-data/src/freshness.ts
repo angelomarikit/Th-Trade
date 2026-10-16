@@ -1,3 +1,4 @@
+import { isQuoteUsableForEntry } from "./quoteUsability.js";
 import { classifyUsEquitySession, type SessionSnapshot } from "./session.js";
 import type { Bar, FreshnessResult, MarketSnapshot } from "./types.js";
 
@@ -53,10 +54,21 @@ export function assessFreshness(
     };
   }
 
-  // When a quote is present during RTH, it must be fresh — do not let stale quotes hide behind newer bar timestamps.
+  // RTH: stale Alpaca quote *timestamps* must not fail verification when we just fetched a usable NBBO and bars are current.
   if (snapshot.quote?.timestamp && sess.session === "RTH" && limit > 0) {
     const quoteAgeMs = Math.max(0, now.getTime() - snapshot.quote.timestamp.getTime());
-    if (quoteAgeMs > limit) {
+    const fetchAgeMs = Math.max(0, now.getTime() - snapshot.receivedAt.getTime());
+    const last1m = snapshot.bars1m.at(-1);
+    const barAgeMs = last1m
+      ? Math.max(0, now.getTime() - barEffectiveEndTime(last1m).getTime())
+      : Number.POSITIVE_INFINITY;
+    const justFetched = fetchAgeMs < 5_000;
+    const barsCurrent = barAgeMs <= limit;
+    const nbboUsable = isQuoteUsableForEntry(snapshot);
+    /** Alpaca quote `t` can lag a little behind a just-fetched NBBO; do not forgive multi-minute timestamps. */
+    const timestampLagOnly =
+      justFetched && barsCurrent && nbboUsable && quoteAgeMs <= limit + 30_000;
+    if (quoteAgeMs > limit && !timestampLagOnly) {
       return {
         ok: false,
         ageMs: quoteAgeMs,

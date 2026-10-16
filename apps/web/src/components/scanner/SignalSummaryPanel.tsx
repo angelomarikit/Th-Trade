@@ -7,7 +7,8 @@ import { addMonitorSymbol } from "../../lib/api";
 import { friendlyApiError } from "../../lib/apiBase";
 import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
 import { SessionPriceBanner } from "../ui/SessionPriceBanner";
-import { canShowSetupChartLevels, isSetupChartStale } from "../../lib/setupChartSync";
+import { MarketDataStatusStrip } from "../ui/MarketDataStatusStrip";
+import { isSetupChartStale } from "../../lib/setupChartSync";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
 /**
@@ -48,14 +49,10 @@ export function SignalSummaryPanel() {
     setupEvaluatedAt: lc.evaluatedAt ?? data?.card.evaluatedAt ?? null,
     loading,
   });
-  const showExecutableLevels = canShowSetupChartLevels({
-    symbol,
-    setupSymbol,
-    barsSymbol: bars?.symbol,
-    setupEvaluatedAt: lc.evaluatedAt ?? data?.card.evaluatedAt ?? null,
-    loading,
-    dataFresh: lc.dataFresh !== false,
-  });
+  const planForSymbol =
+    setupSymbol != null && setupSymbol.toUpperCase() === symbol.toUpperCase() && !loading;
+  const planStale = setupStale || lc.dataFresh === false;
+  const entryMid = (lc.entryZone.low + lc.entryZone.high) / 2;
   const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
@@ -76,6 +73,7 @@ export function SignalSummaryPanel() {
 
   return (
     <aside className="signal-panel panel" aria-label="Trading recommendation">
+      <MarketDataStatusStrip />
       <SessionPriceBanner
         session={lc.session?.session}
         dataFresh={lc.dataFresh !== false}
@@ -96,94 +94,106 @@ export function SignalSummaryPanel() {
       </div>
 
       <div className={`signal-action-hero ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
-        <p className="action-label">Your action</p>
         <p className="action-value">{lc.tradingAction ?? "WAIT"}</p>
-        <p className="action-label signal-hero-price">
-          Price {displayPrice != null ? fmtPrice(displayPrice) : fmtPrice(lc.lastPrice)}
-        </p>
-        {status !== "SCANNING" && (lc.waitingFor?.[0] ?? lc.watchingSummary) ? (
-          <p className="action-label signal-waiting-for" style={{ marginTop: "0.35rem", lineHeight: 1.35 }}>
-            <strong>Waiting for:</strong> {lc.waitingFor?.[0] ?? lc.watchingSummary}
-          </p>
-        ) : null}
-        <p className="action-label" style={{ marginTop: "0.5rem" }}>
-          Direction
-        </p>
-        <div className="signal-panel-dir" style={{ margin: 0 }}>
-          <div className="side-toggle" role="group" aria-label="Direction">
-            <button
-              type="button"
-              className={`buy ${side === "LONG" ? "active" : ""}`}
-              onClick={() => {
-                setSide("LONG");
-                void scan({ ticker: symbol, side: "LONG", brief: false });
-              }}
-            >
-              LONG
-            </button>
-            <button
-              type="button"
-              className={`sell ${side === "SHORT" ? "active" : ""}`}
-              onClick={() => {
-                setSide("SHORT");
-                void scan({ ticker: symbol, side: "SHORT", brief: false });
-              }}
-            >
-              SHORT
-            </button>
-          </div>
-        </div>
-        <p className="action-value" style={{ marginTop: "0.35rem" }}>
-          {status}
-        </p>
+        <p className="action-label">{status}</p>
       </div>
 
+      <div className="signal-panel-dir">
+        <div className="side-toggle" role="group" aria-label="Direction">
+          <button
+            type="button"
+            className={`buy ${side === "LONG" ? "active" : ""}`}
+            onClick={() => {
+              setSide("LONG");
+              void scan({ ticker: symbol, side: "LONG", brief: false });
+            }}
+          >
+            LONG
+          </button>
+          <button
+            type="button"
+            className={`sell ${side === "SHORT" ? "active" : ""}`}
+            onClick={() => {
+              setSide("SHORT");
+              void scan({ ticker: symbol, side: "SHORT", brief: false });
+            }}
+          >
+            SHORT
+          </button>
+        </div>
+      </div>
+
+      {setupStale ? (
+        <p className="muted signal-scan-note">Refreshing scan — values below update with each evaluation.</p>
+      ) : null}
+      {lc.evaluatedAt ? (
+        <p className="muted signal-scan-note">
+          Scan {formatEtTime(lc.evaluatedAt)}
+          {planStale ? " · reference / not entry permission" : " · verified evaluation"}
+        </p>
+      ) : null}
+
+      {planForSymbol ? (
+        <dl className={`signal-trade-plan${planStale ? " signal-trade-plan-stale" : ""}`}>
+          <div>
+            <dt>Direction</dt>
+            <dd>{side}</dd>
+          </div>
+          <div>
+            <dt>Action</dt>
+            <dd>{lc.tradingAction ?? "WAIT"}</dd>
+          </div>
+          <div>
+            <dt>Current price</dt>
+            <dd>{displayPrice != null ? fmtPrice(displayPrice) : fmtPrice(lc.lastPrice)}</dd>
+          </div>
+          <div>
+            <dt>Trigger</dt>
+            <dd>{fmtPrice(lc.alertAt)}</dd>
+          </div>
+          <div className="signal-entry-zone">
+            <dt>Entry zone</dt>
+            <dd>
+              {fmtPrice(lc.entryZone.low)} – {fmtPrice(lc.entryZone.high)}
+              <span className="muted"> (mid {fmtPrice(entryMid)})</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Stop loss</dt>
+            <dd className="level-stop">{fmtPrice(lc.stop)}</dd>
+          </div>
+          <div>
+            <dt>Target 1</dt>
+            <dd className="level-t1">{fmtPrice(lc.t1)}</dd>
+          </div>
+          <div>
+            <dt>Target 2</dt>
+            <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
+          </div>
+          {lc.t3 != null && (
+            <div>
+              <dt>Target 3</dt>
+              <dd>{fmtPrice(lc.t3)}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Risk / reward</dt>
+            <dd>{rr != null && Number.isFinite(rr) ? `${rr.toFixed(2)}R to T1` : "—"}</dd>
+          </div>
+          <div className="signal-waiting-row">
+            <dt>Waiting for</dt>
+            <dd>{lc.waitingFor?.[0] ?? lc.watchingSummary ?? "—"}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="muted">Loading trade plan for {symbol}…</p>
+      )}
+
       <div className="signal-brief" role="status">
-        {setupStale ? (
-          <p className="muted">Refreshing scan to keep levels aligned with the chart.</p>
-        ) : null}
         {briefLines.map((line) => (
           <p key={line}>{line}</p>
         ))}
       </div>
-
-      {showExecutableLevels ? (
-      <dl className="signal-levels">
-        <div>
-          <dt>Trigger</dt>
-          <dd>{fmtPrice(lc.alertAt)}</dd>
-        </div>
-        <div className="signal-entry-zone">
-          <dt>Entry zone</dt>
-          <dd>
-            {fmtPrice(lc.entryZone.low)} – {fmtPrice(lc.entryZone.high)}
-          </dd>
-        </div>
-        <div>
-          <dt>Stop</dt>
-          <dd className="level-stop">{fmtPrice(lc.stop)}</dd>
-        </div>
-        <div>
-          <dt>T1</dt>
-          <dd className="level-t1">{fmtPrice(lc.t1)}</dd>
-        </div>
-        <div>
-          <dt>T2</dt>
-          <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
-        </div>
-        {lc.t3 != null && (
-          <div>
-            <dt>T3</dt>
-            <dd>{fmtPrice(lc.t3)}</dd>
-          </div>
-        )}
-      </dl>
-      ) : (
-        <p className="muted" style={{ margin: "0.5rem 0" }}>
-          Entry trigger, zone, stop, and targets are hidden until data is verified and aligned with the
-          chart.
-        </p>
-      )}
 
       <p className="disclaimer">
         Signals only — no orders sent. Entry requires completed 5m confirmation, ~2R, fresh data, and

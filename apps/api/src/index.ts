@@ -826,6 +826,7 @@ async function main() {
             rewardToRisk: card.rewardToRisk,
             dataFresh: card.dataFresh,
             dataFreshReason: card.dataFreshReason ?? null,
+            marketDataStatus: card.marketDataStatus ?? null,
             evaluatedAt: card.evaluatedAt,
             setupScore: `${card.setupScore.total} / 100`,
             setupScoreValue: card.setupScore.total,

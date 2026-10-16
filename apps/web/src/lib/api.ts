@@ -86,6 +86,17 @@ export interface SetupResponse {
     marketDataAt?: string | null;
     dataFeed?: string | null;
     dataFreshReason?: string | null;
+    marketDataStatus?: {
+      session: string;
+      barsFresh: boolean;
+      barsAgeSec: number | null;
+      quotePresent: boolean;
+      quoteFresh: boolean;
+      quoteAgeSec: number | null;
+      quoteUsableForEntry: boolean;
+      verifiedForSetup: boolean;
+      summary: string;
+    } | null;
     entryGeometry?: {
       kind: string;
       summary: string;

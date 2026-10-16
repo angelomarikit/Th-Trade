@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { SessionPriceBanner } from "../components/ui/SessionPriceBanner";
-import { canShowSetupChartLevels, isSetupChartStale } from "../lib/setupChartSync";
+import { isSetupChartStale } from "../lib/setupChartSync";
 import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
@@ -52,14 +52,6 @@ export function ScannerPage() {
     setupEvaluatedAt: lc?.evaluatedAt ?? data?.card.evaluatedAt ?? null,
     loading,
   });
-  const showLevels = canShowSetupChartLevels({
-    symbol,
-    setupSymbol,
-    barsSymbol: bars?.symbol,
-    setupEvaluatedAt: lc?.evaluatedAt ?? data?.card.evaluatedAt ?? null,
-    loading,
-    dataFresh: lc?.dataFresh !== false,
-  });
   const resyncAtRef = useRef(0);
   useEffect(() => {
     if (!setupStale || loading) return;
@@ -71,20 +63,6 @@ export function ScannerPage() {
     }, 350);
     return () => window.clearTimeout(id);
   }, [setupStale, loading, scan, symbol]);
-  // Chart lines must match the same setup evaluation as the recommendation panel.
-  const levels =
-    lc && showLevels
-      ? {
-          trigger: lc.alertAt,
-          zoneLow: lc.entryZone.low,
-          zoneHigh: lc.entryZone.high,
-          stop: lc.stop,
-          t1: lc.t1,
-          t2: lc.t2,
-          forSymbol: symbol,
-        }
-      : null;
-
   const last = displayPrice;
   const sessionLabel = lc?.session?.session ?? data?.card.session?.session;
   const lastBar = bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1) : undefined;
@@ -115,8 +93,7 @@ export function ScannerPage() {
       )}
       {setupStale && (
         <p className="banner warn" role="status">
-          Syncing chart and recommendation — refreshing scan. Levels stay visible when the last evaluation
-          is current.
+          Syncing chart and recommendation — refreshing scan.
         </p>
       )}
       {data ? (
@@ -203,7 +180,6 @@ export function ScannerPage() {
             error={barsError}
             timeframe={chartTf}
             onTimeframe={setChartTf}
-            levels={levels}
             symbol={symbol}
             extendedHours={extendedHours}
             onExtendedHours={setExtendedHours}

@@ -2401,6 +2401,96 @@ a {
   margin-bottom: 0.65rem;
 }
 
+.market-data-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  margin-bottom: 0.55rem;
+  font-size: 0.72rem;
+}
+
+.mds-item {
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mds-item.ok {
+  border-color: rgba(53, 200, 154, 0.45);
+  color: #35c89a;
+}
+
+.mds-item.warn {
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
+}
+
+.mds-item.bad {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #f87171;
+}
+
+.mds-item.muted {
+  color: var(--muted);
+}
+
+.mds-summary {
+  flex: 1 1 100%;
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.signal-trade-plan {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 0.75rem;
+  margin: 0.65rem 0;
+  font-size: 0.82rem;
+}
+
+.signal-trade-plan dt {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.signal-trade-plan dd {
+  margin: 0.1rem 0 0;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.signal-trade-plan-stale dd {
+  color: var(--muted);
+}
+
+.signal-waiting-row {
+  grid-column: 1 / -1;
+}
+
+.signal-scan-note {
+  margin: 0.25rem 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+.chart-legend-minimal .leg.last-px {
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .signal-trade-plan {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .watch-card-levels-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

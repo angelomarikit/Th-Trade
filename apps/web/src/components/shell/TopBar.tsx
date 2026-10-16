@@ -65,10 +65,13 @@ export function TopBar() {
           <span className="badge">SESSION —</span>
         )}
 
-        <span className={`badge ${feedConnected ? "teal" : "red"}`} title="Market data API connectivity">
+        <span
+          className={`badge ${feedConnected ? "teal" : "red"}`}
+          title="WULU API reachability only — not verified NBBO or entry permission"
+        >
           {feedConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
           <span className="dot" />
-          <span className="feed-label">FEED {feedConnected ? "OK" : "DOWN"}</span>
+          <span className="feed-label">API {feedConnected ? "OK" : "DOWN"}</span>
         </span>
 
         <span className="badge blue show-mobile-only" title="Data feed">

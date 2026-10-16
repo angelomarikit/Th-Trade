@@ -4,18 +4,6 @@ import { useTerminal } from "../context/TerminalContext";
 
 export function ChartsPage() {
   const { bars, barsLoading, barsError, chartTf, setChartTf, extendedHours, setExtendedHours, symbol, data, scan } = useTerminal();
-  const lc = data?.liveCard;
-  const levels = lc
-    ? {
-        trigger: lc.alertAt,
-        zoneLow: lc.entryZone.low,
-        zoneHigh: lc.entryZone.high,
-        stop: lc.stop,
-        t1: lc.t1,
-        t2: lc.t2,
-      }
-    : null;
-
   return (
     <div className="page">
       <h1 className="page-title">Charts · {symbol}</h1>
@@ -31,7 +19,6 @@ export function ChartsPage() {
         error={barsError}
         timeframe={chartTf}
         onTimeframe={setChartTf}
-        levels={levels}
         symbol={symbol}
         extendedHours={extendedHours}
         onExtendedHours={setExtendedHours}

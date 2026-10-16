@@ -56,6 +56,18 @@ export interface LiveSetupCard {
   dataFresh: boolean;
   /** Why data is or is not verified (session, stale age, missing timestamp). */
   dataFreshReason?: string;
+  /** Separates connection vs quote vs bars vs entry permission (display only). */
+  marketDataStatus?: {
+    session: string;
+    barsFresh: boolean;
+    barsAgeSec: number | null;
+    quotePresent: boolean;
+    quoteFresh: boolean;
+    quoteAgeSec: number | null;
+    quoteUsableForEntry: boolean;
+    verifiedForSetup: boolean;
+    summary: string;
+  };
   evaluatedAt: string;
   setupId: string;
   session: {
