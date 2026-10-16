@@ -22,7 +22,11 @@ export default defineConfig({
 
 
   test: {
-    include: ["packages/**/tests/**/*.test.ts", "apps/api/src/**/*.test.ts"],
+    include: [
+      "packages/**/tests/**/*.test.ts",
+      "apps/api/src/**/*.test.ts",
+      "apps/web/src/**/*.test.ts",
+    ],
     environment: "node",
   },
 });

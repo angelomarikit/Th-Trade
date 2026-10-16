@@ -7,6 +7,8 @@ import {
   MonitorLimitError,
   WatchMonitor,
   isAlertWorthyTransition,
+  isUserVisibleAlertTransition,
+  isMonitorEventPersisted,
   toUserFacingStatus,
 } from "../src/index.js";
 import type { SetupScanner } from "../src/SetupScanner.js";
@@ -297,6 +299,15 @@ describe("WatchMonitor / MonitorHub Phase 2", () => {
     expect(isAlertWorthyTransition("NEAR ACTIVE", "NEAR ACTIVE")).toBe(false);
     expect(isAlertWorthyTransition("WAIT", "DATA NOT VERIFIED")).toBe(false);
     expect(isAlertWorthyTransition("DATA NOT VERIFIED", "DATA NOT VERIFIED")).toBe(false);
+    expect(isUserVisibleAlertTransition("WAIT", "NEAR ACTIVE")).toBe(true);
+    expect(isUserVisibleAlertTransition("WAIT", "ENTRY ACTIVE")).toBe(true);
+    expect(isUserVisibleAlertTransition("WAIT", "NO TRADE")).toBe(false);
+    expect(isUserVisibleAlertTransition("DATA NOT VERIFIED", "WAIT")).toBe(false);
+    expect(isUserVisibleAlertTransition("ENTRY ACTIVE", "MISSED")).toBe(true);
+    expect(isMonitorEventPersisted("WAIT", "NEAR ACTIVE")).toBe(true);
+    expect(isMonitorEventPersisted("ENTRY ACTIVE", "DATA NOT VERIFIED")).toBe(true);
+    expect(isMonitorEventPersisted("WAIT", "NO TRADE")).toBe(false);
+    expect(isUserVisibleAlertTransition("ENTRY ACTIVE", "DATA NOT VERIFIED")).toBe(false);
   });
 
   it("supports replace and remove", async () => {

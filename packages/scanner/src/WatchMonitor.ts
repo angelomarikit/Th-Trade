@@ -8,7 +8,7 @@ import { backgroundAlpacaShouldWait, withAlpacaPriority } from "@wulu/market-dat
 import { SETUP_STATES, type SetupState, type TradeSide } from "@wulu/domain";
 import {
   buildAlertEvent,
-  isAlertWorthyTransition,
+  isMonitorEventPersisted,
   type AlertEventStore,
   type MonitorAlertEvent,
 } from "./alertEvents.js";
@@ -301,7 +301,7 @@ export class WatchMonitor {
     };
     this.states.set(cfg.symbol, next);
 
-    if (prev && isAlertWorthyTransition(prev.status, next.status)) {
+    if (prev && isMonitorEventPersisted(prev.status, next.status)) {
       return buildAlertEvent({
         userId: this.sessionId,
         symbol: next.symbol,
@@ -357,7 +357,7 @@ export class WatchMonitor {
       updatedAt: new Date().toISOString(),
     };
     this.states.set(cfg.symbol, next);
-    if (prev && isAlertWorthyTransition(prev.status, next.status)) {
+    if (prev && isMonitorEventPersisted(prev.status, next.status)) {
       return buildAlertEvent({
         userId: this.sessionId,
         symbol: next.symbol,
@@ -440,7 +440,7 @@ export class WatchMonitor {
       updatedAt,
     };
     this.states.set(cfg.symbol, next);
-    if (prev && isAlertWorthyTransition(prev.status, next.status)) {
+    if (prev && isMonitorEventPersisted(prev.status, next.status)) {
       return buildAlertEvent({
         userId: this.sessionId,
         symbol: next.symbol,

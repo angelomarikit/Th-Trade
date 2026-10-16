@@ -21,6 +21,7 @@ import {
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
 import { barsForChart, historyLimit } from "../lib/regularSession";
+import { isUserVisibleMonitorTransition } from "../lib/monitorDisplay";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -68,6 +69,8 @@ interface TerminalContextValue {
     /** Request ChatGPT brief (credits). Default false for polls. */
     brief?: boolean;
     fast?: boolean;
+    refreshBars?: boolean;
+    poll?: boolean;
   }) => Promise<void>;
   data: SetupResponse | null;
   bars: BarsResponse | null;
@@ -105,7 +108,7 @@ interface TerminalContextValue {
 
 const TerminalContext = createContext<TerminalContextValue | null>(null);
 
-const POLL_MS = 20_000;
+const POLL_MS = 15_000;
 
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const { session, setCreditsLocal } = useAuth();
@@ -359,7 +362,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
         });
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted || symbolRef.current !== t) return;
         setData(next);
         setUpdatedAt(Date.now());
         const charged = next.signalRecommendation?.creditsCharged ?? 0;
@@ -467,6 +470,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         const browserOn = Boolean(prefs?.preferences.browserEnabled);
         for (const e of ev.events) {
           if (serverAlertSeen.current.has(e.id)) continue;
+          if (!isUserVisibleMonitorTransition(e.previousStatus, e.newStatus)) continue;
           serverAlertSeen.current.add(e.id);
           if (prefs?.preferences.inAppEnabled === false) continue;
           pushAlert({

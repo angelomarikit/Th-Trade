@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { SessionPriceBanner } from "../components/ui/SessionPriceBanner";
+import { canShowSetupChartLevels, isSetupChartStale } from "../lib/setupChartSync";
 import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
@@ -41,17 +43,37 @@ export function ScannerPage() {
   }, [setInspectorOpen]);
 
   const lc = data?.liveCard;
-  const setupPx = lc?.lastPrice;
   const chartClose = bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
-  const setupStale =
-    setupPx != null &&
-    chartClose != null &&
-    Number.isFinite(setupPx) &&
-    Number.isFinite(chartClose) &&
-    Math.abs(setupPx - chartClose) / Math.max(chartClose, 1e-6) > 0.008;
+  const setupSymbol = lc?.symbol ?? data?.card.symbol ?? null;
+  const setupStale = isSetupChartStale({
+    symbol,
+    setupSymbol,
+    barsSymbol: bars?.symbol,
+    setupEvaluatedAt: lc?.evaluatedAt ?? data?.card.evaluatedAt ?? null,
+    loading,
+  });
+  const showLevels = canShowSetupChartLevels({
+    symbol,
+    setupSymbol,
+    barsSymbol: bars?.symbol,
+    setupEvaluatedAt: lc?.evaluatedAt ?? data?.card.evaluatedAt ?? null,
+    loading,
+    dataFresh: lc?.dataFresh !== false,
+  });
+  const resyncAtRef = useRef(0);
+  useEffect(() => {
+    if (!setupStale || loading) return;
+    const now = Date.now();
+    if (now - resyncAtRef.current < 8_000) return;
+    resyncAtRef.current = now;
+    const id = window.setTimeout(() => {
+      void scan({ fast: true, poll: true, refreshBars: true });
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [setupStale, loading, scan, symbol]);
   // Chart lines must match the same setup evaluation as the recommendation panel.
   const levels =
-    lc && !setupStale
+    lc && showLevels
       ? {
           trigger: lc.alertAt,
           zoneLow: lc.entryZone.low,
@@ -93,16 +115,17 @@ export function ScannerPage() {
       )}
       {setupStale && (
         <p className="banner warn" role="status">
-          Updating setup levels to match the latest candle — lines hidden until the next scan completes.
+          Syncing chart and recommendation — refreshing scan. Levels stay visible when the last evaluation
+          is current.
         </p>
       )}
-      {data && (data.liveCard.dataFresh === false || data.card.dataFresh === false) && (
-        <p className="banner warn">
-          No trade — the quote is too old for this session (
-          {data.liveCard.session?.session ?? data.card.session?.session ?? "closed"}). Candles below are
-          still the Alpaca bars we received. They are not a live permission to enter.
-        </p>
-      )}
+      {data ? (
+        <SessionPriceBanner
+          session={data.liveCard.session?.session ?? data.card.session?.session}
+          dataFresh={data.liveCard.dataFresh !== false && data.card.dataFresh !== false}
+          referencePriceOnly={data.liveCard.quoteTransparency?.referencePriceOnly === true}
+        />
+      ) : null}
 
       {/* Single global search lives in TopBar — no second hero search on Scanner. */}
       <div className={`scanner-layout-v7 ${inspectorOpen ? "with-inspector" : ""}`}>

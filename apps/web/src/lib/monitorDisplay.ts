@@ -1,3 +1,16 @@
+/** Same filter as monitor event recording — for in-app notification pulls. */
+export function isUserVisibleMonitorTransition(prev: string, next: string): boolean {
+  if (!next || prev === next) return false;
+  const p = shortStatus(prev);
+  const n = shortStatus(next);
+  if (p === n) return false;
+  if (n === "ENTRY ACTIVE") return true;
+  if (n === "NEAR ACTIVE" && (p === "WAIT" || p === "CONFIRMATION")) return true;
+  if (n === "MISSED" || n === "INVALIDATED") return true;
+  if (n.includes("TARGET HIT") || n.includes("STOP HIT")) return true;
+  return false;
+}
+
 /** Customer-facing labels for monitor lifecycle events. */
 export function formatMonitorEventChange(previousStatus: string, newStatus: string): string {
   const prev = shortStatus(previousStatus);
@@ -27,6 +40,7 @@ function shortStatus(status: string): string {
   const u = status.toUpperCase();
   if (u.includes("ENTRY ACTIVE")) return "ENTRY ACTIVE";
   if (u.includes("NEAR ACTIVE")) return "NEAR ACTIVE";
+  if (u.includes("CONFIRMATION")) return "CONFIRMATION";
   if (u.includes("INVALIDATED")) return "INVALIDATED";
   if (u.includes("MISSED")) return "MISSED";
   if (u.includes("NO TRADE")) return "NO TRADE";

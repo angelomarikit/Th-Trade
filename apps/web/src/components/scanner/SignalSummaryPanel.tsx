@@ -6,6 +6,8 @@ import { useTerminal } from "../../context/TerminalContext";
 import { addMonitorSymbol } from "../../lib/api";
 import { friendlyApiError } from "../../lib/apiBase";
 import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
+import { SessionPriceBanner } from "../ui/SessionPriceBanner";
+import { canShowSetupChartLevels, isSetupChartStale } from "../../lib/setupChartSync";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
 /**
@@ -38,14 +40,22 @@ export function SignalSummaryPanel() {
   const strat = primaryStrategyName(lc);
   const chartClose =
     bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
-  const setupPx = displayPrice ?? lc.lastPrice;
-  const setupStale =
-    setupPx != null &&
-    chartClose != null &&
-    Number.isFinite(setupPx) &&
-    Number.isFinite(chartClose) &&
-    Math.abs(setupPx - chartClose) / Math.max(chartClose, 1e-6) > 0.008;
-  const showExecutableLevels = lc.dataFresh && !setupStale;
+  const setupSymbol = lc.symbol ?? data?.card.symbol ?? null;
+  const setupStale = isSetupChartStale({
+    symbol,
+    setupSymbol,
+    barsSymbol: bars?.symbol,
+    setupEvaluatedAt: lc.evaluatedAt ?? data?.card.evaluatedAt ?? null,
+    loading,
+  });
+  const showExecutableLevels = canShowSetupChartLevels({
+    symbol,
+    setupSymbol,
+    barsSymbol: bars?.symbol,
+    setupEvaluatedAt: lc.evaluatedAt ?? data?.card.evaluatedAt ?? null,
+    loading,
+    dataFresh: lc.dataFresh !== false,
+  });
   const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
@@ -66,6 +76,12 @@ export function SignalSummaryPanel() {
 
   return (
     <aside className="signal-panel panel" aria-label="Trading recommendation">
+      <SessionPriceBanner
+        session={lc.session?.session}
+        dataFresh={lc.dataFresh !== false}
+        referencePriceOnly={lc.quoteTransparency?.referencePriceOnly === true}
+      />
+
       <div className="signal-panel-market">
         <span className="badge">{lc.session?.session ?? "—"}</span>
         <span className={`badge ${lc.dataFresh ? "green" : "amber"}`}>
@@ -82,22 +98,12 @@ export function SignalSummaryPanel() {
       <div className={`signal-action-hero ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
         <p className="action-label">Your action</p>
         <p className="action-value">{lc.tradingAction ?? "WAIT"}</p>
-        {lc.watchingSummary ? (
-          <p className="action-label" style={{ marginTop: "0.35rem", lineHeight: 1.35 }}>
-            {lc.watchingSummary}
-          </p>
-        ) : null}
-        {lc.marketDataAt ? (
-          <p className="action-label muted">
-            Data {lc.dataFeed?.toUpperCase() ?? "IEX"} · {formatEtTime(lc.marketDataAt)}
-          </p>
-        ) : null}
-        {lc.dataFresh === false && lc.dataFreshReason ? (
-          <p className="action-label muted">{lc.dataFreshReason}</p>
-        ) : null}
-        {lc.entryGeometry?.summary ? (
-          <p className="action-label muted" style={{ marginTop: "0.35rem" }}>
-            {lc.entryGeometry.summary}
+        <p className="action-label signal-hero-price">
+          Price {displayPrice != null ? fmtPrice(displayPrice) : fmtPrice(lc.lastPrice)}
+        </p>
+        {status !== "SCANNING" && (lc.waitingFor?.[0] ?? lc.watchingSummary) ? (
+          <p className="action-label signal-waiting-for" style={{ marginTop: "0.35rem", lineHeight: 1.35 }}>
+            <strong>Waiting for:</strong> {lc.waitingFor?.[0] ?? lc.watchingSummary}
           </p>
         ) : null}
         <p className="action-label" style={{ marginTop: "0.5rem" }}>
@@ -130,16 +136,11 @@ export function SignalSummaryPanel() {
         <p className="action-value" style={{ marginTop: "0.35rem" }}>
           {status}
         </p>
-        <p className="action-label">
-          Setup score {score10 != null ? `${score10}/10` : "—"}
-          {rr != null && Number.isFinite(rr) ? ` · ${rr.toFixed(2)}R to T1` : ""}
-        </p>
-        {strat ? <p className="action-label">Strategy: {strat}</p> : null}
       </div>
 
       <div className="signal-brief" role="status">
         {setupStale ? (
-          <p className="muted">Updating setup — entry levels hidden until chart and scan match.</p>
+          <p className="muted">Refreshing scan to keep levels aligned with the chart.</p>
         ) : null}
         {briefLines.map((line) => (
           <p key={line}>{line}</p>
@@ -229,6 +230,21 @@ export function SignalSummaryPanel() {
       </button>
       {detailsOpen && (
         <div className="decision-section-body">
+          <p className="muted">
+            Setup score {score10 != null ? `${score10}/10` : "—"}
+            {rr != null && Number.isFinite(rr) ? ` · ${rr.toFixed(2)}R to T1` : ""}
+            {strat ? ` · ${strat}` : ""}
+          </p>
+          {lc.watchingSummary ? <p className="muted">{lc.watchingSummary}</p> : null}
+          {lc.dataFresh === false && lc.dataFreshReason ? (
+            <p className="muted">{lc.dataFreshReason}</p>
+          ) : null}
+          {lc.entryGeometry?.summary ? <p className="muted">{lc.entryGeometry.summary}</p> : null}
+          {lc.marketDataAt ? (
+            <p className="muted">
+              Data {lc.dataFeed?.toUpperCase() ?? "IEX"} · {formatEtTime(lc.marketDataAt)}
+            </p>
+          ) : null}
           <ul className="signal-checklist">
             {indicatorRows.map((ind) => (
               <li key={ind.id} className={`check-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>

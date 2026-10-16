@@ -2351,6 +2351,77 @@ a {
   margin-right: 0.28rem;
 }
 
+.watch-card-compact {
+  padding: 0.55rem 0.65rem;
+}
+
+.watch-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.watch-card-price-compact {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.2rem 0 0.35rem;
+  font-size: 0.82rem;
+}
+
+.watch-card-price-compact .watch-card-price {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.watch-card-session-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.watch-card-waiting-oneline {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.watch-card-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.session-price-banner {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  margin-bottom: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .watch-card-levels-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .watch-card-actions .btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.78rem;
+  }
+
+  .signal-panel.panel {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .signal-action-hero .action-value {
+    font-size: 1.65rem;
+  }
+}
+
 .watch-card-actions {
   display: flex;
   gap: 0.4rem;

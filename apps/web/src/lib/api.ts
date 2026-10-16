@@ -43,6 +43,8 @@ export interface SignalRecommendation {
 export interface SetupResponse {
   signalRecommendation?: SignalRecommendation;
   liveCard: {
+    symbol?: string;
+    side?: "LONG" | "SHORT";
     headline: string;
     status: string;
     state?: string;
@@ -84,6 +86,20 @@ export interface SetupResponse {
     marketDataAt?: string | null;
     dataFeed?: string | null;
     dataFreshReason?: string | null;
+    entryGeometry?: {
+      kind: string;
+      summary: string;
+      entryModelNote: string;
+    };
+    quoteTransparency?: {
+      bid: number | null;
+      ask: number | null;
+      spreadPct: number | null;
+      quoteAt: string | null;
+      priceSource?: string;
+      referencePriceOnly?: boolean;
+      priceBasis: string;
+    };
     rewardToRisk?: number;
     dataFresh?: boolean;
     evaluatedAt?: string;
@@ -161,6 +177,8 @@ export interface SetupResponse {
     } | null;
   };
   card: {
+    symbol?: string;
+    side?: "LONG" | "SHORT";
     lastPrice: number;
     rewardToRisk: number;
     dataFresh: boolean;

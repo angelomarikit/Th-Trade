@@ -37,6 +37,7 @@ import {
   createOptionsEngineFromEnv,
   createSetupScannerFromEnv,
   DEFAULT_MONITOR_WATCHLIST,
+  isUserVisibleAlertTransition,
   MonitorHub,
   MonitorLimitError,
   normalizeTicker,
@@ -781,6 +782,8 @@ async function main() {
 
         return json(res, 200, {
           liveCard: {
+            symbol: card.symbol,
+            side: card.side,
             headline: `${card.symbol} — ${card.side}`,
             status: displayStatus,
             tradingAction,
@@ -1013,14 +1016,21 @@ async function main() {
             requireAuth: supabaseReady,
           });
           const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-          const events = await monitorHub.listAlerts(sessionId, limit);
+          const raw = await monitorHub.listAlerts(sessionId, limit);
+          const events = raw.filter((e) =>
+            isUserVisibleAlertTransition(e.previousStatus, e.newStatus),
+          );
           const prefs =
             sessionId !== "default"
               ? await getAlertPreferences(sessionId)
               : await getAlertPreferences("default");
+          const audit =
+            url.searchParams.get("audit") === "1" || url.searchParams.get("view") === "audit";
+          const visible = audit ? raw : events;
           return json(res, 200, {
-            count: events.length,
-            events,
+            count: visible.length,
+            events: visible,
+            view: audit ? "audit" : "user",
             delivery: "recorded_for_in_app_and_optional_browser",
             preferences: prefs,
             note: "Status-change events are recorded. SMS/email/push senders are not wired. Automatic orders remain disabled. Signals are not live-validated until RTH confirmation.",

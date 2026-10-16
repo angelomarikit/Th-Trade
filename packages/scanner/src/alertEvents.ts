@@ -110,6 +110,34 @@ export function isAlertWorthyTransition(prev: string, next: string): boolean {
   return false;
 }
 
+/**
+ * User-facing monitor alerts only — excludes routine WAIT / NO TRADE / DATA NOT VERIFIED churn.
+ */
+export function isUserVisibleAlertTransition(prev: string, next: string): boolean {
+  if (!next || prev === next) return false;
+  const p = normalizeStatusFamily(prev);
+  const n = normalizeStatusFamily(next);
+  if (p === n) return false;
+  if (n === "ENTRY ACTIVE") return true;
+  if (n === "NEAR ACTIVE" && (p === "WAIT" || p === "CONFIRMATION")) return true;
+  if (n === "MISSED" || n === "INVALIDATED") return true;
+  if (n.includes("TARGET HIT") || n.includes("STOP HIT")) return true;
+  return false;
+}
+
+/** Durable monitor history — includes safety transitions not shown in the default UI feed. */
+export function isMonitorEventPersisted(prev: string, next: string): boolean {
+  if (!next || prev === next) return false;
+  if (isAlertWorthyTransition(prev, next)) return true;
+  const p = normalizeStatusFamily(prev);
+  const n = normalizeStatusFamily(next);
+  if (n === "DATA NOT VERIFIED" && (p === "ENTRY ACTIVE" || p === "NEAR ACTIVE" || p === "CONFIRMATION")) {
+    return true;
+  }
+  if (n === "NO TRADE" && (p === "ENTRY ACTIVE" || p === "NEAR ACTIVE")) return true;
+  return false;
+}
+
 export function normalizeStatusFamily(status: string): string {
   const u = status.toUpperCase();
   if (u.includes("DATA NOT VERIFIED") || u.includes("DATA_NOT_VERIFIED")) return "DATA NOT VERIFIED";

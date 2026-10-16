@@ -221,9 +221,13 @@ export function WatchlistPage() {
 
       {events.length > 0 ? (
         <div className="panel">
-          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
-            Recent changes
+          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.35rem" }}>
+            Meaningful alerts
           </h2>
+          <p className="muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem" }}>
+            Near active, entry active, missed, invalidated, target hit, or stop hit — not routine WAIT
+            churn.
+          </p>
           <table className="wulu-data-table">
             <thead>
               <tr>
@@ -252,6 +256,13 @@ export function WatchlistPage() {
   );
 }
 
+function sessionPriceHint(session: string | null, dataFresh: boolean): string {
+  const s = (session ?? "").toUpperCase();
+  if (s.includes("PRE")) return "Premarket · chart context only";
+  if (!dataFresh) return "Not verified · no entry permission";
+  return "Verified live";
+}
+
 function MonitorCard({
   row,
   onOpen,
@@ -265,61 +276,44 @@ function MonitorCard({
 }) {
   const [open, setOpen] = useState(false);
   const scanning = row.statusLabel === "SCANNING" || row.status === "SCANNING";
-  const indicators = row.indicatorChecklist ?? [];
   const action = scanning ? "WAIT" : (row.tradingAction ?? "WAIT");
+  const waitingLine =
+    !scanning && row.waitingFor[0]
+      ? row.waitingFor[0]
+      : !scanning && row.watchingSummary
+        ? row.watchingSummary
+        : null;
 
   return (
     <article
-      className={`watch-card ${row.dataFresh && !scanning ? "" : "watch-card-stale"}`}
+      className={`watch-card watch-card-compact ${row.dataFresh && !scanning ? "" : "watch-card-stale"}`}
     >
       <div className="watch-card-top">
         <strong className="watch-card-symbol">
           {row.symbol}
           <span className="watch-card-side">{row.side}</span>
         </strong>
-        <span className={`badge action-${action.toLowerCase()}`}>{action}</span>
-        <StatusBadge status={row.statusLabel || row.status} />
+        <div className="watch-card-badges">
+          <span className={`badge action-${action.toLowerCase()}`}>{action}</span>
+          <StatusBadge status={row.statusLabel || row.status} />
+        </div>
       </div>
-      <p className="watch-card-price-line">
-        Price {fmtPrice(row.lastPrice)}
-        {row.dataFresh ? " · verified live" : " · not verified"}
-        {!row.dataFresh ? " · reference only until quote OK" : ""}
-        {" · "}
-        Data {fmtDataTime(row.marketDataAt ?? row.evaluatedAt)}
-        {row.feed ? ` · ${row.feed.toUpperCase()}` : ""}
+
+      <p className="watch-card-price-line watch-card-price-compact">
+        <span className="watch-card-price">{fmtPrice(row.lastPrice)}</span>
+        <span className="watch-card-session-hint">{sessionPriceHint(row.session, row.dataFresh)}</span>
       </p>
-      {!row.dataFresh && row.dataFreshReason ? (
-        <p className="watch-card-fresh-reason">{row.dataFreshReason}</p>
-      ) : null}
-      {row.watchingSummary ? (
-        <p className="watch-card-watching watch-card-lead">{row.watchingSummary}</p>
-      ) : null}
-      {row.entryGeometrySummary ? (
-        <p className="watch-card-waiting">{row.entryGeometrySummary}</p>
-      ) : null}
-      {row.quoteSpreadPct != null && row.quoteSpreadPct > 0.35 ? (
-        <p className="watch-card-fresh-reason">
-          Quote spread {row.quoteSpreadPct.toFixed(2)}% — liquidity filter uses bid/ask; setup price may
-          use last RTH bar when the quote is not usable.
+
+      {!scanning && waitingLine ? (
+        <p className="watch-card-waiting watch-card-waiting-oneline">
+          <b>Waiting for:</b> {waitingLine}
         </p>
       ) : null}
-      {!scanning && row.waitingFor[0] ? (
-        <p className="watch-card-waiting">
-          <b>Still need:</b> {row.waitingFor.slice(0, 3).join(" · ")}
-        </p>
-      ) : null}
+
       {row.error ? <p className="watch-card-error">{row.error}</p> : null}
 
       {!row.error && !scanning ? (
-        <div className="watch-card-levels watch-card-levels-full">
-          <span>
-            <b>R:R</b>
-            {row.rewardToRisk != null ? `${row.rewardToRisk.toFixed(2)}R` : "—"}
-          </span>
-          <span>
-            <b>Score</b>
-            {row.qualityScore10 ?? row.setupScore ?? "—"}/10
-          </span>
+        <div className="watch-card-levels watch-card-levels-grid">
           <span>
             <b>Trigger</b>
             {fmtPrice(row.alertAt)}
@@ -349,19 +343,9 @@ function MonitorCard({
         </div>
       ) : null}
 
-      {indicators.length > 0 ? (
-        <ul className="watch-card-indicators-compact" aria-label="Indicator checklist">
-          {indicators.map((ind) => (
-            <li key={ind.id}>
-              {ind.label}: <strong>{ind.bias}</strong>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       <div className="watch-card-actions">
         <button type="button" className="btn primary" onClick={onOpen}>
-          Open chart
+          Chart
         </button>
         <button
           type="button"
@@ -369,7 +353,7 @@ function MonitorCard({
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
-          {open ? "Hide detail" : "More detail"}
+          {open ? "Hide" : "Details"}
         </button>
         <button type="button" className="btn" disabled={busy} onClick={() => onRemove()}>
           Remove
@@ -378,6 +362,27 @@ function MonitorCard({
 
       {open ? (
         <div className="watch-card-detail">
+          <p className="muted">
+            Data {fmtDataTime(row.marketDataAt ?? row.evaluatedAt)}
+            {row.feed ? ` · ${row.feed.toUpperCase()}` : ""}
+            {row.rewardToRisk != null ? ` · ${row.rewardToRisk.toFixed(2)}R` : ""}
+            {" · Score "}
+            {row.qualityScore10 ?? row.setupScore ?? "—"}/10
+          </p>
+          {row.watchingSummary ? <p>{row.watchingSummary}</p> : null}
+          {!row.dataFresh && row.dataFreshReason ? <p>{row.dataFreshReason}</p> : null}
+          {row.entryGeometrySummary ? <p>{row.entryGeometrySummary}</p> : null}
+          {row.quoteSpreadPct != null && row.quoteSpreadPct > 0.35 ? (
+            <p>
+              Quote spread {row.quoteSpreadPct.toFixed(2)}% — wide spread may block ENTER until bid/ask
+              tighten or RTH bar reference is used.
+            </p>
+          ) : null}
+          {row.waitingFor.length > 1 ? (
+            <p>
+              <b>Also watching:</b> {row.waitingFor.slice(1, 4).join(" · ")}
+            </p>
+          ) : null}
           <ul className="signal-checklist">
             {(row.indicatorChecklist ?? []).map((ind) => (
               <li key={ind.id} className={`check-${ind.bias.toLowerCase().replace(/\s+/g, "-")}`}>
