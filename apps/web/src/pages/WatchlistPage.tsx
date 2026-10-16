@@ -121,7 +121,7 @@ export function WatchlistPage() {
   }
 
   const ordered = mergeMonitorRows(snap);
-  const planCap = plan?.maxWatchlist ?? snap?.maxSymbols ?? 6;
+  const planCap = snap?.planMax ?? plan?.maxWatchlist ?? snap?.maxSymbols ?? 6;
   const planNote =
     signedIn && ordered.length >= planCap
       ? `Watchlist full (${planCap} symbols on your plan). Remove one to add another.`

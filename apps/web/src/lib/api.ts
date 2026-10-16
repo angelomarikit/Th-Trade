@@ -702,6 +702,8 @@ export interface MonitorSymbolState {
 export interface MonitorSnapshot {
   sessionId: string;
   maxSymbols: number;
+  /** Server-enforced watchlist cap (preview allowance or plan). */
+  planMax?: number;
   intervalMs: number;
   running: boolean;
   symbols: Array<{ symbol: string; side: "LONG" | "SHORT" }>;

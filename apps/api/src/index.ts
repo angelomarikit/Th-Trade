@@ -766,6 +766,7 @@ async function main() {
           dataFresh: card.dataFresh,
           entryExecutable: card.entryZone.executable,
           outcomeDetail: resolvedDetail,
+          rewardToRisk: card.rewardToRisk,
         });
         const strategyName =
           card.matchedStrategies[0]?.strategyName ??
@@ -778,6 +779,7 @@ async function main() {
           alertAt: card.alertAt,
           waitingFor: card.nearActive.stillWaitingFor,
           tradingAction,
+          rewardToRisk: card.rewardToRisk,
         });
 
         return json(res, 200, {
@@ -893,10 +895,21 @@ async function main() {
               monitorHub.start();
             }
           }
+          let planMax = resolveWatchlistPlanMax(null);
+          if (sessionId !== "default" && supabaseReady) {
+            try {
+              const user = await requireUser(req.headers.authorization);
+              const profile = await getOrCreateProfile(user);
+              planMax = resolveWatchlistPlanMax(profile.plan_tier);
+            } catch {
+              // keep default cap; GET stays readable
+            }
+          }
           return json(res, 200, {
             ...monitorHub.snapshot(sessionId),
             hub: monitorHub.metrics(),
             defaultWatchlist: DEFAULT_MONITOR_WATCHLIST,
+            planMax,
           });
         } catch (err) {
           return authError(res, err);
