@@ -53,6 +53,19 @@ export function assessFreshness(
     };
   }
 
+  // When a quote is present during RTH, it must be fresh — do not let stale quotes hide behind newer bar timestamps.
+  if (snapshot.quote?.timestamp && sess.session === "RTH" && limit > 0) {
+    const quoteAgeMs = Math.max(0, now.getTime() - snapshot.quote.timestamp.getTime());
+    if (quoteAgeMs > limit) {
+      return {
+        ok: false,
+        ageMs: quoteAgeMs,
+        maxAgeMs: limit,
+        reason: `Stale quote age ${(quoteAgeMs / 1000).toFixed(1)}s > ${(limit / 1000).toFixed(0)}s (${sess.session}) — fail closed`,
+      };
+    }
+  }
+
   const ageMs = Math.max(0, now.getTime() - marketTs.getTime());
 
   if (limit === 0) {

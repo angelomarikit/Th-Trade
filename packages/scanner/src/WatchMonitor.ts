@@ -81,6 +81,8 @@ export interface MonitoredSymbolState {
   outcomeDetail: string | null;
   outcomeR: number | null;
   dataFreshReason: string | null;
+  entryGeometrySummary: string | null;
+  quoteSpreadPct: number | null;
   error: string | null;
   updatedAt: string;
 }
@@ -292,6 +294,8 @@ export class WatchMonitor {
       outcomeDetail: null,
       outcomeR: null,
       dataFreshReason: card.dataFreshReason ?? null,
+      entryGeometrySummary: card.entryGeometry?.summary ?? null,
+      quoteSpreadPct: card.quoteTransparency?.spreadPct ?? null,
       error: null,
       updatedAt,
     };
@@ -430,6 +434,8 @@ export class WatchMonitor {
       outcomeDetail: prev?.outcomeDetail ?? null,
       outcomeR: prev?.outcomeR ?? null,
       dataFreshReason: prev?.dataFreshReason ?? null,
+      entryGeometrySummary: prev?.entryGeometrySummary ?? null,
+      quoteSpreadPct: prev?.quoteSpreadPct ?? null,
       error: readable,
       updatedAt,
     };
@@ -814,6 +820,8 @@ export function createPendingScanState(cfg: MonitorSymbolConfig): MonitoredSymbo
     outcomeDetail: null,
     outcomeR: null,
     dataFreshReason: "Scan in progress — wait for this card to finish before trading.",
+    entryGeometrySummary: null,
+    quoteSpreadPct: null,
     error: null,
     updatedAt,
   };

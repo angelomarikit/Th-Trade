@@ -90,6 +90,11 @@ export function SignalSummaryPanel() {
         {lc.dataFresh === false && lc.dataFreshReason ? (
           <p className="action-label muted">{lc.dataFreshReason}</p>
         ) : null}
+        {lc.entryGeometry?.summary ? (
+          <p className="action-label muted" style={{ marginTop: "0.35rem" }}>
+            {lc.entryGeometry.summary}
+          </p>
+        ) : null}
         <p className="action-label" style={{ marginTop: "0.5rem" }}>
           Direction
         </p>
@@ -240,6 +245,20 @@ export function SignalSummaryPanel() {
           )}
           {lc.qualityScore10Disclaimer ? (
             <p className="muted">{lc.qualityScore10Disclaimer}</p>
+          ) : null}
+          {lc.quoteTransparency ? (
+            <p className="muted">
+              Quote bid {lc.quoteTransparency.bid != null ? fmtPrice(lc.quoteTransparency.bid) : "—"} · ask{" "}
+              {lc.quoteTransparency.ask != null ? fmtPrice(lc.quoteTransparency.ask) : "—"}
+              {lc.quoteTransparency.spreadPct != null
+                ? ` · spread ${lc.quoteTransparency.spreadPct.toFixed(2)}%`
+                : ""}
+              {lc.quoteTransparency.quoteAt
+                ? ` · ${formatEtTime(lc.quoteTransparency.quoteAt)}`
+                : ""}
+              <br />
+              {lc.quoteTransparency.priceBasis}
+            </p>
           ) : null}
         </div>
       )}

@@ -663,6 +663,8 @@ export interface MonitorSymbolState {
   outcomeDetail: string | null;
   outcomeR: number | null;
   dataFreshReason?: string | null;
+  entryGeometrySummary?: string | null;
+  quoteSpreadPct?: number | null;
   error: string | null;
   updatedAt: string;
 }

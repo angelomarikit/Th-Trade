@@ -17,6 +17,8 @@ import { evaluateRetest, type RetestPhase } from "./retest.js";
 import { setupScoreFromMatrix } from "./scoreFromMatrix.js";
 import { assertEntryNotFromNewsAlone, decideSetupState } from "./stateMachine.js";
 import { buildIndicatorChecklist } from "./indicatorReadouts.js";
+import { describeEntryGeometry } from "./entryGeometry.js";
+import { evaluateLiquidity } from "./liquidity.js";
 import type {
   HistoricalEdgeCardInfo,
   LiveSetupCard,
@@ -88,6 +90,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     marketRegime: input.marketRegime,
     sectorAlignment: input.sectorAlignment,
     profile,
+    evaluatedAt: now,
   });
 
   const prev = input.previousState;
@@ -162,6 +165,17 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     minRvol: profile.minRelativeVolume,
   });
 
+  const liquidityMeta = evaluateLiquidity(input.snapshot.quote, profile.maxSpreadPct, {
+    maxQuoteAgeMs: profile.maxDataAgeMs,
+    now,
+  });
+  const entryGeometry = describeEntryGeometry(
+    input.side,
+    levels,
+    input.snapshot.lastPrice,
+    near.statusLabel,
+  );
+
   return {
     symbol: input.symbol.toUpperCase(),
     side: input.side,
@@ -221,7 +235,25 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     matchedStrategies: input.matchedStrategies ?? [],
     options: input.options ?? null,
     indicatorChecklist,
+    entryGeometry,
+    quoteTransparency: {
+      bid: liquidityMeta.bid,
+      ask: liquidityMeta.ask,
+      spreadPct: liquidityMeta.spreadPct,
+      quoteAt: liquidityMeta.quoteAt,
+      priceBasis: quoteUsableLabel(input.snapshot, freshness.ok),
+    },
   };
+}
+
+function quoteUsableLabel(snapshot: MarketSnapshot, dataFresh: boolean): string {
+  if (!snapshot.quote) {
+    return "Setup price from last completed RTH bar (no usable quote).";
+  }
+  if (!dataFresh) {
+    return "Setup price from last completed RTH bar when quote is stale or wide — chart uses same bar series.";
+  }
+  return "Setup price from verified IEX quote mid; bars and indicators use the same snapshot time.";
 }
 
 function actionHintFor(

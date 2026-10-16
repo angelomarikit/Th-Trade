@@ -74,6 +74,20 @@ export interface LiveSetupCard {
   relativeMomentum: RelativeMomentumCardInfo | null;
   /** Customer-facing indicator biases — context for the monitored direction. */
   indicatorChecklist: IndicatorReading[];
+  /** Pullback vs above-zone vs missed — plain language. */
+  entryGeometry?: {
+    kind: string;
+    summary: string;
+    entryModelNote: string;
+  };
+  /** Bid/ask/spread audit for liquidity questions. */
+  quoteTransparency?: {
+    bid: number | null;
+    ask: number | null;
+    spreadPct: number | null;
+    quoteAt: string | null;
+    priceBasis: string;
+  };
 }
 
 export interface RelativeMomentumCardInfo {

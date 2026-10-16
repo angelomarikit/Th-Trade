@@ -818,6 +818,8 @@ async function main() {
               reason: r.reason,
             })),
             indicatorChecklist: card.indicatorChecklist,
+            entryGeometry: card.entryGeometry ?? null,
+            quoteTransparency: card.quoteTransparency ?? null,
             rewardToRisk: card.rewardToRisk,
             dataFresh: card.dataFresh,
             dataFreshReason: card.dataFreshReason ?? null,

@@ -293,6 +293,15 @@ function MonitorCard({
       {row.watchingSummary ? (
         <p className="watch-card-watching watch-card-lead">{row.watchingSummary}</p>
       ) : null}
+      {row.entryGeometrySummary ? (
+        <p className="watch-card-waiting">{row.entryGeometrySummary}</p>
+      ) : null}
+      {row.quoteSpreadPct != null && row.quoteSpreadPct > 0.35 ? (
+        <p className="watch-card-fresh-reason">
+          Quote spread {row.quoteSpreadPct.toFixed(2)}% — liquidity filter uses bid/ask; setup price may
+          use last RTH bar when the quote is not usable.
+        </p>
+      ) : null}
       {!scanning && row.waitingFor[0] ? (
         <p className="watch-card-waiting">
           <b>Still need:</b> {row.waitingFor.slice(0, 3).join(" · ")}

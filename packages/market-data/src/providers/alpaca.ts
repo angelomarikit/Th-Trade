@@ -170,10 +170,18 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78, regularHoursOnly: true });
 
     const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
-    const lastPrice =
-      quote && quote.bid > 0 && quote.ask > 0
-        ? (quote.bid + quote.ask) / 2
-        : (trade?.price ?? lastBar?.close ?? 0);
+    const completed5 = bars5m.filter((b) => b.completed).at(-1) ?? lastBar;
+    const quoteMid =
+      quote && quote.bid > 0 && quote.ask > 0 ? (quote.bid + quote.ask) / 2 : null;
+    let spread: number | null = null;
+    if (quote && quote.bid > 0 && quote.ask > 0) {
+      const mid = (quote.bid + quote.ask) / 2;
+      spread = mid > 0 ? ((quote.ask - quote.bid) / mid) * 100 : null;
+    }
+    // After-hours IEX quotes can show 5–15% spreads while RTH bar close is authoritative for setup geometry.
+    const barClose = completed5?.close ?? lastBar?.close ?? null;
+    const quoteUsable = quoteMid != null && (spread == null || spread <= 0.35);
+    const lastPrice = quoteUsable ? quoteMid : (barClose ?? trade?.price ?? quoteMid ?? 0);
 
     const marketTimestamp =
       quote?.timestamp ??

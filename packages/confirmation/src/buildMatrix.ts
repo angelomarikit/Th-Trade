@@ -1,7 +1,8 @@
 import {
   buildConditionMatrix,
   CONDITION_LABELS,
-  computeRiskReward,
+  computeRiskRewardAtEntry,
+  conservativeEntryPriceForRisk,
   isEntryZoneExecutable,
   type ConditionMatrix,
   type ConditionRow,
@@ -34,6 +35,8 @@ export interface MatrixBuildInput {
   marketRegime?: AlignmentInput;
   sectorAlignment?: AlignmentInput;
   profile?: ConfirmationProfile;
+  /** Same clock as assessFreshness (critical for tests and RTH). */
+  evaluatedAt?: Date;
 }
 
 export interface MatrixBuildResult {
@@ -61,9 +64,14 @@ export function buildSetupConditionMatrix(input: MatrixBuildInput): MatrixBuildR
     snapshot.lastPrice,
     side,
   );
-  const liquidity = evaluateLiquidity(snapshot.quote, maxSpread);
-  const rr = computeRiskReward(levels, minRr);
+  const evalNow = input.evaluatedAt ?? snapshot.receivedAt;
+  const liquidity = evaluateLiquidity(snapshot.quote, maxSpread, {
+    maxQuoteAgeMs: profile?.maxDataAgeMs,
+    now: evalNow,
+  });
   const zoneExecutable = isEntryZoneExecutable(levels, snapshot.lastPrice);
+  const entryForRr = conservativeEntryPriceForRisk(levels, snapshot.lastPrice);
+  const rr = computeRiskRewardAtEntry(levels, entryForRr, minRr);
 
   const regimeStatus = input.marketRegime?.status ?? "WAITING";
   const sectorStatus = input.sectorAlignment?.status ?? "WAITING";
@@ -127,10 +135,16 @@ export function buildSetupConditionMatrix(input: MatrixBuildInput): MatrixBuildR
     ),
     row(
       "RISK_REWARD",
-      rr.meetsMinimum ? "PASS" : zoneExecutable ? "WAITING" : "FAIL",
       rr.meetsMinimum
-        ? `R:R PASS: ${rr.rewardToRisk.toFixed(2)} >= ${rr.minimumRequired}`
-        : `Waiting for acceptable R:R (${rr.rewardToRisk.toFixed(2)} < ${rr.minimumRequired})`,
+        ? "PASS"
+        : zoneExecutable && !five.waiting
+          ? "FAIL"
+          : "WAITING",
+      rr.meetsMinimum
+        ? `R:R PASS: ${rr.rewardToRisk.toFixed(2)}R at conservative entry ${entryForRr.toFixed(2)} >= ${rr.minimumRequired}R`
+        : zoneExecutable && !five.waiting
+          ? `R:R FAIL: ${rr.rewardToRisk.toFixed(2)}R at zone entry ${entryForRr.toFixed(2)} < ${rr.minimumRequired}R — cannot go ENTRY ACTIVE`
+          : `Waiting for acceptable R:R (${rr.rewardToRisk.toFixed(2)}R at reference entry ${entryForRr.toFixed(2)} < ${rr.minimumRequired}R)`,
       true,
     ),
   ];

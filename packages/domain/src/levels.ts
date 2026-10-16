@@ -29,12 +29,19 @@ export function computeRiskReward(
   levels: TradeLevels,
   minimumRequired: number = MIN_REWARD_TO_RISK,
 ): RiskRewardMetrics {
-  const mid =
-    (levels.entryZoneLow + levels.entryZoneHigh) / 2;
-  const stopDistance = Math.abs(mid - levels.stop);
-  const target1Distance = Math.abs(levels.target1 - mid);
-  const rewardToRisk =
-    stopDistance > 0 ? target1Distance / stopDistance : 0;
+  const mid = (levels.entryZoneLow + levels.entryZoneHigh) / 2;
+  return computeRiskRewardAtEntry(levels, mid, minimumRequired);
+}
+
+/** R:R from a specific entry price (use conservative fill for ENTRY gates). */
+export function computeRiskRewardAtEntry(
+  levels: TradeLevels,
+  entryPrice: number,
+  minimumRequired: number = MIN_REWARD_TO_RISK,
+): RiskRewardMetrics {
+  const stopDistance = Math.abs(entryPrice - levels.stop);
+  const target1Distance = Math.abs(levels.target1 - entryPrice);
+  const rewardToRisk = stopDistance > 0 ? target1Distance / stopDistance : 0;
 
   return {
     rewardToRisk,
@@ -43,6 +50,26 @@ export function computeRiskReward(
     meetsMinimum: rewardToRisk >= minimumRequired,
     minimumRequired,
   };
+}
+
+/**
+ * Worst-case entry for R:R — LONG uses top of zone (pay up), SHORT uses bottom.
+ * When price is outside the zone, assume fill at the nearest zone edge toward price.
+ */
+export function conservativeEntryPriceForRisk(
+  levels: TradeLevels,
+  lastPrice: number,
+): number {
+  const low = Math.min(levels.entryZoneLow, levels.entryZoneHigh);
+  const high = Math.max(levels.entryZoneLow, levels.entryZoneHigh);
+  if (levels.side === "LONG") {
+    if (lastPrice >= low && lastPrice <= high) return high;
+    if (lastPrice > high) return high;
+    return high;
+  }
+  if (lastPrice >= low && lastPrice <= high) return low;
+  if (lastPrice < low) return low;
+  return low;
 }
 
 /**
