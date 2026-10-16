@@ -14,3 +14,6 @@ data/journal/
 *.sqlite
 *.sqlite-journal
 
+# WULU quote health logs (Step 2)
+quote-health-*.csv
+
