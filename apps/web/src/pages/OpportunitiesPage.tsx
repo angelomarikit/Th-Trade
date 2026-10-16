@@ -126,10 +126,10 @@ export function OpportunitiesPage() {
       </div>
 
       <DataTable
-        headers={["#", "Symbol", "Price", "Day %", "RVOL*", "Sector", "Score", "Action"]}
+        headers={["#", "Symbol", "Price", "Day %", "Day vol ×*", "Sector", "Score", "Action"]}
         footer={
           <p className="muted" style={{ fontSize: "0.75rem", marginTop: "0.5rem" }}>
-            *RVOL proxy = day volume / prior day (IEX approx). Click a symbol to open Scanner.
+            *Day vol × = today&apos;s volume ÷ prior day (IEX approx). Not the Scanner&apos;s RVOL. Click a symbol to open Scanner.
           </p>
         }
       >
