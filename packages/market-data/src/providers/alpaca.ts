@@ -182,6 +182,13 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     const barClose = completed5?.close ?? lastBar?.close ?? null;
     const quoteUsable = quoteMid != null && (spread == null || spread <= 0.35);
     const lastPrice = quoteUsable ? quoteMid : (barClose ?? trade?.price ?? quoteMid ?? 0);
+    const priceSource = quoteUsable
+      ? "quote_mid"
+      : barClose != null
+        ? "rth_bar_close"
+        : trade?.price != null
+          ? "trade"
+          : "unknown";
 
     const marketTimestamp =
       quote?.timestamp ??
@@ -197,6 +204,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       bars5m,
       receivedAt: new Date(),
       marketTimestamp,
+      priceSource,
     };
   }
 

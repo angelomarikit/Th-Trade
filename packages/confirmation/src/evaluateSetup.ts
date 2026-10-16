@@ -3,7 +3,10 @@ import {
   assessFreshness,
   classifyUsEquitySession,
   confirmationProfileForSession,
+  isQuoteUsableForEntry,
   lastCompletedBar,
+  referencePriceExplanation,
+  resolvePriceSource,
   type MarketSnapshot,
 } from "@wulu/market-data";
 import type { WhyMovingBlock } from "@wulu/news";
@@ -54,7 +57,22 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const now = input.now ?? new Date();
   const session = classifyUsEquitySession(now);
   const profile = confirmationProfileForSession(session);
-  const freshness = assessFreshness(input.snapshot, now, profile.maxDataAgeMs, session);
+  let freshness = assessFreshness(input.snapshot, now, profile.maxDataAgeMs, session);
+  const quoteOk = isQuoteUsableForEntry(input.snapshot, profile.maxSpreadPct);
+  const priceSource = resolvePriceSource(input.snapshot);
+  const referencePriceOnly = priceSource !== "quote_mid";
+  if (
+    !quoteOk &&
+    (session.session === "RTH" || session.session === "PREMARKET" || session.session.includes("HOUR"))
+  ) {
+    freshness = {
+      ok: false,
+      ageMs: freshness.ageMs,
+      maxAgeMs: freshness.maxAgeMs,
+      reason:
+        "Live bid/ask not trustworthy for entry (missing, stale, or spread too wide) — levels use last RTH bar as reference only.",
+    };
+  }
   const levels = deriveLevels(input.snapshot.bars5m, input.side, input.snapshot.lastPrice);
 
   const breakout = analyzeBreakout({
@@ -241,19 +259,11 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       ask: liquidityMeta.ask,
       spreadPct: liquidityMeta.spreadPct,
       quoteAt: liquidityMeta.quoteAt,
-      priceBasis: quoteUsableLabel(input.snapshot, freshness.ok),
+      priceSource,
+      referencePriceOnly,
+      priceBasis: referencePriceExplanation(priceSource),
     },
   };
-}
-
-function quoteUsableLabel(snapshot: MarketSnapshot, dataFresh: boolean): string {
-  if (!snapshot.quote) {
-    return "Setup price from last completed RTH bar (no usable quote).";
-  }
-  if (!dataFresh) {
-    return "Setup price from last completed RTH bar when quote is stale or wide — chart uses same bar series.";
-  }
-  return "Setup price from verified IEX quote mid; bars and indicators use the same snapshot time.";
 }
 
 function actionHintFor(

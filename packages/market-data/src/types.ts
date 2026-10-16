@@ -39,6 +39,8 @@ export interface MarketSnapshot {
   receivedAt: Date;
   /** Latest upstream market timestamp observed */
   marketTimestamp: Date | null;
+  /** How lastPrice was chosen — bar close is reference-only for entry. */
+  priceSource?: "quote_mid" | "rth_bar_close" | "trade" | "unknown";
 }
 
 export interface FreshnessResult {

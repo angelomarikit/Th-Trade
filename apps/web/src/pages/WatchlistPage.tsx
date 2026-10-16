@@ -282,7 +282,8 @@ function MonitorCard({
       </div>
       <p className="watch-card-price-line">
         Price {fmtPrice(row.lastPrice)}
-        {row.dataFresh ? " · verified" : " · not verified"}
+        {row.dataFresh ? " · verified live" : " · not verified"}
+        {!row.dataFresh ? " · reference only until quote OK" : ""}
         {" · "}
         Data {fmtDataTime(row.marketDataAt ?? row.evaluatedAt)}
         {row.feed ? ` · ${row.feed.toUpperCase()}` : ""}

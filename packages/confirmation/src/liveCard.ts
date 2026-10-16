@@ -86,6 +86,8 @@ export interface LiveSetupCard {
     ask: number | null;
     spreadPct: number | null;
     quoteAt: string | null;
+    priceSource?: string;
+    referencePriceOnly?: boolean;
     priceBasis: string;
   };
 }

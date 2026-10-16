@@ -71,6 +71,11 @@ export function SignalSummaryPanel() {
         <span className={`badge ${lc.dataFresh ? "green" : "amber"}`}>
           {lc.dataFresh ? "Verified data" : "Not verified"}
         </span>
+        {lc.quoteTransparency?.referencePriceOnly ? (
+          <span className="badge amber" title={lc.quoteTransparency.priceBasis}>
+            RTH reference price
+          </span>
+        ) : null}
         <StatusBadge status={status} className="signal-status" />
       </div>
 
