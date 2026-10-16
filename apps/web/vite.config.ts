@@ -6,12 +6,17 @@ const scannerV2PreviewBranch =
   (process.env.VERCEL_GIT_COMMIT_REF ?? "").replace(/^refs\/heads\//, "") ===
   "phase7/scanner-v2-preview";
 
+/** Vercel system env var (build time). Shows which commit is actually live. */
+const buildSha =
+  (process.env.VERCEL_GIT_COMMIT_SHA ?? "").trim().slice(0, 7) || "local";
+
 export default defineConfig({
   plugins: [react()],
   define: {
     "import.meta.env.VITE_IS_SCANNER_V2_PREVIEW": JSON.stringify(
       scannerV2PreviewBranch ? "1" : "0",
     ),
+    "import.meta.env.VITE_BUILD_SHA": JSON.stringify(buildSha),
   },
   server: {
     port: 5173,

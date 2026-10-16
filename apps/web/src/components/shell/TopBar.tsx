@@ -86,6 +86,14 @@ export function TopBar() {
           {env}
         </span>
 
+        <span
+          className="badge hide-sm"
+          title="Deployed build: web commit / API commit. Put this in every test screenshot."
+        >
+          web {import.meta.env.VITE_BUILD_SHA ?? "local"} · api{" "}
+          {(health?.gitCommit ?? "unknown").slice(0, 7)}
+        </span>
+
         {configured && session && (
           <>
             <button

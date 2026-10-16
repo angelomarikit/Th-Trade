@@ -248,6 +248,7 @@ export interface HealthResponse {
   newsProvider: string;
   marketDataProvider: string;
   alpacaFeed?: string;
+  gitCommit?: string | null;
   supportsFastSetup?: boolean;
   alpacaInteractivePriority?: boolean;
   alpacaCredentialsPresent: boolean;
