@@ -1,7 +1,9 @@
 import { createNewsServiceFromEnv } from "@wulu/news";
 import {
   createAlpacaMarketDataFromEnv,
+  marketDataAuthSoftFailEnabled,
   MockMarketDataProvider,
+  wrapMarketDataAuthSoftFail,
   type MarketDataProvider,
 } from "@wulu/market-data";
 import { createJournalFromEnv, type SignalJournal } from "@wulu/journal";
@@ -32,7 +34,11 @@ export function createMarketDataFromEnv(
       incompleteFiveMin: true,
     });
   }
-  return createAlpacaMarketDataFromEnv(env);
+  const alpaca = createAlpacaMarketDataFromEnv(env);
+  if (marketDataAuthSoftFailEnabled(env)) {
+    return wrapMarketDataAuthSoftFail(alpaca);
+  }
+  return alpaca;
 }
 
 /**

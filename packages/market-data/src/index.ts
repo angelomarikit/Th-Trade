@@ -10,3 +10,4 @@ export * from "./MarketDataProvider.js";
 export * from "./indicators.js";
 export * from "./providers/alpaca.js";
 export * from "./providers/mock.js";
+export * from "./resilientMarketData.js";

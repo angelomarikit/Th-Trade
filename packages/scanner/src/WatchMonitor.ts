@@ -648,7 +648,10 @@ export class MonitorHub {
 
   start(): void {
     this.ensureTimer();
-    void this.tick();
+    void this.tick().catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[monitor] tick failed on start: ${message.slice(0, 200)}`);
+    });
   }
 
   stop(): void {
@@ -683,13 +686,14 @@ export class MonitorHub {
       }
       this.uniquePairsLastCycle = pairMap.size;
 
-      await withAlpacaPriority("background", async () => {
-        const symbols = [...pairMap.values()].map(({ cfg }) => cfg.symbol);
-        const snapBySymbol = this.scanner.preloadSnapshots
-          ? await this.scanner.preloadSnapshots(symbols)
-          : new Map();
+      try {
+        await withAlpacaPriority("background", async () => {
+          const symbols = [...pairMap.values()].map(({ cfg }) => cfg.symbol);
+          const snapBySymbol = this.scanner.preloadSnapshots
+            ? await this.scanner.preloadSnapshots(symbols)
+            : new Map();
 
-        for (const { cfg, monitors } of pairMap.values()) {
+          for (const { cfg, monitors } of pairMap.values()) {
           try {
             const previousState = monitors[0]?.previousSetupState(cfg.symbol);
             const card = await this.scanner.scan({
@@ -721,8 +725,13 @@ export class MonitorHub {
               if (evt && this.alertStore) await this.alertStore.record(evt);
             }
           }
-        }
-      });
+          }
+        });
+      } catch (err) {
+        failed += pairMap.size;
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[monitor] background cycle failed: ${message.slice(0, 240)}`);
+      }
 
       const cycleMs = Date.now() - started;
       this.lastCycleMs = cycleMs;
@@ -746,7 +755,10 @@ export class MonitorHub {
   private ensureTimer(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      void this.tick();
+      void this.tick().catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[monitor] scheduled tick failed: ${message.slice(0, 200)}`);
+      });
     }, this.intervalMs);
   }
 
