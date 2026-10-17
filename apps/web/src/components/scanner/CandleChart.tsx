@@ -226,7 +226,7 @@ export function CandleChart(props: {
     });
     const lineCommon = {
       priceLineVisible: false as const,
-      lastValueVisible: true as const,
+      lastValueVisible: false as const,
       crosshairMarkerVisible: false as const,
     };
     const vwap = chart.addSeries(LineSeries, {

@@ -37,7 +37,11 @@ export function MarketDataStatusStrip() {
         Entry {entryPermitted ? "permitted" : "blocked"}
       </span>
       {loading ? <span className="mds-item muted">Updating…</span> : null}
-      {md?.summary && lc?.dataFresh === false ? <p className="mds-summary">{md.summary}</p> : null}
+      {md?.summary &&
+      lc?.dataFresh === false &&
+      md.summary !== lc.dataFreshReason ? (
+        <p className="mds-summary">{md.summary}</p>
+      ) : null}
     </div>
   );
 }

@@ -398,6 +398,8 @@ a {
   margin: 0 0 1rem;
   color: var(--muted);
   font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 52rem;
 }
 
 .panel {
@@ -1638,8 +1640,21 @@ a {
 .wulu-page-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.55rem;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .wulu-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .wulu-page-actions .btn {
+    flex: 1 1 calc(50% - 0.3rem);
+    min-width: 8.5rem;
+  }
 }
 .btn {
   border: 1px solid var(--border);
