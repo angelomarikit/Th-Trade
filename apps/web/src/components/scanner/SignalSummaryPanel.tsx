@@ -53,7 +53,10 @@ export function SignalSummaryPanel() {
   const planForSymbol =
     setupSymbol != null && setupSymbol.toUpperCase() === symbol.toUpperCase() && !loading;
   const planStale = setupStale || lc.dataFresh === false;
-  const entryMid = (lc.entryZone.low + lc.entryZone.high) / 2;
+  const entryMid =
+    lc.entryZone != null
+      ? (lc.entryZone.low + lc.entryZone.high) / 2
+      : null;
   const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
@@ -95,9 +98,14 @@ export function SignalSummaryPanel() {
       </div>
 
       <div className={`signal-action-hero ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
-        <p className="action-value">{lc.tradingAction ?? "WAIT"}</p>
+        <p className="action-value">{lc.dataFresh === false ? "WAIT" : (lc.tradingAction ?? "WAIT")}</p>
         <p className="action-label">{status}</p>
       </div>
+      {lc.dataFresh === false && lc.dataFreshReason ? (
+        <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          <strong>Not verified:</strong> {lc.dataFreshReason}
+        </p>
+      ) : null}
 
       <div className="signal-panel-dir">
         <div className="side-toggle" role="group" aria-label="Direction">
@@ -155,8 +163,12 @@ export function SignalSummaryPanel() {
           <div className="signal-entry-zone">
             <dt>Entry zone</dt>
             <dd>
-              {fmtPrice(lc.entryZone.low)} – {fmtPrice(lc.entryZone.high)}
-              <span className="muted"> (mid {fmtPrice(entryMid)})</span>
+              {lc.entryZone
+                ? `${fmtPrice(lc.entryZone.low)} – ${fmtPrice(lc.entryZone.high)}`
+                : "—"}
+              {entryMid != null ? (
+                <span className="muted"> (mid {fmtPrice(entryMid)})</span>
+              ) : null}
             </dd>
           </div>
           <div>

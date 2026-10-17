@@ -20,6 +20,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { SignalsPage } from "./pages/SignalsPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
+import { AppErrorBoundary } from "./components/ui/AppErrorBoundary";
 
 export function App() {
   return (
@@ -38,7 +39,14 @@ export function App() {
               }
             >
               <Route index element={<OverviewPage />} />
-              <Route path="scanner" element={<ScannerPage />} />
+              <Route
+                path="scanner"
+                element={
+                  <AppErrorBoundary label="Scanner failed to load">
+                    <ScannerPage />
+                  </AppErrorBoundary>
+                }
+              />
               <Route path="opportunities" element={<OpportunitiesPage />} />
               <Route path="watchlist" element={<WatchlistPage />} />
               <Route path="signals" element={<SignalsPage />} />

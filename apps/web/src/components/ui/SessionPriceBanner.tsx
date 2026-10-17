@@ -36,21 +36,32 @@ export function SessionPriceBanner({
 
   if (dataFresh) return null;
 
-  if (referencePriceOnly || sess === "RTH") {
-    return (
-      <p className="banner warn session-price-banner" role="status">
-        Chart uses Alpaca bar closes. Recommendation shows{" "}
-        <strong>{referencePriceOnly ? "RTH reference price" : "DATA NOT VERIFIED"}</strong> when the
-        live quote is stale, wide, or fails confirmation — do not treat candle movement alone as ENTER.
-        {reason ? (
-          <>
-            <br />
-            <strong>Blocking check:</strong> {reason}
-          </>
-        ) : null}
-      </p>
-    );
-  }
+  const closed =
+    sess === "WEEKEND" ||
+    sess === "CLOSED" ||
+    sess.includes("HOLIDAY") ||
+    sess.includes("CLOSED");
 
-  return null;
+  return (
+    <p className="banner warn session-price-banner" role="status">
+      {closed ? (
+        <>
+          Market is <strong>{sess}</strong> — live entry is blocked. Chart may show the last regular
+          session; the scanner will not authorize ENTER until data is verified in session.
+        </>
+      ) : (
+        <>
+          Chart uses Alpaca bar closes. Recommendation shows{" "}
+          <strong>{referencePriceOnly ? "RTH reference price" : "DATA NOT VERIFIED"}</strong> when the
+          live quote is stale, wide, or fails confirmation — do not treat candle movement alone as ENTER.
+        </>
+      )}
+      {reason ? (
+        <>
+          <br />
+          <strong>Blocking check:</strong> {reason}
+        </>
+      ) : null}
+    </p>
+  );
 }
