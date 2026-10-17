@@ -11,6 +11,15 @@ If the build log shows **`tsc --noEmit && vite build`** and errors on `SignalSum
 Verify in browser:  
 https://github.com/angelomarikit/Th-Trade/blob/phase7/scanner-v2-preview/apps/web/package.json
 
+## Common mistake: “Redeploy” on an old failed deployment
+
+**Redeploy** re-runs the **same commit** that failed. After pushing fixes to GitHub, create a **new** deployment from branch HEAD (or push an empty commit), not “Redeploy” on a build from `838cd6a` / older.
+
+Your error log proves an old commit if you see:
+
+- `tsc --noEmit && vite build` (current Git uses **`vite build`** only)
+- `SignalSummaryPanel.tsx` line **93** = `entryGeometry` (current Git uses **`viewLiveCard`** around line 37+)
+
 ## Fix in Vercel dashboard
 
 1. **Project → Settings → Git**
