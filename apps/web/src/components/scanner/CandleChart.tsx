@@ -37,6 +37,47 @@ const TFS = [
 /** Small padding after the last candle — not a large empty future gap. */
 const RIGHT_OFFSET_BARS = 3;
 const DEFAULT_VISIBLE_BARS = 72;
+const MIN_VISIBLE_BARS = 8;
+
+/** lightweight-charts throws if from > to — common on mobile pinch before data settles. */
+function clampVisibleLogicalRange(
+  from: number,
+  to: number,
+  barCount: number,
+): { from: Logical; to: Logical } | null {
+  if (barCount <= 0) return null;
+  const maxTo = barCount - 1 + RIGHT_OFFSET_BARS;
+  let f = Number.isFinite(from) ? from : 0;
+  let t = Number.isFinite(to) ? to : maxTo;
+  f = Math.max(0, Math.min(f, maxTo));
+  t = Math.max(0, Math.min(t, maxTo));
+  if (f > t) {
+    const visible = Math.min(DEFAULT_VISIBLE_BARS, barCount);
+    f = Math.max(0, barCount - visible);
+    t = maxTo;
+  }
+  if (t - f < MIN_VISIBLE_BARS) {
+    t = Math.min(maxTo, f + MIN_VISIBLE_BARS);
+    f = Math.max(0, t - MIN_VISIBLE_BARS);
+  }
+  if (f > t) return null;
+  return { from: f as Logical, to: t as Logical };
+}
+
+function safeSetVisibleLogicalRange(
+  chart: IChartApi,
+  from: number,
+  to: number,
+  barCount: number,
+): void {
+  const range = clampVisibleLogicalRange(from, to, barCount);
+  if (!range) return;
+  try {
+    chart.timeScale().setVisibleLogicalRange(range);
+  } catch {
+    /* pinch/resize race on mobile Safari */
+  }
+}
 
 export function CandleChart(props: {
   bars: ChartBar[] | null;
@@ -76,18 +117,20 @@ export function CandleChart(props: {
     if (!chart || !series) return;
     const count = series.data().length;
     if (count <= 0) return;
-    const visible = Math.min(DEFAULT_VISIBLE_BARS, count);
-    const from = Math.max(0, count - visible);
-    const to = count - 1 + RIGHT_OFFSET_BARS;
     chart.timeScale().applyOptions({ rightOffset: RIGHT_OFFSET_BARS });
-    chart.timeScale().setVisibleLogicalRange({ from: from as Logical, to: to as Logical });
+    const visible = Math.min(DEFAULT_VISIBLE_BARS, count);
+    safeSetVisibleLogicalRange(chart, Math.max(0, count - visible), count - 1 + RIGHT_OFFSET_BARS, count);
   }, []);
 
   const goLive = useCallback(() => {
     followLiveRef.current = true;
     setFollowLive(true);
     applyLiveViewport();
-    chartRef.current?.timeScale().scrollToRealTime();
+    try {
+      chartRef.current?.timeScale().scrollToRealTime();
+    } catch {
+      /* no data yet */
+    }
   }, [applyLiveViewport]);
 
   useEffect(() => {
@@ -252,27 +295,19 @@ export function CandleChart(props: {
       const maxTo = count - 1 + RIGHT_OFFSET_BARS;
       let from = Number(range.from);
       let to = Number(range.to);
-      let changed = false;
-      if (from < 0) {
-        from = 0;
-        changed = true;
-      }
-      if (to > maxTo) {
-        to = maxTo;
-        changed = true;
-      }
-      if (to - from < 8) {
-        to = Math.min(maxTo, from + 8);
-        changed = true;
-      }
-      const atLiveEdge = to >= count - 1.5;
+      const clamped = clampVisibleLogicalRange(from, to, count);
+      if (!clamped) return;
+      const changed = clamped.from !== from || clamped.to !== to;
+      from = clamped.from as number;
+      to = clamped.to as number;
+      const atLiveEdge = to >= maxTo - 0.5 || to >= count - 1.5;
       if (!atLiveEdge && followLiveRef.current) {
         followLiveRef.current = false;
         setFollowLive(false);
       }
       if (changed) {
         clampRef.current = true;
-        chart.timeScale().setVisibleLogicalRange({ from: from as Logical, to: to as Logical });
+        safeSetVisibleLogicalRange(chart, from, to, count);
         clampRef.current = false;
       }
     });
