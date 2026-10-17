@@ -245,12 +245,19 @@ async function main() {
     if (existing) return existing;
     const job = (async () => {
       const started = Date.now();
-      const bars = await marketData.getBars({
-        symbol: ticker,
-        timeframe,
-        limit: safeLimit,
-        regularHoursOnly,
-      });
+      let bars;
+      try {
+        bars = await marketData.getBars({
+          symbol: ticker,
+          timeframe,
+          limit: safeLimit,
+          regularHoursOnly,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[bars] refresh failed ${ticker} ${timeframe}: ${message.slice(0, 200)}`);
+        throw err;
+      }
       const alpacaMs = Date.now() - started;
       const payload = {
         symbol: ticker.toUpperCase(),
@@ -568,7 +575,14 @@ async function main() {
           return json(res, 200, cached.payload);
         }
         if (cached && age < BARS_STALE_MS) {
-          void refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
+          refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly).catch(
+            (err) => {
+              const message = err instanceof Error ? err.message : String(err);
+              console.warn(
+                `[bars] stale background refresh failed ${ticker}: ${message.slice(0, 200)}`,
+              );
+            },
+          );
           return json(res, 200, cached.payload);
         }
         const pending = barsInflight.get(cacheKey) ?? refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
@@ -1724,6 +1738,8 @@ async function main() {
 function isCorsOriginAllowed(origin: string, allowed: string[]): boolean {
   if (!origin) return false;
   if (allowed.includes("*") || allowed.includes(origin)) return true;
+  const previewWeb = (process.env.PREVIEW_WEB_URL ?? "").trim().replace(/\/+$/, "");
+  if (previewWeb && origin === previewWeb) return true;
   // Vercel Preview / branch aliases for this project (shared Railway API).
   if (/^https:\/\/[\w.-]+-supporttoptiersoluts-projects\.vercel\.app$/i.test(origin)) {
     return true;
