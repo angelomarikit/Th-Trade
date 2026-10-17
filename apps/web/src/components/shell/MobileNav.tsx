@@ -18,8 +18,10 @@ export function MobileNav() {
           to={item.to}
           className={({ isActive }) => (isActive ? "active" : undefined)}
         >
-          <item.icon size={18} />
-          {item.label}
+          <>
+            <item.icon size={20} aria-hidden />
+            {item.label}
+          </>
         </NavLink>
       ))}
     </nav>

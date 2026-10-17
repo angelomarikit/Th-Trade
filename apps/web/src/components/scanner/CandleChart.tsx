@@ -176,7 +176,7 @@ export function CandleChart(props: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.04, bottom: 0.42 } },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.34 } },
       localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
@@ -217,11 +217,11 @@ export function CandleChart(props: {
       priceScaleId: "vol",
     });
     chart.priceScale("vol").applyOptions({
-      scaleMargins: { top: 0.58, bottom: 0.24 },
+      scaleMargins: { top: 0.62, bottom: 0.2 },
       borderVisible: false,
     });
     chart.priceScale("rsi").applyOptions({
-      scaleMargins: { top: 0.78, bottom: 0.03 },
+      scaleMargins: { top: 0.82, bottom: 0.02 },
       borderVisible: false,
     });
     const lineCommon = {
@@ -452,19 +452,22 @@ export function CandleChart(props: {
       className={`panel chart-wrap chart-wrap-hero${fullscreen ? " chart-fullscreen" : ""}`}
     >
       <div className="chart-toolbar">
-        <div className="tf-group" role="group" aria-label="Chart timeframe">
-          {TFS.map((tf) => (
-            <button
-              key={tf.id}
-              type="button"
-              className={props.timeframe === tf.id ? "active" : ""}
-              onClick={() => props.onTimeframe(tf.id)}
-            >
-              {tf.label}
-            </button>
-          ))}
+        <div className="chart-toolbar-row chart-toolbar-tf">
+          <div className="tf-group" role="group" aria-label="Chart timeframe">
+            {TFS.map((tf) => (
+              <button
+                key={tf.id}
+                type="button"
+                className={props.timeframe === tf.id ? "active" : ""}
+                aria-pressed={props.timeframe === tf.id}
+                onClick={() => props.onTimeframe(tf.id)}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="chart-toolbar-right">
+        <div className="chart-toolbar-row chart-toolbar-right">
           <div className="chart-legend chart-legend-minimal">
             <span className="leg ema9">EMA 9</span>
             <span className="leg bb">BB 20</span>
@@ -489,8 +492,9 @@ export function CandleChart(props: {
               title="Jump to the latest candles"
               onClick={() => goLive()}
             >
-              <Radio size={14} aria-hidden />
-              Live
+              <Radio size={16} aria-hidden />
+              <span className="chart-live-label-long">Return to Live</span>
+              <span className="chart-live-label-short">Live</span>
             </button>
             <button
               type="button"
