@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm run build -w @wulu/web",
+  "devCommand": "npm run dev -w @wulu/web",
+  "installCommand": "npm install",
+  "outputDirectory": "apps/web/dist",
+  "framework": "vite"
+}
