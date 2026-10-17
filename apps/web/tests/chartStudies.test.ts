@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emaSeries, rsiSeries } from "./chartStudies";
+import { emaSeries, rsiSeries } from "../src/lib/chartStudies";
 
 describe("chartStudies", () => {
   it("computes EMA and RSI on simple closes", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canShowSetupChartLevels, isSetupChartStale } from "./setupChartSync";
+import { canShowSetupChartLevels, isSetupChartStale } from "../src/lib/setupChartSync";
 
 describe("setupChartSync", () => {
   it("hides levels when setup symbol or bars do not match active ticker", () => {
