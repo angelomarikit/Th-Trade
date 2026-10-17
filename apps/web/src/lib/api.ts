@@ -40,153 +40,158 @@ export interface SignalRecommendation {
   creditsRemaining?: number | null;
 }
 
+export interface SetupHistoricalEdge {
+  strategyName: string;
+  sampleSize: number;
+  winRatePct: number | null;
+  expectancyR: number | null;
+  averageWinnerR: number | null;
+  averageLoserR: number | null;
+  disclaimer: string;
+  collapsedSummary: string;
+}
+
+/** Setup card returned on liveCard — named type avoids circular `SetupResponse["liveCard"]` truncation in `card`. */
+export interface SetupLiveCard {
+  symbol?: string;
+  side?: "LONG" | "SHORT";
+  headline: string;
+  status: string;
+  state?: string;
+  whyMoving: string;
+  catalyst: string | null;
+  newsAgeMinutes: number | null;
+  priceReaction: string | null;
+  conditions: string;
+  conditionsPassed?: number;
+  conditionsTotal?: number;
+  alertAt: number;
+  waitingFor: string[];
+  entryZone: { low: number; high: number; executable: boolean };
+  stop: number;
+  t1: number;
+  t2: number;
+  t3?: number | null;
+  lastPrice?: number;
+  qualityScore10?: number | null;
+  qualityScore10Disclaimer?: string | null;
+  matrixChecklist?: Array<{
+    id: string;
+    label: string;
+    status: string;
+    requiredForEntry: boolean;
+    reason: string;
+  }>;
+  indicatorChecklist?: Array<{
+    id: string;
+    label: string;
+    bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "NOT VERIFIED";
+    explanation: string;
+    gateStatus: string;
+  }>;
+  tradingAction?: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
+  watchingSummary?: string | null;
+  outcomeDetail?: string | null;
+  outcomeR?: number | null;
+  marketDataAt?: string | null;
+  dataFeed?: string | null;
+  dataFreshReason?: string | null;
+  marketDataStatus?: {
+    session: string;
+    barsFresh: boolean;
+    barsAgeSec: number | null;
+    quotePresent: boolean;
+    quoteFresh: boolean;
+    quoteAgeSec: number | null;
+    quoteUsableForEntry: boolean;
+    verifiedForSetup: boolean;
+    summary: string;
+  } | null;
+  entryGeometry?: {
+    kind: string;
+    summary: string;
+    entryModelNote: string;
+  };
+  quoteTransparency?: {
+    bid: number | null;
+    ask: number | null;
+    spreadPct: number | null;
+    quoteAt: string | null;
+    priceSource?: string;
+    referencePriceOnly?: boolean;
+    priceBasis: string;
+  };
+  rewardToRisk?: number;
+  dataFresh?: boolean;
+  evaluatedAt?: string;
+  setupScore: string;
+  setupScoreValue?: number;
+  setupScoreDisclaimer: string;
+  market: string | null;
+  marketRegime: string | null;
+  session: SessionInfo | null;
+  matchedStrategies?: Array<{
+    strategyId: string;
+    strategyName: string;
+    family: string;
+    reason: string;
+  }>;
+  historicalEdge: SetupHistoricalEdge | null;
+  options: {
+    enabled: boolean;
+    eligible: boolean;
+    reason: string;
+    bestContract: {
+      right: string;
+      strike: number;
+      expiration: string;
+      dte: number;
+      delta: number | null;
+      bid: number;
+      ask: number;
+      spreadPct: number;
+      volume: number;
+      openInterest: number;
+    } | null;
+    whyThisContract: string[];
+  } | null;
+  nearActive?: {
+    active: boolean;
+    trigger: number;
+    distanceToTriggerAbs: number;
+    distanceToTriggerPct: number;
+    distanceLabel: string;
+    conditionsPassed: number;
+    conditionsTotal: number;
+    stillWaitingFor: string[];
+    confirmationRequirement: string;
+    permissionToEnter: false;
+    dataTimestamp: string | null;
+    setupQualityScore: number | null;
+  };
+  relativeMomentum?: {
+    feed: string;
+    feedLimitation: string;
+    symbolIntradayPct: number | null;
+    spyIntradayPct: number | null;
+    qqqIntradayPct: number | null;
+    sectorEtf: string;
+    sectorIntradayPct: number | null;
+    vsSpyPct: number | null;
+    vsQqqPct: number | null;
+    vsSectorPct: number | null;
+    gapPct: number | null;
+    rvol: number | null;
+    vwapLocation: string;
+    intradayTrend: string;
+    rankScore: number;
+    notes: string[];
+  } | null;
+}
+
 export interface SetupResponse {
   signalRecommendation?: SignalRecommendation;
-  liveCard: {
-    symbol?: string;
-    side?: "LONG" | "SHORT";
-    headline: string;
-    status: string;
-    state?: string;
-    whyMoving: string;
-    catalyst: string | null;
-    newsAgeMinutes: number | null;
-    priceReaction: string | null;
-    conditions: string;
-    conditionsPassed?: number;
-    conditionsTotal?: number;
-    alertAt: number;
-    waitingFor: string[];
-    entryZone: { low: number; high: number; executable: boolean };
-    stop: number;
-    t1: number;
-    t2: number;
-    t3?: number | null;
-    lastPrice?: number;
-    qualityScore10?: number | null;
-    qualityScore10Disclaimer?: string | null;
-    matrixChecklist?: Array<{
-      id: string;
-      label: string;
-      status: string;
-      requiredForEntry: boolean;
-      reason: string;
-    }>;
-    indicatorChecklist?: Array<{
-      id: string;
-      label: string;
-      bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "NOT VERIFIED";
-      explanation: string;
-      gateStatus: string;
-    }>;
-    tradingAction?: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
-    watchingSummary?: string | null;
-    outcomeDetail?: string | null;
-    outcomeR?: number | null;
-    marketDataAt?: string | null;
-    dataFeed?: string | null;
-    dataFreshReason?: string | null;
-    marketDataStatus?: {
-      session: string;
-      barsFresh: boolean;
-      barsAgeSec: number | null;
-      quotePresent: boolean;
-      quoteFresh: boolean;
-      quoteAgeSec: number | null;
-      quoteUsableForEntry: boolean;
-      verifiedForSetup: boolean;
-      summary: string;
-    } | null;
-    entryGeometry?: {
-      kind: string;
-      summary: string;
-      entryModelNote: string;
-    };
-    quoteTransparency?: {
-      bid: number | null;
-      ask: number | null;
-      spreadPct: number | null;
-      quoteAt: string | null;
-      priceSource?: string;
-      referencePriceOnly?: boolean;
-      priceBasis: string;
-    };
-    rewardToRisk?: number;
-    dataFresh?: boolean;
-    evaluatedAt?: string;
-    setupScore: string;
-    setupScoreValue?: number;
-    setupScoreDisclaimer: string;
-    market: string | null;
-    marketRegime: string | null;
-    session: SessionInfo | null;
-    matchedStrategies?: Array<{
-      strategyId: string;
-      strategyName: string;
-      family: string;
-      reason: string;
-    }>;
-    historicalEdge: {
-      strategyName: string;
-      sampleSize: number;
-      winRatePct: number | null;
-      expectancyR: number | null;
-      averageWinnerR: number | null;
-      averageLoserR: number | null;
-      disclaimer: string;
-      collapsedSummary: string;
-    } | null;
-    options: {
-      enabled: boolean;
-      eligible: boolean;
-      reason: string;
-      bestContract: {
-        right: string;
-        strike: number;
-        expiration: string;
-        dte: number;
-        delta: number | null;
-        bid: number;
-        ask: number;
-        spreadPct: number;
-        volume: number;
-        openInterest: number;
-      } | null;
-      whyThisContract: string[];
-    } | null;
-    nearActive?: {
-      active: boolean;
-      trigger: number;
-      distanceToTriggerAbs: number;
-      distanceToTriggerPct: number;
-      distanceLabel: string;
-      conditionsPassed: number;
-      conditionsTotal: number;
-      stillWaitingFor: string[];
-      confirmationRequirement: string;
-      permissionToEnter: false;
-      dataTimestamp: string | null;
-      setupQualityScore: number | null;
-    };
-    relativeMomentum?: {
-      feed: string;
-      feedLimitation: string;
-      symbolIntradayPct: number | null;
-      spyIntradayPct: number | null;
-      qqqIntradayPct: number | null;
-      sectorEtf: string;
-      sectorIntradayPct: number | null;
-      vsSpyPct: number | null;
-      vsQqqPct: number | null;
-      vsSectorPct: number | null;
-      gapPct: number | null;
-      rvol: number | null;
-      vwapLocation: string;
-      intradayTrend: string;
-      rankScore: number;
-      notes: string[];
-    } | null;
-  };
+  liveCard: SetupLiveCard;
   card: {
     symbol?: string;
     side?: "LONG" | "SHORT";
@@ -205,7 +210,7 @@ export interface SetupResponse {
       family: string;
       reason: string;
     }>;
-    historicalEdge: SetupResponse["liveCard"]["historicalEdge"];
+    historicalEdge: SetupHistoricalEdge | null;
     whyMoving: {
       whyMoving: string;
       catalystLabel: string | null;

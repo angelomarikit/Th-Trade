@@ -1,8 +1,8 @@
-import type { MonitorSymbolState, SetupResponse } from "./api";
+import type { MonitorSymbolState, SetupLiveCard } from "./api";
 import { fmtPrice } from "./format";
 import { normalizeStatus } from "../components/ui/StatusBadge";
 
-export function primaryStrategyName(lc: SetupResponse["liveCard"]): string | null {
+export function primaryStrategyName(lc: SetupLiveCard): string | null {
   const m = lc.matchedStrategies?.[0];
   return m?.strategyName ?? m?.strategyId ?? null;
 }
@@ -11,7 +11,7 @@ export function primaryStrategyName(lc: SetupResponse["liveCard"]): string | nul
 export function buildTradingBrief(input: {
   symbol: string;
   side: "LONG" | "SHORT";
-  liveCard: SetupResponse["liveCard"];
+  liveCard: SetupLiveCard;
   displayPrice: number | null;
 }): string[] {
   const { symbol, side, liveCard: lc, displayPrice } = input;
