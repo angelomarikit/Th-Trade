@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { SessionPriceBanner } from "../components/ui/SessionPriceBanner";
 import { isSetupChartStale } from "../lib/setupChartSync";
+import { viewLiveCard } from "../lib/scannerLiveCardView";
 import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
@@ -100,7 +101,9 @@ export function ScannerPage() {
         <SessionPriceBanner
           session={data.liveCard.session?.session ?? data.card.session?.session}
           dataFresh={data.liveCard.dataFresh !== false && data.card.dataFresh !== false}
-          referencePriceOnly={data.liveCard.quoteTransparency?.referencePriceOnly === true}
+          referencePriceOnly={
+            viewLiveCard(data.liveCard).quoteTransparency?.referencePriceOnly === true
+          }
           reason={data.liveCard.dataFreshReason ?? null}
         />
       ) : null}

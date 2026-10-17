@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { StatusBadge, normalizeStatus } from "../ui/StatusBadge";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
-import { addMonitorSymbol, type SetupLiveCard } from "../../lib/api";
+import { addMonitorSymbol } from "../../lib/api";
+import { viewLiveCard } from "../../lib/scannerLiveCardView";
 import { friendlyApiError } from "../../lib/apiBase";
 import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
 import { SessionPriceBanner } from "../ui/SessionPriceBanner";
@@ -34,7 +35,7 @@ export function SignalSummaryPanel() {
     );
   }
 
-  const lc: SetupLiveCard = data.liveCard;
+  const lc = viewLiveCard(data.liveCard);
   const status = normalizeStatus(lc.status);
   const rr = lc.rewardToRisk;
   const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
