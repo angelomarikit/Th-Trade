@@ -286,7 +286,21 @@ async function main() {
     return job;
   }
 
-  const server = createServer(async (req, res) => {
+  const server = createServer((req, res) => {
+    void handleHttpRequest(req, res).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[http] unhandled:", message.slice(0, 300));
+      if (!res.headersSent) {
+        applyCors(req, res);
+        json(res, 500, { error: "internal server error" });
+      }
+    });
+  });
+
+  async function handleHttpRequest(
+    req: import("node:http").IncomingMessage,
+    res: import("node:http").ServerResponse,
+  ) {
     try {
       applyCors(req, res);
       if (req.method === "OPTIONS") {
@@ -542,7 +556,7 @@ async function main() {
       }
 
       if (url.pathname === "/v1/bars" && req.method === "GET") {
-        return withAlpacaPriority("interactive", async () => {
+        await withAlpacaPriority("interactive", async () => {
         const ticker = url.searchParams.get("ticker");
         if (!ticker) {
           return json(res, 400, { error: "ticker query required" });
@@ -585,10 +599,22 @@ async function main() {
           );
           return json(res, 200, cached.payload);
         }
-        const pending = barsInflight.get(cacheKey) ?? refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
-        const payload = await pending;
-        return json(res, 200, payload);
+        const pending =
+          barsInflight.get(cacheKey) ??
+          refreshBarsCache(cacheKey, ticker, timeframe, safeLimit, regularHoursOnly);
+        try {
+          const payload = await pending;
+          return json(res, 200, payload);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return json(res, 502, {
+            error: message.slice(0, 300),
+            symbol: ticker.toUpperCase(),
+            provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
+          });
+        }
         });
+        return;
       }
 
       if (url.pathname === "/v1/catalyst" && req.method === "GET") {
@@ -631,7 +657,7 @@ async function main() {
       }
 
       if (url.pathname === "/v1/setup" && req.method === "GET") {
-        return withAlpacaPriority("interactive", async () => {
+        await withAlpacaPriority("interactive", async () => {
         try {
         const ticker = url.searchParams.get("ticker");
         const sideParam = (url.searchParams.get("side") ?? "LONG").toUpperCase();
@@ -895,6 +921,7 @@ async function main() {
           });
         }
         });
+        return;
       }
 
       // ── Phase 2: server-side multi-stock monitor ─────────────────────────
@@ -1689,7 +1716,7 @@ async function main() {
       const message = err instanceof Error ? err.message : "unknown error";
       json(res, 500, { error: message });
     }
-  });
+  }
 
   server.listen(port, () => {
     console.log(`Wulu API (Phase G) on http://localhost:${port}`);
