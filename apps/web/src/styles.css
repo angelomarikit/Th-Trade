@@ -2073,48 +2073,10 @@ a {
   font-weight: 500;
 }
 
-.chart-rsi-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.8rem;
-  align-items: stretch;
-  min-height: 136px;
-}
-
 .chart-rsi-host {
   min-height: 136px;
   height: 136px;
-}
-
-.chart-rsi-scale {
-  position: relative;
-  min-height: 136px;
-}
-
-.rsi-lv {
-  position: absolute;
-  right: 0.35rem;
-  left: 0;
-  transform: translateY(-50%);
-  text-align: right;
-  font-family: var(--mono);
-  font-weight: 800;
-  font-size: 1.45rem;
-  line-height: 1.05;
-}
-
-.rsi-ob {
-  top: 32%;
-  color: #f87171;
-}
-
-.rsi-mid {
-  top: 50%;
-  color: #cbd5e1;
-}
-
-.rsi-os {
-  top: 68%;
-  color: #35c89a;
+  width: 100%;
 }
 
 .chart-legend {
@@ -2897,10 +2859,9 @@ a {
     min-height: 168px;
   }
 
-  .chart-rsi-host,
-  .chart-rsi-scale {
-    min-height: 132px;
-    height: 132px;
+  .chart-rsi-host {
+    min-height: 148px;
+    height: 148px;
   }
 
   .chart-toolbar {

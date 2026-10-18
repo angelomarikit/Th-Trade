@@ -421,16 +421,19 @@ export function CandleChart(props: {
         background: { type: ColorType.Solid, color: "#080D14" },
         textColor: "#9AA8BA",
         fontFamily: "JetBrains Mono, ui-monospace, monospace",
-        fontSize: (el.clientWidth ?? 999) < 768 ? 12 : 11,
+        fontSize: (el.clientWidth ?? 999) < 768 ? 16 : 14,
       },
       grid: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#1a2533" },
       },
       rightPriceScale: {
-        visible: false,
+        visible: true,
+        borderVisible: false,
         borderColor: "#2a3a4d",
-        scaleMargins: { top: 0.08, bottom: 0.08 },
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+        alignLabels: false,
+        textColor: "transparent",
       },
       localization: chartEtLocalization,
       timeScale: {
@@ -454,8 +457,9 @@ export function CandleChart(props: {
       color: STUDY_LINE.rsi.color,
       lineWidth: STUDY_LINE.rsi.lineWidth,
       priceLineVisible: false,
-      lastValueVisible: true,
+      lastValueVisible: false,
       crosshairMarkerVisible: false,
+      priceFormat: { type: "price", precision: 0, minMove: 1 },
     });
     rsiLinesRef.current = [
       rsi.createPriceLine({
@@ -467,27 +471,33 @@ export function CandleChart(props: {
       }),
       rsi.createPriceLine({
         price: 70,
-        color: "rgba(248, 113, 113, 0.95)",
+        color: "#f87171",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
-        axisLabelVisible: false,
+        axisLabelVisible: true,
         title: "",
+        axisLabelColor: "#f87171",
+        axisLabelTextColor: "#1a0a0a",
       }),
       rsi.createPriceLine({
         price: 50,
-        color: "rgba(148, 163, 184, 0.7)",
+        color: "#cbd5e1",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
-        axisLabelVisible: false,
+        axisLabelVisible: true,
         title: "",
+        axisLabelColor: "#cbd5e1",
+        axisLabelTextColor: "#111820",
       }),
       rsi.createPriceLine({
         price: 30,
-        color: "rgba(53, 200, 154, 0.95)",
+        color: "#35c89a",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
-        axisLabelVisible: false,
+        axisLabelVisible: true,
         title: "",
+        axisLabelColor: "#35c89a",
+        axisLabelTextColor: "#042016",
       }),
       rsi.createPriceLine({
         price: 0,
@@ -845,14 +855,7 @@ export function CandleChart(props: {
               <span className="chart-rsi-val muted">—</span>
             )}
           </div>
-          <div className="chart-rsi-body">
-            <div className="chart-rsi-host" ref={rsiHostRef} />
-            <div className="chart-rsi-scale" aria-hidden="true">
-              <span className="rsi-lv rsi-ob">70</span>
-              <span className="rsi-lv rsi-mid">50</span>
-              <span className="rsi-lv rsi-os">30</span>
-            </div>
-          </div>
+          <div className="chart-rsi-host" ref={rsiHostRef} />
         </div>
       </div>
     </div>
