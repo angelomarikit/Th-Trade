@@ -1648,6 +1648,11 @@ a {
   .show-mobile-only {
     display: inline-flex !important;
   }
+
+  .trade-signal-bar-slot.show-mobile-only {
+    display: block !important;
+    width: 100%;
+  }
   .chart-host {
     height: 300px;
   }
@@ -2401,6 +2406,150 @@ a {
   border: 1px solid var(--border);
 }
 
+/* Mobile trade signal strip (mockup §1) */
+.trade-signal-bar {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 0.75rem 0.85rem 0.65rem;
+  background: rgba(8, 13, 20, 0.92);
+}
+
+.trade-signal-bar-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.trade-signal-bar-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.trade-signal-headline {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.trade-signal-score {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trade-signal-direction {
+  margin: 0.35rem 0 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.trade-signal-levels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.65rem;
+  margin: 0;
+}
+
+.trade-signal-levels dt {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trade-signal-levels dd {
+  margin: 0.1rem 0 0;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.trade-signal-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.trade-signal-bar.tone-entry {
+  border-color: rgba(53, 200, 154, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(53, 200, 154, 0.12);
+}
+.trade-signal-bar.tone-entry .trade-signal-headline,
+.trade-signal-bar.tone-entry svg {
+  color: var(--green);
+}
+
+.trade-signal-bar.tone-watch {
+  border-color: rgba(251, 191, 36, 0.5);
+}
+.trade-signal-bar.tone-watch .trade-signal-headline,
+.trade-signal-bar.tone-watch svg {
+  color: #fbbf24;
+}
+
+.trade-signal-bar.tone-manage {
+  border-color: rgba(96, 165, 250, 0.5);
+}
+.trade-signal-bar.tone-manage .trade-signal-headline,
+.trade-signal-bar.tone-manage svg {
+  color: #60a5fa;
+}
+
+.trade-signal-bar.tone-exit {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+.trade-signal-bar.tone-exit .trade-signal-headline,
+.trade-signal-bar.tone-exit svg {
+  color: var(--red);
+}
+
+.trade-signal-bar.tone-none,
+.trade-signal-bar.tone-wait {
+  border-color: var(--border);
+}
+.trade-signal-bar.tone-none .trade-signal-headline,
+.trade-signal-bar.tone-wait .trade-signal-headline {
+  color: var(--muted);
+}
+
+.scanner-instrument-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.scanner-instrument-tf {
+  margin-top: 0.55rem;
+}
+
+.tf-group-mobile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.scanner-star.starred {
+  color: #fbbf24;
+}
+
 @media (max-width: 1100px) {
   .scanner-layout-v7,
   .scanner-layout-v7.with-inspector {
@@ -2408,6 +2557,11 @@ a {
     overflow: auto;
     display: flex;
     flex-direction: column;
+  }
+  .trade-signal-bar-slot {
+    order: 0;
+    width: 100%;
+    flex-shrink: 0;
   }
   .scanner-main-v7 {
     order: 1;
@@ -2493,12 +2647,45 @@ a {
   }
 
   .scanner-instrument h1 {
-    font-size: 1.35rem;
-    width: 100%;
+    font-size: 1.5rem;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .scanner-instrument-title {
+    align-items: center;
+  }
+
+  .scanner-price-row {
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.55rem;
+    margin-top: 0.25rem;
   }
 
   .scanner-price-row .last {
-    font-size: 1.35rem;
+    font-size: 1.65rem;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
+
+  .scanner-price-row .chg {
+    font-size: 0.95rem;
+    font-family: var(--mono);
+    font-weight: 600;
+  }
+
+  .hide-mobile-tf {
+    display: none !important;
+  }
+
+  .signal-panel-hero-dup,
+  .signal-panel-plan-dup {
+    display: none !important;
+  }
+
+  .trade-signal-levels {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   /* Keep page width fixed; chart host remains the touch surface for pan/zoom */
@@ -2507,8 +2694,21 @@ a {
     overscroll-behavior: contain;
     width: 100%;
     max-width: 100%;
-    height: min(62vh, 640px);
-    min-height: 400px;
+    height: min(48vh, 520px);
+    min-height: 280px;
+  }
+
+  .chart-rsi-panel {
+    min-height: 96px;
+  }
+
+  .chart-rsi-host {
+    min-height: 80px;
+    height: 80px;
+  }
+
+  .chart-toolbar {
+    gap: 0.35rem;
   }
 
   .chart-toolbar-row {
@@ -2516,20 +2716,25 @@ a {
   }
 
   .chart-toolbar-indicators {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0.35rem 0.25rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(8, 13, 20, 0.92);
-    position: sticky;
-    top: 0;
-    z-index: 6;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.35rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.4rem;
+  }
+
+  .chart-toolbar-indicators::-webkit-scrollbar {
+    display: none;
   }
 
   .chart-indicators-label {
-    padding-top: 0;
-    padding-left: 0.15rem;
+    display: none;
   }
 
   .chart-toolbar-right {
@@ -2549,9 +2754,29 @@ a {
   }
 
   .leg-toggle {
-    min-height: 36px;
+    min-height: 38px;
+    padding: 0.35rem 0.65rem;
     font-size: 0.72rem;
     flex-shrink: 0;
+    border-radius: 999px;
+  }
+
+  .leg-toggle.on {
+    border-color: rgba(45, 212, 191, 0.65);
+    background: rgba(45, 212, 191, 0.14);
+    color: var(--teal);
+  }
+
+  .leg-toggle.on::after {
+    content: "✓";
+    margin-left: 0.15rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--teal);
+  }
+
+  .leg-toggle::before {
+    display: none;
   }
 
   .chart-live-label-long {

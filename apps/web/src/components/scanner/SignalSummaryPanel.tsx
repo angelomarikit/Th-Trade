@@ -97,7 +97,7 @@ export function SignalSummaryPanel() {
         <StatusBadge status={status} className="signal-status" />
       </div>
 
-      <div className={`signal-action-hero ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
+      <div className={`signal-action-hero signal-panel-hero-dup ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
         <p className="action-value">{lc.dataFresh === false ? "WAIT" : (lc.tradingAction ?? "WAIT")}</p>
         <p className="action-label">{status}</p>
       </div>
@@ -143,7 +143,7 @@ export function SignalSummaryPanel() {
       ) : null}
 
       {planForSymbol ? (
-        <dl className={`signal-trade-plan${planStale ? " signal-trade-plan-stale" : ""}`}>
+        <dl className={`signal-trade-plan signal-panel-plan-dup${planStale ? " signal-trade-plan-stale" : ""}`}>
           <div>
             <dt>Direction</dt>
             <dd>{side}</dd>

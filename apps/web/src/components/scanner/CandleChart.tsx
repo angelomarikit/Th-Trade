@@ -24,6 +24,7 @@ import {
   formatEtChartTick,
   formatLastBarEtLabel,
 } from "../../lib/chartEtTime";
+import { CHART_TIMEFRAMES } from "../../lib/chartTimeframes";
 import { studiesFromBars } from "../../lib/chartStudies";
 import {
   DEFAULT_CHART_OVERLAYS,
@@ -54,13 +55,6 @@ const OVERLAY_TOGGLES = [
   { id: "bb" as const, label: "BB 20", className: "bb" },
   { id: "rsi" as const, label: "RSI 14", className: "rsi" },
 ];
-
-const TFS = [
-  { id: "1m", label: "1m" },
-  { id: "5m", label: "5m" },
-  { id: "15m", label: "15m" },
-  { id: "1D", label: "1D" },
-] as const;
 
 function safeSetVisibleLogicalRange(
   chart: IChartApi,
@@ -654,9 +648,9 @@ export function CandleChart(props: {
       className={`panel chart-wrap chart-wrap-hero${fullscreen ? " chart-fullscreen" : ""}`}
     >
       <div className="chart-toolbar">
-        <div className="chart-toolbar-row chart-toolbar-tf">
+        <div className="chart-toolbar-row chart-toolbar-tf hide-mobile-tf">
           <div className="tf-group" role="group" aria-label="Chart timeframe">
-            {TFS.map((tf) => (
+            {CHART_TIMEFRAMES.map((tf) => (
               <button
                 key={tf.id}
                 type="button"

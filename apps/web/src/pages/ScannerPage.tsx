@@ -1,11 +1,14 @@
-import { useEffect, useRef } from "react";
+import { Star } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
 import { isSetupChartStale } from "../lib/setupChartSync";
 import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
+import { TradeSignalBar } from "../components/scanner/TradeSignalBar";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
-import { fmtPct, fmtPrice, formatEtTime } from "../lib/format";
+import { CHART_TIMEFRAMES } from "../lib/chartTimeframes";
+import { fmtCompactVolume, fmtPct, fmtPrice, formatEtTime } from "../lib/format";
 
 export function ScannerPage() {
   const openSymbol = useOpenSymbol();
@@ -28,6 +31,8 @@ export function ScannerPage() {
     dayChangePct,
     health,
     scan,
+    toggleWatchlist,
+    watchlist,
   } = useTerminal();
 
   // One signal rail on phone/tablet — inspector duplicates recommendation UI.
@@ -76,6 +81,22 @@ export function ScannerPage() {
   const chg = dayChangePct;
   const rvol = lc?.relativeMomentum?.rvol;
   const feedLabel = (health?.alpacaFeed ?? bars?.feed ?? "iex").toUpperCase();
+  const starred = watchlist.includes(symbol);
+  const sessionBars =
+    bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars : [];
+  const dayStats = useMemo(() => {
+    if (!sessionBars.length) return null;
+    let hi = -Infinity;
+    let lo = Infinity;
+    let vol = 0;
+    for (const b of sessionBars) {
+      hi = Math.max(hi, b.high);
+      lo = Math.min(lo, b.low);
+      vol += b.volume ?? 0;
+    }
+    if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+    return { hi, lo, vol };
+  }, [sessionBars]);
 
   return (
     <div className="page scanner-page-v7">
@@ -127,11 +148,24 @@ export function ScannerPage() {
           </ul>
         </aside>
 
+        <div className="trade-signal-bar-slot show-mobile-only">
+          <TradeSignalBar />
+        </div>
+
         <div className="scanner-main-v7">
           <header className="scanner-instrument panel">
             <div>
               <div className="scanner-instrument-title">
                 <h1>{symbol}</h1>
+                <button
+                  type="button"
+                  className={`icon-btn scanner-star show-mobile-only${starred ? " starred" : ""}`}
+                  onClick={() => toggleWatchlist(symbol)}
+                  title={starred ? "Remove from watchlist" : "Add to watchlist"}
+                  aria-label={starred ? "Remove from watchlist" : "Add to watchlist"}
+                >
+                  <Star size={18} fill={starred ? "currentColor" : "none"} aria-hidden />
+                </button>
                 {/* Status chips: TopBar on mobile; desktop duplicates session/feed here */}
                 <div className="scanner-instrument-meta hide-mobile">
                   {loading && <span className="badge">Updating…</span>}
@@ -148,21 +182,49 @@ export function ScannerPage() {
                 </span>
                 {chg != null && (
                   <span className={`chg ${chg >= 0 ? "up" : "down"}`} title="Session change from setup">
-                    {fmtPct(chg)}
+                    {dayStats && sessionBars.length > 0 ? (
+                      <>
+                        {sessionBars.at(-1)!.close - sessionBars[0].open >= 0 ? "+" : ""}
+                        {fmtPrice(sessionBars.at(-1)!.close - sessionBars[0].open)}{" "}
+                      </>
+                    ) : null}
+                    ({fmtPct(chg)})
                   </span>
                 )}
-                <span className="muted">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
-                <span className="muted" title="US Eastern time of the last candle open">
+                <span className="muted hide-mobile">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
+                <span className="muted hide-mobile" title="US Eastern time of the last candle open">
                   Last bar {lastBarAt ?? "—"}
                 </span>
-                <span className="badge blue" title="Alpaca Basic IEX via REST. Not the SIP consolidated feed and not a websocket.">
+                <span className="badge blue hide-mobile" title="Alpaca Basic IEX via REST. Not the SIP consolidated feed and not a websocket.">
                   {feedLabel} REST
                 </span>
                 {quoteDiffers && (
-                  <span className="muted" title="Latest quote from the setup check. The candle is not changed to this number.">
+                  <span className="muted hide-mobile" title="Latest quote from the setup check. The candle is not changed to this number.">
                     Quote {fmtPrice(quotePx)}
                   </span>
                 )}
+              </div>
+              <div className="scanner-instrument-stats show-mobile-only">
+                <span>Vol {fmtCompactVolume(dayStats?.vol)}</span>
+                <span>
+                  Day {dayStats ? `${fmtPrice(dayStats.lo)} – ${fmtPrice(dayStats.hi)}` : "—"}
+                </span>
+                <span>Updated {lastBarAt ?? "—"}</span>
+              </div>
+              <div className="scanner-instrument-tf show-mobile-only" role="group" aria-label="Chart timeframe">
+                <div className="tf-group tf-group-mobile">
+                  {CHART_TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf.id}
+                      type="button"
+                      className={chartTf === tf.id ? "active" : ""}
+                      aria-pressed={chartTf === tf.id}
+                      onClick={() => setChartTf(tf.id)}
+                    >
+                      {tf.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </header>
