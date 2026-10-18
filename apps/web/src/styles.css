@@ -2075,7 +2075,7 @@ a {
 
 .chart-rsi-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 8.2rem;
+  grid-template-columns: minmax(0, 1fr) 2.8rem;
   align-items: stretch;
   min-height: 136px;
 }
@@ -2100,13 +2100,6 @@ a {
   font-weight: 800;
   font-size: 1.45rem;
   line-height: 1.05;
-}
-
-.rsi-lv small {
-  display: block;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
 }
 
 .rsi-ob {
@@ -2454,10 +2447,10 @@ a {
 
 /* Mobile trade signal strip (mockup §1) */
 .trade-signal-bar {
-  border-radius: 14px;
-  border: 2px solid var(--border);
-  padding: 0.85rem 0.9rem 0.75rem;
-  background: rgba(8, 13, 20, 0.96);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 0.95rem 1rem 0.8rem;
+  background: #101820;
 }
 
 .trade-signal-bar-top {
@@ -2477,9 +2470,21 @@ a {
 
 .trade-signal-headline {
   font-family: var(--mono);
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.trade-signal-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .trade-signal-score {
@@ -2532,64 +2537,76 @@ a {
 
 .trade-signal-levels {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem 0.65rem;
-  margin: 0;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.85rem;
+  margin: 0.85rem 0 0.7rem;
+}
+
+.trade-signal-levels > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .trade-signal-levels dt {
   margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #f4f7fb;
 }
 
 .trade-signal-levels dd {
-  margin: 0.1rem 0 0;
+  margin: 0;
   font-family: var(--mono);
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
+  color: #f4f7fb;
 }
 
 .trade-signal-note {
-  margin: 0.55rem 0 0;
-  font-size: 0.68rem;
-  color: var(--muted);
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: #9aa8ba;
   line-height: 1.35;
 }
 
 .trade-signal-bar.tone-entry {
-  border-color: rgba(53, 200, 154, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(53, 200, 154, 0.12);
+  background: #06281c;
+  border-color: #1f8f5f;
 }
 .trade-signal-bar.tone-entry .trade-signal-headline,
-.trade-signal-bar.tone-entry svg {
-  color: var(--green);
+.trade-signal-bar.tone-entry .trade-signal-icon {
+  color: #3dd68c;
 }
 
 .trade-signal-bar.tone-watch {
-  border-color: rgba(251, 191, 36, 0.5);
+  background: #2a2208;
+  border-color: #a16207;
 }
 .trade-signal-bar.tone-watch .trade-signal-headline,
-.trade-signal-bar.tone-watch svg {
+.trade-signal-bar.tone-watch .trade-signal-icon {
   color: #fbbf24;
 }
 
 .trade-signal-bar.tone-manage {
-  border-color: rgba(96, 165, 250, 0.5);
+  background: #0c1c33;
+  border-color: #2563eb;
 }
 .trade-signal-bar.tone-manage .trade-signal-headline,
-.trade-signal-bar.tone-manage svg {
+.trade-signal-bar.tone-manage .trade-signal-icon {
   color: #60a5fa;
 }
 
 .trade-signal-bar.tone-exit {
-  border-color: rgba(248, 113, 113, 0.55);
+  background: #2a1012;
+  border-color: #b91c1c;
 }
 .trade-signal-bar.tone-exit .trade-signal-headline,
-.trade-signal-bar.tone-exit svg {
-  color: var(--red);
+.trade-signal-bar.tone-exit .trade-signal-icon {
+  color: #f87171;
 }
 
 .trade-signal-bar.tone-none,
@@ -2845,12 +2862,11 @@ a {
   }
 
   .trade-signal-levels {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.4rem 0.35rem;
+    grid-template-columns: 1fr 1fr;
   }
 
-  .trade-signal-levels dd {
-    font-size: 0.92rem;
+  .trade-signal-headline {
+    font-size: 1.2rem;
   }
 
   .trade-signal-score {

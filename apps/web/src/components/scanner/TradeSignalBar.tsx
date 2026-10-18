@@ -54,12 +54,9 @@ export function TradeSignalBar() {
     score10 != null && Number.isFinite(score10)
       ? `${Math.round(score10)}/10`
       : "—/10";
-  const entryLabel =
-    lc.entryZone != null
-      ? `${fmtPrice(lc.entryZone.low)} – ${fmtPrice(lc.entryZone.high)}`
-      : lc.alertAt != null
-        ? fmtPrice(lc.alertAt)
-        : "—";
+  const entryPx =
+    lc.entryZone != null ? (lc.entryZone.low + lc.entryZone.high) / 2 : lc.alertAt;
+  const money = (n: number | null | undefined) => (n != null && Number.isFinite(n) ? `$${fmtPrice(n)}` : "—");
   const stale = !fresh;
 
   return (
@@ -68,39 +65,43 @@ export function TradeSignalBar() {
       aria-label="Trade signal"
     >
       <div className="trade-signal-bar-top">
-        <div className="trade-signal-bar-status">
-          <Icon size={20} strokeWidth={2.25} aria-hidden />
-          <span className="trade-signal-headline">{stale ? "DATA NOT VERIFIED" : headline}</span>
-          <span className="trade-signal-direction">{side}</span>
-        </div>
-        <span className="trade-signal-score">
-          <b>{scoreLabel}</b>
-          <span>SETUP SCORE</span>
+        <span className="trade-signal-headline">
+          {headline}
+          {stale ? "" : ` · ${side}`}
         </span>
-      </div>
-      <div className="trade-signal-entry">
-        <span>Entry zone</span>
-        <strong>{entryLabel}</strong>
+        <span className="trade-signal-icon" aria-hidden="true">
+          <Icon size={18} strokeWidth={2.4} />
+        </span>
       </div>
       <dl className="trade-signal-levels">
         <div>
-          <dt>Stop loss</dt>
-          <dd className="level-stop">{fmtPrice(lc.stop)}</dd>
+          <dt>Entry:</dt>
+          <dd>{money(entryPx)}</dd>
         </div>
         <div>
-          <dt>Target 1</dt>
-          <dd className="level-t1">{fmtPrice(lc.t1)}</dd>
+          <dt>Stop:</dt>
+          <dd>{money(lc.stop)}</dd>
         </div>
         <div>
-          <dt>Target 2</dt>
-          <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
+          <dt>T1:</dt>
+          <dd>{money(lc.t1)}</dd>
         </div>
         <div>
-          <dt>Target 3</dt>
-          <dd>{lc.t3 != null ? fmtPrice(lc.t3) : "—"}</dd>
+          <dt>T2:</dt>
+          <dd>{money(lc.t2)}</dd>
         </div>
+        {lc.t3 != null ? (
+          <div>
+            <dt>T3:</dt>
+            <dd>{money(lc.t3)}</dd>
+          </div>
+        ) : null}
       </dl>
-      {stale && lc.dataFreshReason ? <p className="trade-signal-note">{lc.dataFreshReason}</p> : null}
+      <p className="trade-signal-note">
+        {stale && lc.dataFreshReason
+          ? lc.dataFreshReason
+          : `Setup score ${scoreLabel}. Signals only — not an order.`}
+      </p>
     </section>
   );
 }

@@ -848,15 +848,9 @@ export function CandleChart(props: {
           <div className="chart-rsi-body">
             <div className="chart-rsi-host" ref={rsiHostRef} />
             <div className="chart-rsi-scale" aria-hidden="true">
-              <span className="rsi-lv rsi-ob">
-                70
-                <small>OVERBOUGHT</small>
-              </span>
+              <span className="rsi-lv rsi-ob">70</span>
               <span className="rsi-lv rsi-mid">50</span>
-              <span className="rsi-lv rsi-os">
-                30
-                <small>OVERSOLD</small>
-              </span>
+              <span className="rsi-lv rsi-os">30</span>
             </div>
           </div>
         </div>
