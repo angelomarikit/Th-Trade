@@ -2040,7 +2040,7 @@ a {
   flex-direction: column;
   border-top: 1px solid var(--border);
   background: #080d14;
-  min-height: 108px;
+  min-height: 168px;
 }
 
 .chart-rsi-panel--hidden {
@@ -2050,21 +2050,22 @@ a {
 .chart-rsi-head {
   display: flex;
   align-items: baseline;
-  gap: 0.45rem;
-  padding: 0.35rem 0.65rem 0.15rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem 0.2rem;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.95rem;
 }
 
 .chart-rsi-title {
-  color: rgba(192, 132, 252, 0.95);
-  font-weight: 600;
+  color: rgba(192, 132, 252, 0.98);
+  font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .chart-rsi-val {
-  color: rgba(192, 132, 252, 0.92);
-  font-weight: 600;
+  color: rgba(216, 180, 254, 1);
+  font-weight: 800;
+  font-size: 1.05rem;
 }
 
 .chart-rsi-val.muted {
@@ -2072,10 +2073,55 @@ a {
   font-weight: 500;
 }
 
+.chart-rsi-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.2rem;
+  align-items: stretch;
+  min-height: 136px;
+}
+
 .chart-rsi-host {
-  flex: 1 1 auto;
-  min-height: 88px;
-  height: 88px;
+  min-height: 136px;
+  height: 136px;
+}
+
+.chart-rsi-scale {
+  position: relative;
+  min-height: 136px;
+}
+
+.rsi-lv {
+  position: absolute;
+  right: 0.35rem;
+  left: 0;
+  transform: translateY(-50%);
+  text-align: right;
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 1.45rem;
+  line-height: 1.05;
+}
+
+.rsi-lv small {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.rsi-ob {
+  top: 32%;
+  color: #f87171;
+}
+
+.rsi-mid {
+  top: 50%;
+  color: #cbd5e1;
+}
+
+.rsi-os {
+  top: 68%;
+  color: #35c89a;
 }
 
 .chart-legend {
@@ -2409,9 +2455,9 @@ a {
 /* Mobile trade signal strip (mockup §1) */
 .trade-signal-bar {
   border-radius: 14px;
-  border: 1px solid var(--border);
-  padding: 0.75rem 0.85rem 0.65rem;
-  background: rgba(8, 13, 20, 0.92);
+  border: 2px solid var(--border);
+  padding: 0.85rem 0.9rem 0.75rem;
+  background: rgba(8, 13, 20, 0.96);
 }
 
 .trade-signal-bar-top {
@@ -2431,19 +2477,48 @@ a {
 
 .trade-signal-headline {
   font-family: var(--mono);
-  font-size: 0.92rem;
+  font-size: 1.15rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .trade-signal-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  font-weight: 650;
+  font-size: 0.58rem;
+  font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--muted);
   text-align: right;
   white-space: nowrap;
+}
+
+.trade-signal-score b {
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.trade-signal-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.15rem 0 0.45rem;
+}
+
+.trade-signal-entry span {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trade-signal-entry strong {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 800;
 }
 
 .trade-signal-direction {
@@ -2473,8 +2548,8 @@ a {
 .trade-signal-levels dd {
   margin: 0.1rem 0 0;
   font-family: var(--mono);
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 800;
+  font-size: 1.05rem;
 }
 
 .trade-signal-note {
@@ -2770,12 +2845,12 @@ a {
   }
 
   .trade-signal-levels {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.35rem 0.3rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem 0.35rem;
   }
 
   .trade-signal-levels dd {
-    font-size: 0.78rem;
+    font-size: 0.92rem;
   }
 
   .trade-signal-score {
@@ -2795,17 +2870,18 @@ a {
     overscroll-behavior: contain;
     width: 100%;
     max-width: 100%;
-    height: min(48vh, 520px);
-    min-height: 280px;
+    height: min(42vh, 460px);
+    min-height: 240px;
   }
 
   .chart-rsi-panel {
-    min-height: 96px;
+    min-height: 168px;
   }
 
-  .chart-rsi-host {
-    min-height: 80px;
-    height: 80px;
+  .chart-rsi-host,
+  .chart-rsi-scale {
+    min-height: 132px;
+    height: 132px;
   }
 
   .chart-toolbar {
@@ -2858,14 +2934,37 @@ a {
   }
 
   .leg-toggle {
-    min-height: 36px;
+    min-height: 42px;
     min-width: 0;
     justify-content: center;
-    padding: 0.3rem 0.15rem;
-    font-size: 0.62rem;
+    padding: 0.35rem 0.2rem;
+    font-size: 0.74rem;
+    font-weight: 700;
     flex-shrink: 1;
     border-radius: 999px;
     white-space: nowrap;
+  }
+
+  .leg-toggle.on {
+    color: #d1fae5;
+  }
+
+  .watch-card-symbol,
+  .watch-card-price,
+  .watch-card-side {
+    font-size: 1.05rem;
+  }
+
+  .watch-card-badges .badge,
+  .status-badge {
+    font-size: 0.78rem;
+    padding: 0.28rem 0.45rem;
+  }
+
+  .watch-card-waiting,
+  .alert-history-item {
+    font-size: 0.95rem;
+    line-height: 1.4;
   }
 
   .leg-toggle.on {
@@ -2932,6 +3031,14 @@ a {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+.alert-history-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .watch-card {

@@ -428,8 +428,9 @@ export function CandleChart(props: {
         horzLines: { color: "#1a2533" },
       },
       rightPriceScale: {
+        visible: false,
         borderColor: "#2a3a4d",
-        scaleMargins: { top: 0.06, bottom: 0.06 },
+        scaleMargins: { top: 0.08, bottom: 0.08 },
       },
       localization: chartEtLocalization,
       timeScale: {
@@ -466,26 +467,27 @@ export function CandleChart(props: {
       }),
       rsi.createPriceLine({
         price: 70,
-        color: "rgba(248, 113, 113, 0.78)",
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: "70",
+        color: "rgba(248, 113, 113, 0.95)",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: false,
+        title: "",
       }),
       rsi.createPriceLine({
         price: 50,
-        color: "rgba(148, 163, 184, 0.55)",
+        color: "rgba(148, 163, 184, 0.7)",
         lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
+        lineStyle: LineStyle.Dashed,
         axisLabelVisible: false,
+        title: "",
       }),
       rsi.createPriceLine({
         price: 30,
-        color: "rgba(53, 200, 154, 0.78)",
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: "30",
+        color: "rgba(53, 200, 154, 0.95)",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: false,
+        title: "",
       }),
       rsi.createPriceLine({
         price: 0,
@@ -843,7 +845,20 @@ export function CandleChart(props: {
               <span className="chart-rsi-val muted">—</span>
             )}
           </div>
-          <div className="chart-rsi-host" ref={rsiHostRef} />
+          <div className="chart-rsi-body">
+            <div className="chart-rsi-host" ref={rsiHostRef} />
+            <div className="chart-rsi-scale" aria-hidden="true">
+              <span className="rsi-lv rsi-ob">
+                70
+                <small>OVERBOUGHT</small>
+              </span>
+              <span className="rsi-lv rsi-mid">50</span>
+              <span className="rsi-lv rsi-os">
+                30
+                <small>OVERSOLD</small>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

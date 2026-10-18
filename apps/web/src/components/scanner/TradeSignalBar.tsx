@@ -11,32 +11,25 @@ import { viewLiveCard } from "../../lib/scannerLiveCardView";
 import { fmtPrice } from "../../lib/format";
 import { normalizeStatus } from "../ui/StatusBadge";
 
-function mobileHeadline(status: string): string {
+/** Display labels only. Engine status and gates are unchanged. */
+function signalDisplay(status: string, dataFresh: boolean): {
+  headline: string;
+  tone: string;
+  Icon: LucideIcon;
+} {
+  if (!dataFresh || normalizeStatus(status) === "DATA NOT VERIFIED") {
+    return { headline: "DATA NOT VERIFIED", tone: "tone-none", Icon: XCircle };
+  }
   const n = normalizeStatus(status);
-  if (n === "NEAR ACTIVE") return "WATCH CLOSELY";
-  if (n.includes("TARGET HIT") || n.includes("STOP HIT")) return "EXIT NOW";
-  if (n === "INVALIDATED" || n === "MISSED") return "EXIT NOW";
-  return n;
-}
-
-function barTone(status: string): string {
-  const u = status.toUpperCase();
-  if (u.includes("ENTRY ACTIVE")) return "tone-entry";
-  if (u.includes("NEAR ACTIVE") || u.includes("WATCH")) return "tone-watch";
-  if (u.includes("TARGET HIT")) return "tone-manage";
-  if (u.includes("STOP HIT") || u.includes("INVALIDATED") || u.includes("MISSED")) return "tone-exit";
-  if (u.includes("NO TRADE") || u.includes("DATA NOT VERIFIED")) return "tone-none";
-  return "tone-wait";
-}
-
-function barIcon(status: string): LucideIcon {
-  const u = status.toUpperCase();
-  if (u.includes("ENTRY ACTIVE")) return TrendingUp;
-  if (u.includes("NEAR ACTIVE") || u.includes("WATCH")) return Crosshair;
-  if (u.includes("TARGET HIT")) return PauseCircle;
-  if (u.includes("STOP HIT") || u.includes("INVALIDATED") || u.includes("MISSED")) return TrendingDown;
-  if (u.includes("NO TRADE") || u.includes("DATA NOT VERIFIED")) return XCircle;
-  return Crosshair;
+  if (n === "ENTRY ACTIVE") return { headline: "ENTRY ACTIVE", tone: "tone-entry", Icon: TrendingUp };
+  if (n === "NEAR ACTIVE" || n === "WATCH") return { headline: "WATCH CLOSELY", tone: "tone-watch", Icon: Crosshair };
+  if (n.includes("TARGET HIT")) return { headline: "MANAGE TRADE", tone: "tone-manage", Icon: PauseCircle };
+  if (n.includes("STOP HIT") || n === "INVALIDATED" || n === "MISSED") {
+    return { headline: "EXIT / STOP HIT", tone: "tone-exit", Icon: TrendingDown };
+  }
+  if (n === "NO TRADE") return { headline: "NO TRADE", tone: "tone-none", Icon: XCircle };
+  if (n === "WAIT") return { headline: "WAIT", tone: "tone-wait", Icon: Crosshair };
+  return { headline: n, tone: "tone-wait", Icon: Crosshair };
 }
 
 /** Mobile-first trade signal strip — levels mirror setup engine output (display only). */
@@ -54,17 +47,20 @@ export function TradeSignalBar() {
     );
   }
 
-  const headline = mobileHeadline(lc.status);
-  const Icon = barIcon(lc.status);
-  const tone = barTone(lc.status);
+  const fresh = lc.dataFresh !== false;
+  const { headline, tone, Icon } = signalDisplay(lc.status, fresh);
   const score10 = lc.qualityScore10;
   const scoreLabel =
     score10 != null && Number.isFinite(score10)
-      ? `${Math.round(score10)}/10 SETUP SCORE`
-      : "—/10 SETUP SCORE";
-  const entryMid =
-    lc.entryZone != null ? (lc.entryZone.low + lc.entryZone.high) / 2 : lc.alertAt;
-  const stale = lc.dataFresh === false;
+      ? `${Math.round(score10)}/10`
+      : "—/10";
+  const entryLabel =
+    lc.entryZone != null
+      ? `${fmtPrice(lc.entryZone.low)} – ${fmtPrice(lc.entryZone.high)}`
+      : lc.alertAt != null
+        ? fmtPrice(lc.alertAt)
+        : "—";
+  const stale = !fresh;
 
   return (
     <section
@@ -77,13 +73,16 @@ export function TradeSignalBar() {
           <span className="trade-signal-headline">{stale ? "DATA NOT VERIFIED" : headline}</span>
           <span className="trade-signal-direction">{side}</span>
         </div>
-        <span className="trade-signal-score">{scoreLabel}</span>
+        <span className="trade-signal-score">
+          <b>{scoreLabel}</b>
+          <span>SETUP SCORE</span>
+        </span>
+      </div>
+      <div className="trade-signal-entry">
+        <span>Entry zone</span>
+        <strong>{entryLabel}</strong>
       </div>
       <dl className="trade-signal-levels">
-        <div>
-          <dt>Entry</dt>
-          <dd>{entryMid != null ? fmtPrice(entryMid) : "—"}</dd>
-        </div>
         <div>
           <dt>Stop loss</dt>
           <dd className="level-stop">{fmtPrice(lc.stop)}</dd>

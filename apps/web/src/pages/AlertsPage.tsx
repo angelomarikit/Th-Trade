@@ -157,15 +157,7 @@ export function AlertsPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", padding: "0.55rem 0.75rem" }}>
             {tradeAlerts.map((a) => (
-              <div
-                key={a.id}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  padding: "0.55rem 0.65rem",
-                  fontSize: "0.82rem",
-                }}
-              >
+              <div key={a.id} className="alert-history-item">
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                   <strong style={{ fontFamily: "var(--mono)" }}>
                     {a.symbol}

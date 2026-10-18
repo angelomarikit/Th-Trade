@@ -106,8 +106,8 @@ export function TopBar() {
           <>
             <button
               type="button"
-              className="badge teal"
-              title="Credits remaining"
+              className="badge teal hide-mobile"
+              title="Credits remaining. Open Plans from Settings."
               onClick={() => navigate("/billing")}
               style={{ cursor: "pointer" }}
             >
@@ -116,8 +116,8 @@ export function TopBar() {
             </button>
             <button
               type="button"
-              className="badge"
-              title="Current plan"
+              className="badge hide-mobile"
+              title="Current plan. Open Plans from Settings."
               onClick={() => navigate("/billing")}
               style={{ cursor: "pointer" }}
             >
