@@ -33,6 +33,7 @@ export function ScannerPage() {
     scan,
     toggleWatchlist,
     watchlist,
+    side,
     setSide,
   } = useTerminal();
 
