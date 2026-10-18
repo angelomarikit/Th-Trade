@@ -2611,11 +2611,14 @@ a {
 
 .trade-signal-bar.tone-none,
 .trade-signal-bar.tone-wait {
-  border-color: var(--border);
+  background: #101820;
+  border-color: #3a4654;
 }
 .trade-signal-bar.tone-none .trade-signal-headline,
-.trade-signal-bar.tone-wait .trade-signal-headline {
-  color: var(--muted);
+.trade-signal-bar.tone-wait .trade-signal-headline,
+.trade-signal-bar.tone-none .trade-signal-icon,
+.trade-signal-bar.tone-wait .trade-signal-icon {
+  color: #cbd5e1;
 }
 
 .scanner-instrument-stats {

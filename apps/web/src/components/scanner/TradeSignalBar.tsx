@@ -1,8 +1,8 @@
 import {
+  ArrowUp,
   Crosshair,
   PauseCircle,
   TrendingDown,
-  TrendingUp,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -21,7 +21,7 @@ function signalDisplay(status: string, dataFresh: boolean): {
     return { headline: "DATA NOT VERIFIED", tone: "tone-none", Icon: XCircle };
   }
   const n = normalizeStatus(status);
-  if (n === "ENTRY ACTIVE") return { headline: "ENTRY ACTIVE", tone: "tone-entry", Icon: TrendingUp };
+  if (n === "ENTRY ACTIVE") return { headline: "ENTRY ACTIVE", tone: "tone-entry", Icon: ArrowUp };
   if (n === "NEAR ACTIVE" || n === "WATCH") return { headline: "WATCH CLOSELY", tone: "tone-watch", Icon: Crosshair };
   if (n.includes("TARGET HIT")) return { headline: "MANAGE TRADE", tone: "tone-manage", Icon: PauseCircle };
   if (n.includes("STOP HIT") || n === "INVALIDATED" || n === "MISSED") {
@@ -66,8 +66,7 @@ export function TradeSignalBar() {
     >
       <div className="trade-signal-bar-top">
         <span className="trade-signal-headline">
-          {headline}
-          {stale ? "" : ` · ${side}`}
+          {headline} · {side}
         </span>
         <span className="trade-signal-icon" aria-hidden="true">
           <Icon size={18} strokeWidth={2.4} />
