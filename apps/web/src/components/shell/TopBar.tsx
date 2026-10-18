@@ -40,6 +40,8 @@ export function TopBar() {
   const env = health?.accountEnvironment ?? "SIGNALS_ONLY";
   const feed = health?.alpacaFeed ?? "iex";
   const provider = health?.marketDataProvider ?? "—";
+  const webSha = import.meta.env.VITE_BUILD_SHA ?? "local";
+  const apiSha = (health?.gitCommit ?? "unknown").slice(0, 7);
 
   return (
     <header className="topbar">
@@ -87,11 +89,17 @@ export function TopBar() {
         </span>
 
         <span
-          className="badge hide-sm"
+          className="badge build-stamp hide-sm"
           title="Deployed build: web commit / API commit. Put this in every test screenshot."
         >
-          web {import.meta.env.VITE_BUILD_SHA ?? "local"} · api{" "}
-          {(health?.gitCommit ?? "unknown").slice(0, 7)}
+          web {webSha} · api {apiSha}
+        </span>
+
+        <span
+          className="badge build-stamp build-stamp-mobile show-mobile-only"
+          title="Preview build stamp — web / API git SHAs"
+        >
+          BUILD {webSha} · {apiSha}
         </span>
 
         {configured && session && (

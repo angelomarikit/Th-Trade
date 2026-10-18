@@ -25,7 +25,35 @@ import {
   formatLastBarEtLabel,
 } from "../../lib/chartEtTime";
 import { studiesFromBars } from "../../lib/chartStudies";
+import {
+  DEFAULT_CHART_OVERLAYS,
+  readJson,
+  STORAGE_KEYS,
+  writeJson,
+  type ChartOverlayPrefs,
+} from "../../lib/storage";
+import {
+  clampVisibleLogicalRange,
+  DEFAULT_BAR_SPACING,
+  liveVisibleLogicalRange,
+  RIGHT_OFFSET_BARS,
+} from "../../lib/chartViewport";
 import { SessionShadePrimitive, sessionBands } from "./sessionShade";
+
+/** Display-only styling — calculations unchanged in chartStudies. */
+const STUDY_LINE = {
+  vwap: { color: "rgba(96, 165, 250, 0.82)", lineWidth: 2 as const },
+  ema: { color: "rgba(251, 191, 36, 0.78)", lineWidth: 2 as const },
+  bb: { color: "rgba(34, 211, 238, 0.55)", lineWidth: 1 as const },
+  rsi: { color: "rgba(148, 163, 184, 0.45)", lineWidth: 1 as const },
+};
+
+const OVERLAY_TOGGLES = [
+  { id: "vwap" as const, label: "VWAP", className: "vwap" },
+  { id: "ema" as const, label: "EMA 9", className: "ema9" },
+  { id: "bb" as const, label: "BB 20", className: "bb" },
+  { id: "rsi" as const, label: "RSI 14", className: "rsi" },
+];
 
 const TFS = [
   { id: "1m", label: "1m" },
@@ -33,36 +61,6 @@ const TFS = [
   { id: "15m", label: "15m" },
   { id: "1D", label: "1D" },
 ] as const;
-
-/** Small padding after the last candle — not a large empty future gap. */
-const RIGHT_OFFSET_BARS = 3;
-const DEFAULT_VISIBLE_BARS = 72;
-const MIN_VISIBLE_BARS = 8;
-
-/** lightweight-charts throws if from > to — common on mobile pinch before data settles. */
-function clampVisibleLogicalRange(
-  from: number,
-  to: number,
-  barCount: number,
-): { from: Logical; to: Logical } | null {
-  if (barCount <= 0) return null;
-  const maxTo = barCount - 1 + RIGHT_OFFSET_BARS;
-  let f = Number.isFinite(from) ? from : 0;
-  let t = Number.isFinite(to) ? to : maxTo;
-  f = Math.max(0, Math.min(f, maxTo));
-  t = Math.max(0, Math.min(t, maxTo));
-  if (f > t) {
-    const visible = Math.min(DEFAULT_VISIBLE_BARS, barCount);
-    f = Math.max(0, barCount - visible);
-    t = maxTo;
-  }
-  if (t - f < MIN_VISIBLE_BARS) {
-    t = Math.min(maxTo, f + MIN_VISIBLE_BARS);
-    f = Math.max(0, t - MIN_VISIBLE_BARS);
-  }
-  if (f > t) return null;
-  return { from: f as Logical, to: t as Logical };
-}
 
 function safeSetVisibleLogicalRange(
   chart: IChartApi,
@@ -110,6 +108,17 @@ export function CandleChart(props: {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [followLive, setFollowLive] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [overlays, setOverlays] = useState<ChartOverlayPrefs>(() =>
+    readJson(STORAGE_KEYS.chartOverlays, DEFAULT_CHART_OVERLAYS),
+  );
+
+  const toggleOverlay = useCallback((key: keyof ChartOverlayPrefs) => {
+    setOverlays((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      writeJson(STORAGE_KEYS.chartOverlays, next);
+      return next;
+    });
+  }, []);
 
   const applyLiveViewport = useCallback(() => {
     const chart = chartRef.current;
@@ -117,20 +126,35 @@ export function CandleChart(props: {
     if (!chart || !series) return;
     const count = series.data().length;
     if (count <= 0) return;
+    const live = liveVisibleLogicalRange(count);
+    if (!live) return;
     chart.timeScale().applyOptions({ rightOffset: RIGHT_OFFSET_BARS });
-    const visible = Math.min(DEFAULT_VISIBLE_BARS, count);
-    safeSetVisibleLogicalRange(chart, Math.max(0, count - visible), count - 1 + RIGHT_OFFSET_BARS, count);
+    safeSetVisibleLogicalRange(chart, live.from, live.to, count);
   }, []);
 
   const goLive = useCallback(() => {
     followLiveRef.current = true;
     setFollowLive(true);
-    applyLiveViewport();
-    try {
-      chartRef.current?.timeScale().scrollToRealTime();
-    } catch {
-      /* no data yet */
+    const chart = chartRef.current;
+    if (chart) {
+      chart.applyOptions({
+        timeScale: {
+          barSpacing: DEFAULT_BAR_SPACING,
+          rightOffset: RIGHT_OFFSET_BARS,
+          shiftVisibleRangeOnNewBar: true,
+        },
+      });
+      chart.priceScale("right").applyOptions({ autoScale: true });
     }
+    applyLiveViewport();
+    requestAnimationFrame(() => {
+      applyLiveViewport();
+      try {
+        chartRef.current?.timeScale().scrollToRealTime();
+      } catch {
+        /* no data yet */
+      }
+    });
   }, [applyLiveViewport]);
 
   useEffect(() => {
@@ -176,7 +200,7 @@ export function CandleChart(props: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.34 } },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.4 } },
       localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
@@ -221,8 +245,9 @@ export function CandleChart(props: {
       borderVisible: false,
     });
     chart.priceScale("rsi").applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0.02 },
+      scaleMargins: { top: 0.88, bottom: 0.02 },
       borderVisible: false,
+      visible: false,
     });
     const lineCommon = {
       priceLineVisible: false as const,
@@ -231,35 +256,36 @@ export function CandleChart(props: {
     };
     const vwap = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#60A5FA",
-      lineWidth: 2,
+      color: STUDY_LINE.vwap.color,
+      lineWidth: STUDY_LINE.vwap.lineWidth,
     });
     const ema = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#FBBF24",
-      lineWidth: 2,
+      color: STUDY_LINE.ema.color,
+      lineWidth: STUDY_LINE.ema.lineWidth,
     });
     const bbUpper = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#F87171",
-      lineWidth: 1,
+      color: STUDY_LINE.bb.color,
+      lineWidth: STUDY_LINE.bb.lineWidth,
       lineStyle: LineStyle.Dashed,
     });
     const bbMid = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#22D3EE",
+      color: "rgba(34, 211, 238, 0.35)",
       lineWidth: 1,
     });
     const bbLower = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#C084FC",
-      lineWidth: 1,
+      color: STUDY_LINE.bb.color,
+      lineWidth: STUDY_LINE.bb.lineWidth,
       lineStyle: LineStyle.Dashed,
     });
     const rsi = chart.addSeries(LineSeries, {
       ...lineCommon,
-      color: "#E2E8F0",
-      lineWidth: 2,
+      color: STUDY_LINE.rsi.color,
+      lineWidth: STUDY_LINE.rsi.lineWidth,
+      lineStyle: LineStyle.Dotted,
       priceScaleId: "rsi",
     });
     rsiLinesRef.current = [
@@ -441,6 +467,16 @@ export function CandleChart(props: {
     }
   }, [props.bars, props.symbol, props.timeframe, props.extendedHours, goLive, applyLiveViewport, applyStudyLines]);
 
+  useEffect(() => {
+    vwapRef.current?.applyOptions({ visible: overlays.vwap });
+    emaRef.current?.applyOptions({ visible: overlays.ema });
+    const bbOn = overlays.bb;
+    bbUpperRef.current?.applyOptions({ visible: bbOn });
+    bbMidRef.current?.applyOptions({ visible: bbOn });
+    bbLowerRef.current?.applyOptions({ visible: bbOn });
+    rsiRef.current?.applyOptions({ visible: overlays.rsi });
+  }, [overlays]);
+
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
       ? formatLastBarEtLabel(props.bars.at(-1)!.time)
@@ -468,13 +504,21 @@ export function CandleChart(props: {
           </div>
         </div>
         <div className="chart-toolbar-row chart-toolbar-right">
-          <div className="chart-legend chart-legend-minimal">
-            <span className="leg ema9">EMA 9</span>
-            <span className="leg bb">BB 20</span>
-            <span className="leg vwap">VWAP</span>
-            <span className="leg rsi">RSI 14</span>
+          <div className="chart-overlay-toggles" role="group" aria-label="Chart indicators">
+            {OVERLAY_TOGGLES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`leg-toggle ${item.className}${overlays[item.id] ? " on" : ""}`}
+                aria-pressed={overlays[item.id]}
+                title={`${overlays[item.id] ? "Hide" : "Show"} ${item.label}`}
+                onClick={() => toggleOverlay(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
             {props.lastPrice != null ? (
-              <span className="leg last-px">Last {fmtPrice(props.lastPrice)}</span>
+              <span className="leg last-px chart-last-px">Last {fmtPrice(props.lastPrice)}</span>
             ) : null}
           </div>
           <button
@@ -488,8 +532,8 @@ export function CandleChart(props: {
           <div className="chart-actions" role="group" aria-label="Chart view">
             <button
               type="button"
-              className={`chart-action-btn${followLive ? " active" : ""}`}
-              title="Jump to the latest candles"
+              className={`chart-action-btn chart-live-btn${followLive ? " active" : " needs-live"}`}
+              title="Reset zoom and jump to the latest candles"
               onClick={() => goLive()}
             >
               <Radio size={16} aria-hidden />

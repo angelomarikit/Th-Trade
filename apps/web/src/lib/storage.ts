@@ -24,4 +24,19 @@ export const STORAGE_KEYS = {
   alerts: "wulu.v2.alerts",
   recentScans: "wulu.v2.recentScans",
   inspectorOpen: "wulu.v2.inspectorOpen",
+  chartOverlays: "wulu.v2.chartOverlays",
 } as const;
+
+export type ChartOverlayPrefs = {
+  vwap: boolean;
+  ema: boolean;
+  bb: boolean;
+  rsi: boolean;
+};
+
+export const DEFAULT_CHART_OVERLAYS: ChartOverlayPrefs = {
+  vwap: true,
+  ema: true,
+  bb: true,
+  rsi: true,
+};
