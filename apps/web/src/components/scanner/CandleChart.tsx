@@ -120,6 +120,16 @@ export function CandleChart(props: {
     });
   }, []);
 
+  const applyOverlayVisibility = useCallback((prefs: ChartOverlayPrefs) => {
+    vwapRef.current?.applyOptions({ visible: prefs.vwap });
+    emaRef.current?.applyOptions({ visible: prefs.ema });
+    const bbOn = prefs.bb;
+    bbUpperRef.current?.applyOptions({ visible: bbOn });
+    bbMidRef.current?.applyOptions({ visible: bbOn });
+    bbLowerRef.current?.applyOptions({ visible: bbOn });
+    rsiRef.current?.applyOptions({ visible: prefs.rsi });
+  }, []);
+
   const applyLiveViewport = useCallback(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
@@ -376,6 +386,9 @@ export function CandleChart(props: {
     rsiRef.current?.setData(toLine(rsi14));
   }, []);
 
+  const overlaysRef = useRef(overlays);
+  overlaysRef.current = overlays;
+
   useEffect(() => {
     const series = seriesRef.current;
     const volume = volumeRef.current;
@@ -420,6 +433,7 @@ export function CandleChart(props: {
         vwap.update({ time: t, value: last.vwap });
       }
       applyStudyLines(aligned);
+      applyOverlayVisibility(overlaysRef.current);
       if (followLiveRef.current) {
         requestAnimationFrame(() => applyLiveViewport());
       }
@@ -447,6 +461,7 @@ export function CandleChart(props: {
         .map((b) => ({ time: b.time as Time, value: b.vwap as number }));
       vwap.setData(vwapPts);
       applyStudyLines(aligned);
+      applyOverlayVisibility(overlaysRef.current);
       shadeRef.current?.setBands(sessionBands(aligned, props.timeframe, props.extendedHours === true));
 
       chartRef.current?.applyOptions({
@@ -465,17 +480,20 @@ export function CandleChart(props: {
         }
       }
     }
-  }, [props.bars, props.symbol, props.timeframe, props.extendedHours, goLive, applyLiveViewport, applyStudyLines]);
+  }, [
+    props.bars,
+    props.symbol,
+    props.timeframe,
+    props.extendedHours,
+    goLive,
+    applyLiveViewport,
+    applyStudyLines,
+    applyOverlayVisibility,
+  ]);
 
   useEffect(() => {
-    vwapRef.current?.applyOptions({ visible: overlays.vwap });
-    emaRef.current?.applyOptions({ visible: overlays.ema });
-    const bbOn = overlays.bb;
-    bbUpperRef.current?.applyOptions({ visible: bbOn });
-    bbMidRef.current?.applyOptions({ visible: bbOn });
-    bbLowerRef.current?.applyOptions({ visible: bbOn });
-    rsiRef.current?.applyOptions({ visible: overlays.rsi });
-  }, [overlays]);
+    applyOverlayVisibility(overlays);
+  }, [overlays, applyOverlayVisibility]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
@@ -504,8 +522,8 @@ export function CandleChart(props: {
           </div>
         </div>
         <div className="chart-toolbar-row chart-toolbar-indicators">
-          <span className="chart-indicators-label">Indicators</span>
-          <div className="chart-overlay-toggles" role="group" aria-label="Chart indicators">
+          <span className="chart-indicators-label">Chart lines</span>
+          <div className="chart-overlay-toggles" role="group" aria-label="Chart line overlays">
             {OVERLAY_TOGGLES.map((item) => (
               <button
                 key={item.id}

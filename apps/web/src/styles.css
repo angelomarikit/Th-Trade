@@ -2470,7 +2470,10 @@ a {
     padding: 0.35rem 0.25rem;
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: rgba(8, 13, 20, 0.45);
+    background: rgba(8, 13, 20, 0.92);
+    position: sticky;
+    top: 0;
+    z-index: 6;
   }
 
   .chart-indicators-label {
