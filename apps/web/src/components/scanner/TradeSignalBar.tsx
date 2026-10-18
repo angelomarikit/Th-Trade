@@ -41,7 +41,7 @@ function barIcon(status: string): LucideIcon {
 
 /** Mobile-first trade signal strip — levels mirror setup engine output (display only). */
 export function TradeSignalBar() {
-  const { data, symbol, side, loading } = useTerminal();
+  const { data, side, loading } = useTerminal();
   const lc = data?.liveCard ? viewLiveCard(data.liveCard) : null;
 
   if (!lc) {
@@ -57,13 +57,11 @@ export function TradeSignalBar() {
   const headline = mobileHeadline(lc.status);
   const Icon = barIcon(lc.status);
   const tone = barTone(lc.status);
-  const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
+  const score10 = lc.qualityScore10;
   const scoreLabel =
     score10 != null && Number.isFinite(score10)
       ? `${Math.round(score10)}/10 SETUP SCORE`
-      : lc.setupScoreValue != null
-        ? `${lc.setupScoreValue}/100 SCORE`
-        : null;
+      : "—/10 SETUP SCORE";
   const entryMid =
     lc.entryZone != null ? (lc.entryZone.low + lc.entryZone.high) / 2 : lc.alertAt;
   const stale = lc.dataFresh === false;
@@ -77,10 +75,10 @@ export function TradeSignalBar() {
         <div className="trade-signal-bar-status">
           <Icon size={20} strokeWidth={2.25} aria-hidden />
           <span className="trade-signal-headline">{stale ? "DATA NOT VERIFIED" : headline}</span>
+          <span className="trade-signal-direction">{side}</span>
         </div>
-        {scoreLabel ? <span className="trade-signal-score">{scoreLabel}</span> : null}
+        <span className="trade-signal-score">{scoreLabel}</span>
       </div>
-      <p className="trade-signal-direction">{side}</p>
       <dl className="trade-signal-levels">
         <div>
           <dt>Entry</dt>
@@ -98,18 +96,12 @@ export function TradeSignalBar() {
           <dt>Target 2</dt>
           <dd className="level-t2">{fmtPrice(lc.t2)}</dd>
         </div>
-        {lc.t3 != null ? (
-          <div>
-            <dt>Target 3</dt>
-            <dd>{fmtPrice(lc.t3)}</dd>
-          </div>
-        ) : null}
+        <div>
+          <dt>Target 3</dt>
+          <dd>{lc.t3 != null ? fmtPrice(lc.t3) : "—"}</dd>
+        </div>
       </dl>
-      {stale && lc.dataFreshReason ? (
-        <p className="trade-signal-note">{lc.dataFreshReason}</p>
-      ) : (
-        <p className="trade-signal-note trade-signal-symbol">{symbol} · display only — not an order</p>
-      )}
+      {stale && lc.dataFreshReason ? <p className="trade-signal-note">{lc.dataFreshReason}</p> : null}
     </section>
   );
 }

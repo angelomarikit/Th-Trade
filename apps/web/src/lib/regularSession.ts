@@ -40,6 +40,8 @@ export function historyLimit(timeframe: string): number {
       return 800;
     case "15m":
       return 220;
+    case "1h":
+      return 180;
     case "1d":
       return 120;
     default:

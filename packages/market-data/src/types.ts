@@ -1,6 +1,6 @@
 export interface Bar {
   symbol: string;
-  timeframe: "1Min" | "5Min" | "15Min" | "1Day";
+  timeframe: "1Min" | "5Min" | "15Min" | "1Hour" | "1Day";
   /** Bar open time (UTC) */
   timestamp: Date;
   open: number;

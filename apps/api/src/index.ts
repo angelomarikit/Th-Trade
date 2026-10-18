@@ -247,7 +247,7 @@ async function main() {
   async function refreshBarsCache(
     cacheKey: string,
     ticker: string,
-    timeframe: "1Min" | "5Min" | "15Min" | "1Day",
+    timeframe: "1Min" | "5Min" | "15Min" | "1Hour" | "1Day",
     safeLimit: number,
     regularHoursOnly: boolean,
   ): Promise<unknown> {
@@ -587,20 +587,22 @@ async function main() {
           return json(res, 400, { error: "ticker query required" });
         }
         const tfKey = (url.searchParams.get("timeframe") ?? "5m").trim().toLowerCase();
-        const timeframeMap: Record<string, "1Min" | "5Min" | "15Min" | "1Day"> = {
+        const timeframeMap: Record<string, "1Min" | "5Min" | "15Min" | "1Hour" | "1Day"> = {
           "1m": "1Min",
           "1min": "1Min",
           "5m": "5Min",
           "5min": "5Min",
           "15m": "15Min",
           "15min": "15Min",
+          "1h": "1Hour",
+          "1hour": "1Hour",
           "1d": "1Day",
           "1day": "1Day",
         };
         const timeframe = timeframeMap[tfKey];
         if (!timeframe) {
           return json(res, 400, {
-            error: "timeframe must be 1m, 5m, 15m, or 1D (Alpaca-supported)",
+            error: "timeframe must be 1m, 5m, 15m, 1h, or 1D (Alpaca-supported)",
           });
         }
         const limit = Math.min(2000, Math.max(10, Number(url.searchParams.get("limit") ?? 150)));

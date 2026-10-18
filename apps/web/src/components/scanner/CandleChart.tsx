@@ -15,7 +15,7 @@ import {
   type Time,
   type TickMarkType,
 } from "lightweight-charts";
-import { Maximize2, Minimize2, Radio } from "lucide-react";
+import { Maximize2, Minimize2, Radio, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChartBar } from "../../lib/api";
 import { fmtPrice } from "../../lib/format";
@@ -82,6 +82,13 @@ export function CandleChart(props: {
   onExtendedHours?: (on: boolean) => void;
   lastPrice?: number | null;
   onRetry?: () => void;
+  chartExtras?: {
+    rvol: number | null;
+    feedLabel: string;
+    quoteNote: string | null;
+    side?: "LONG" | "SHORT";
+    onSide?: (side: "LONG" | "SHORT") => void;
+  };
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rsiHostRef = useRef<HTMLDivElement>(null);
@@ -105,6 +112,7 @@ export function CandleChart(props: {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [followLive, setFollowLive] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [overlays, setOverlays] = useState<ChartOverlayPrefs>(() =>
     readJson(STORAGE_KEYS.chartOverlays, DEFAULT_CHART_OVERLAYS),
   );
@@ -376,7 +384,20 @@ export function CandleChart(props: {
       }
     });
 
+    const mobileMq = window.matchMedia("(max-width: 767px)");
+    const applyVolumeLayout = () => {
+      const hideVolume = mobileMq.matches;
+      volume.applyOptions({ visible: !hideVolume });
+      chart.priceScale("vol").applyOptions({ visible: !hideVolume });
+      chart.priceScale("right").applyOptions({
+        scaleMargins: { top: 0.06, bottom: hideVolume ? 0.08 : 0.28 },
+      });
+    };
+    applyVolumeLayout();
+    mobileMq.addEventListener("change", applyVolumeLayout);
+
     return () => {
+      mobileMq.removeEventListener("change", applyVolumeLayout);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -665,22 +686,33 @@ export function CandleChart(props: {
         </div>
         <div className="chart-toolbar-row chart-toolbar-indicators">
           <span className="chart-indicators-label">Chart lines</span>
-          <div className="chart-overlay-toggles" role="group" aria-label="Chart line overlays">
-            {OVERLAY_TOGGLES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`leg-toggle ${item.className}${overlays[item.id] ? " on" : ""}`}
-                aria-pressed={overlays[item.id]}
-                aria-label={`${overlays[item.id] ? "Hide" : "Show"} ${item.label}`}
-                onClick={() => toggleOverlay(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-            {props.lastPrice != null ? (
-              <span className="leg last-px chart-last-px">Last {fmtPrice(props.lastPrice)}</span>
-            ) : null}
+          <div className="chart-indicators-row">
+            <div className="chart-overlay-toggles" role="group" aria-label="Chart line overlays">
+              {OVERLAY_TOGGLES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`leg-toggle ${item.className}${overlays[item.id] ? " on" : ""}`}
+                  aria-pressed={overlays[item.id]}
+                  aria-label={`${overlays[item.id] ? "Hide" : "Show"} ${item.label}`}
+                  onClick={() => toggleOverlay(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+              {props.lastPrice != null ? (
+                <span className="leg last-px chart-last-px">Last {fmtPrice(props.lastPrice)}</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="chart-settings-btn show-mobile-only"
+              aria-label="Chart settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((open) => !open)}
+            >
+              <Settings size={16} aria-hidden />
+            </button>
           </div>
         </div>
         <div className="chart-toolbar-row chart-toolbar-right">
@@ -726,6 +758,56 @@ export function CandleChart(props: {
           </span>
         </div>
       </div>
+      {settingsOpen ? (
+        <div className="chart-settings-sheet" role="dialog" aria-label="Chart settings">
+          <div className="chart-settings-head">
+            <strong>Chart settings</strong>
+            <button type="button" className="chart-action-btn" onClick={() => setSettingsOpen(false)}>
+              Close
+            </button>
+          </div>
+          {props.chartExtras?.onSide ? (
+            <div className="side-toggle" role="group" aria-label="Direction">
+              <button
+                type="button"
+                className={`buy ${props.chartExtras.side === "LONG" ? "active" : ""}`}
+                onClick={() => props.chartExtras?.onSide?.("LONG")}
+              >
+                LONG
+              </button>
+              <button
+                type="button"
+                className={`sell ${props.chartExtras.side === "SHORT" ? "active" : ""}`}
+                onClick={() => props.chartExtras?.onSide?.("SHORT")}
+              >
+                SHORT
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className={`chart-action-btn${props.extendedHours ? " active" : ""}`}
+            onClick={() => props.onExtendedHours?.(!props.extendedHours)}
+          >
+            Extended hours {props.extendedHours ? "ON" : "OFF"}
+          </button>
+          <button type="button" className="chart-action-btn" onClick={() => goLive()}>
+            Return to Live
+          </button>
+          <button type="button" className="chart-action-btn" onClick={() => void toggleFullscreen()}>
+            {fullscreen ? "Exit fullscreen" : "Fullscreen chart"}
+          </button>
+          <p className="chart-settings-meta">
+            {props.extendedHours ? "EXT · ET" : "RTH · ET"}
+            {lastBarEt ? ` · last ${lastBarEt}` : ""}
+            {props.chartExtras?.feedLabel ? ` · ${props.chartExtras.feedLabel}` : ""}
+            {props.chartExtras?.rvol != null ? ` · RVOL ${props.chartExtras.rvol.toFixed(2)}x` : ""}
+          </p>
+          {props.chartExtras?.quoteNote ? (
+            <p className="chart-settings-meta">{props.chartExtras.quoteNote}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="chart-stack">
         <div className="chart-host" ref={hostRef}>
           {props.error && (

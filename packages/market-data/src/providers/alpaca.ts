@@ -467,6 +467,8 @@ function mapTimeframe(tf: Bar["timeframe"]): string {
       return "5Min";
     case "15Min":
       return "15Min";
+    case "1Hour":
+      return "1Hour";
     case "1Day":
       return "1Day";
   }
@@ -480,6 +482,8 @@ function timeframeMs(tf: Bar["timeframe"]): number {
       return 300_000;
     case "15Min":
       return 900_000;
+    case "1Hour":
+      return 3_600_000;
     case "1Day":
       return 86_400_000;
   }
@@ -494,6 +498,8 @@ function lookbackForTimeframe(tf: Bar["timeframe"], limit: number): number {
       return Math.max(14 * 86_400_000, Math.ceil(limit * 300_000 * pad));
     case "15Min":
       return Math.max(21 * 86_400_000, Math.ceil(limit * 900_000 * pad));
+    case "1Hour":
+      return Math.max(90 * 86_400_000, Math.ceil(limit * 3_600_000 * pad));
     case "1Day":
       return Math.max(180 * 86_400_000, Math.ceil(limit * 86_400_000 * pad));
   }

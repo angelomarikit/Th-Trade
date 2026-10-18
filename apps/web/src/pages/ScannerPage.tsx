@@ -33,6 +33,7 @@ export function ScannerPage() {
     scan,
     toggleWatchlist,
     watchlist,
+    setSide,
   } = useTerminal();
 
   // One signal rail on phone/tablet — inspector duplicates recommendation UI.
@@ -154,62 +155,64 @@ export function ScannerPage() {
 
         <div className="scanner-main-v7">
           <header className="scanner-instrument panel">
-            <div>
-              <div className="scanner-instrument-title">
-                <h1>{symbol}</h1>
-                <button
-                  type="button"
-                  className={`icon-btn scanner-star show-mobile-only${starred ? " starred" : ""}`}
-                  onClick={() => toggleWatchlist(symbol)}
-                  title={starred ? "Remove from watchlist" : "Add to watchlist"}
-                  aria-label={starred ? "Remove from watchlist" : "Add to watchlist"}
-                >
-                  <Star size={18} fill={starred ? "currentColor" : "none"} aria-hidden />
-                </button>
-                {/* Status chips: TopBar on mobile; desktop duplicates session/feed here */}
-                <div className="scanner-instrument-meta hide-mobile">
-                  {loading && <span className="badge">Updating…</span>}
-                  {sessionLabel && <span className="badge amber">{sessionLabel}</span>}
-                  <span className="badge blue" title="Market data feed">
-                    {feedLabel}
+            <div className="scanner-instrument-body">
+              <div className="scanner-instrument-main">
+                <div className="scanner-instrument-title">
+                  <h1>{symbol}</h1>
+                  <button
+                    type="button"
+                    className={`icon-btn scanner-star show-mobile-only${starred ? " starred" : ""}`}
+                    onClick={() => toggleWatchlist(symbol)}
+                    title={starred ? "Remove from watchlist" : "Add to watchlist"}
+                    aria-label={starred ? "Remove from watchlist" : "Add to watchlist"}
+                  >
+                    <Star size={18} fill={starred ? "currentColor" : "none"} aria-hidden />
+                  </button>
+                  {/* Status chips: TopBar on mobile; desktop duplicates session/feed here */}
+                  <div className="scanner-instrument-meta hide-mobile">
+                    {loading && <span className="badge">Updating…</span>}
+                    {sessionLabel && <span className="badge amber">{sessionLabel}</span>}
+                    <span className="badge blue" title="Market data feed">
+                      {feedLabel}
+                    </span>
+                    {lc?.marketRegime && <span className="badge">{lc.marketRegime}</span>}
+                  </div>
+                </div>
+                <div className="scanner-price-row">
+                  <span className="last" title="Regular-session close. The chart stops at 16:00 ET and does not include after-hours prints.">
+                    {last != null ? fmtPrice(last) : "—"}
                   </span>
-                  {lc?.marketRegime && <span className="badge">{lc.marketRegime}</span>}
+                  {chg != null && (
+                    <span className={`chg ${chg >= 0 ? "up" : "down"}`} title="Session change from setup">
+                      {dayStats && sessionBars.length > 0 ? (
+                        <>
+                          {sessionBars.at(-1)!.close - sessionBars[0].open >= 0 ? "+" : ""}
+                          {fmtPrice(sessionBars.at(-1)!.close - sessionBars[0].open)}{" "}
+                        </>
+                      ) : null}
+                      ({fmtPct(chg)})
+                    </span>
+                  )}
+                  <span className="muted hide-mobile">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
+                  <span className="muted hide-mobile" title="US Eastern time of the last candle open">
+                    Last bar {lastBarAt ?? "—"}
+                  </span>
+                  <span className="badge blue hide-mobile" title="Alpaca Basic IEX via REST. Not the SIP consolidated feed and not a websocket.">
+                    {feedLabel} REST
+                  </span>
+                  {quoteDiffers && (
+                    <span className="muted hide-mobile" title="Latest quote from the setup check. The candle is not changed to this number.">
+                      Quote {fmtPrice(quotePx)}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="scanner-price-row">
-                <span className="last" title="Regular-session close. The chart stops at 16:00 ET and does not include after-hours prints.">
-                  {last != null ? fmtPrice(last) : "—"}
-                </span>
-                {chg != null && (
-                  <span className={`chg ${chg >= 0 ? "up" : "down"}`} title="Session change from setup">
-                    {dayStats && sessionBars.length > 0 ? (
-                      <>
-                        {sessionBars.at(-1)!.close - sessionBars[0].open >= 0 ? "+" : ""}
-                        {fmtPrice(sessionBars.at(-1)!.close - sessionBars[0].open)}{" "}
-                      </>
-                    ) : null}
-                    ({fmtPct(chg)})
-                  </span>
-                )}
-                <span className="muted hide-mobile">RVOL {rvol != null ? `${rvol.toFixed(2)}x` : "—"}</span>
-                <span className="muted hide-mobile" title="US Eastern time of the last candle open">
-                  Last bar {lastBarAt ?? "—"}
-                </span>
-                <span className="badge blue hide-mobile" title="Alpaca Basic IEX via REST. Not the SIP consolidated feed and not a websocket.">
-                  {feedLabel} REST
-                </span>
-                {quoteDiffers && (
-                  <span className="muted hide-mobile" title="Latest quote from the setup check. The candle is not changed to this number.">
-                    Quote {fmtPrice(quotePx)}
-                  </span>
-                )}
-              </div>
               <div className="scanner-instrument-stats show-mobile-only">
-                <span>Vol {fmtCompactVolume(dayStats?.vol)}</span>
+                <span>Volume {fmtCompactVolume(dayStats?.vol)}</span>
                 <span>
-                  Day {dayStats ? `${fmtPrice(dayStats.lo)} – ${fmtPrice(dayStats.hi)}` : "—"}
+                  Day range {dayStats ? `${fmtPrice(dayStats.lo)} – ${fmtPrice(dayStats.hi)}` : "—"}
                 </span>
-                <span>Updated {lastBarAt ?? "—"}</span>
+                <span>Last update {lastBarAt ?? "—"}</span>
               </div>
               <div className="scanner-instrument-tf show-mobile-only" role="group" aria-label="Chart timeframe">
                 <div className="tf-group tf-group-mobile">
@@ -240,6 +243,16 @@ export function ScannerPage() {
             onExtendedHours={setExtendedHours}
             lastPrice={last}
             onRetry={() => void scan({ ticker: symbol, fast: true })}
+            chartExtras={{
+              rvol: rvol ?? null,
+              feedLabel,
+              quoteNote: quoteDiffers && quotePx != null ? `Quote ${fmtPrice(quotePx)}` : null,
+              side,
+              onSide: (next) => {
+                setSide(next);
+                void scan({ ticker: symbol, side: next, brief: false });
+              },
+            }}
           />
         </div>
 

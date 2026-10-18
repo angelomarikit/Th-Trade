@@ -3,8 +3,8 @@ import { NavLink } from "react-router-dom";
 
 const ITEMS = [
   { to: "/scanner", label: "Scanner", icon: Radar },
+  { to: "/watchlist", label: "Watchlist", icon: Star },
   { to: "/opportunities", label: "Discover", icon: Search },
-  { to: "/watchlist", label: "Watch", icon: Star },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/settings", label: "More", icon: Settings },
 ];

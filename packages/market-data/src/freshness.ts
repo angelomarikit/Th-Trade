@@ -9,6 +9,7 @@ const BAR_DURATION_MS: Record<Bar["timeframe"], number> = {
   "1Min": 60_000,
   "5Min": 300_000,
   "15Min": 900_000,
+  "1Hour": 3_600_000,
   "1Day": 86_400_000,
 };
 
