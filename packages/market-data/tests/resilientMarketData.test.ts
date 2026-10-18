@@ -13,10 +13,11 @@ describe("resilientMarketData", () => {
     expect(isAlpacaMarketDataAuthError(new Error("timeout"))).toBe(false);
   });
 
-  it("enables soft-fail on Railway hosts by default", () => {
+  it("defaults soft-fail on unless explicitly disabled", () => {
+    expect(marketDataAuthSoftFailEnabled({})).toBe(true);
     expect(marketDataAuthSoftFailEnabled({ RAILWAY_PROJECT_ID: "abc" })).toBe(true);
     expect(marketDataAuthSoftFailEnabled({ MARKET_DATA_AUTH_SOFT_FAIL: "0" })).toBe(false);
-    expect(marketDataAuthSoftFailEnabled({ MARKET_DATA_AUTH_SOFT_FAIL: "1" })).toBe(true);
+    expect(marketDataAuthSoftFailEnabled({ MARKET_DATA_AUTH_SOFT_FAIL: "false" })).toBe(false);
   });
 
   it("getSnapshot returns empty snapshot on auth failure instead of throwing", async () => {

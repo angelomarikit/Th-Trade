@@ -175,6 +175,9 @@ async function main() {
   });
 
   const marketData = createMarketDataFromEnv();
+  console.log(
+    `[market-data] provider=${marketData.name} authSoftFail=${marketDataAuthSoftFailEnabled() ? "on" : "off"}`,
+  );
   const flags = loadFeatureFlags();
   const alpaca = loadAlpacaCredentials();
   const journal = scanner.signalJournal;
@@ -263,7 +266,7 @@ async function main() {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.warn(`[bars] refresh failed ${ticker} ${timeframe}: ${message.slice(0, 200)}`);
-        if (isAlpacaMarketDataAuthError(err)) {
+        if (isAlpacaMarketDataAuthError(err) || /401 Authorization Required/i.test(message)) {
           const payload = {
             symbol: ticker.toUpperCase(),
             timeframe,
