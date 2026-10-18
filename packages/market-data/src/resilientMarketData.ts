@@ -2,6 +2,19 @@ import type { MarketDataProvider } from "./MarketDataProvider.js";
 import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "./types.js";
 import type { BarsQuery } from "./MarketDataProvider.js";
 
+function emptyMarketSnapshot(symbol: string): MarketSnapshot {
+  return {
+    symbol: symbol.toUpperCase(),
+    lastPrice: 0,
+    quote: null,
+    bars1m: [],
+    bars5m: [],
+    receivedAt: new Date(),
+    marketTimestamp: null,
+    priceSource: "unknown",
+  };
+}
+
 export function isAlpacaMarketDataAuthError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /Alpaca market data HTTP (401|403)\b/.test(msg);
@@ -19,13 +32,14 @@ export function wrapMarketDataAuthSoftFail(inner: MarketDataProvider): MarketDat
     );
   };
 
-  const onAuthFail = (method: string): never | [] | null | Map<string, never> => {
+  const onAuthFail = (method: string, symbol?: string): [] | null | MarketSnapshot => {
     warn(method);
     if (method === "getBars") return [];
     if (method === "getQuote") return null;
     if (method === "getDiscoverySnapshots") return [];
     if (method === "getSnapshots") return [];
-    throw new Error("Alpaca market data unavailable (authentication failed)");
+    if (method === "getSnapshot") return emptyMarketSnapshot(symbol ?? "UNKNOWN");
+    return [];
   };
 
   return {
@@ -50,7 +64,7 @@ export function wrapMarketDataAuthSoftFail(inner: MarketDataProvider): MarketDat
       try {
         return await inner.getSnapshot(symbol);
       } catch (err) {
-        if (isAlpacaMarketDataAuthError(err)) return onAuthFail("getSnapshot") as never;
+        if (isAlpacaMarketDataAuthError(err)) return onAuthFail("getSnapshot", symbol) as MarketSnapshot;
         throw err;
       }
     },
@@ -79,5 +93,8 @@ export function marketDataAuthSoftFailEnabled(env: NodeJS.ProcessEnv = process.e
   const flag = (env.MARKET_DATA_AUTH_SOFT_FAIL ?? "").trim();
   if (flag === "1" || flag.toLowerCase() === "true") return true;
   if (flag === "0" || flag.toLowerCase() === "false") return false;
-  return (env.RAILWAY_ENVIRONMENT ?? "").toLowerCase() === "preview";
+  if ((env.RAILWAY_ENVIRONMENT ?? "").toLowerCase() === "preview") return true;
+  // Any Railway-hosted API should stay up when keys are wrong — return empty data, not exit.
+  if (env.RAILWAY_PROJECT_ID || env.RAILWAY_SERVICE_ID || env.RAILWAY_REPLICA_ID) return true;
+  return false;
 }

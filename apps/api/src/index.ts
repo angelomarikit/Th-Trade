@@ -23,7 +23,9 @@ import {
   barEffectiveEndTime,
   EXECUTION_POLICY,
   hasAlpacaCredentials,
+  isAlpacaMarketDataAuthError,
   loadAlpacaCredentials,
+  marketDataAuthSoftFailEnabled,
   withAlpacaPriority,
 } from "@wulu/market-data";
 import { createNewsServiceFromEnv, emptyWhyMoving } from "@wulu/news";
@@ -83,6 +85,11 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 // dotenv will report "injected env (0)" when no .env file exists (that is normal).
 loadEnv({ path: path.join(rootDir, ".env") });
 process.env.JOURNAL_ROOT = process.env.JOURNAL_ROOT ?? rootDir;
+
+process.on("unhandledRejection", (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error("[process] unhandledRejection:", message.slice(0, 400));
+});
 
 const port = Number(process.env.PORT ?? 8787);
 /** Normalize: browsers send Origin without trailing slash. */
@@ -256,6 +263,20 @@ async function main() {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.warn(`[bars] refresh failed ${ticker} ${timeframe}: ${message.slice(0, 200)}`);
+        if (isAlpacaMarketDataAuthError(err)) {
+          const payload = {
+            symbol: ticker.toUpperCase(),
+            timeframe,
+            provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
+            feed: process.env.ALPACA_DATA_FEED ?? "iex",
+            count: 0,
+            bars: [] as unknown[],
+            timings: { alpacaMs: Date.now() - started },
+            error: "Alpaca authentication failed — check API keys on the host",
+          };
+          barsResponseCache.set(cacheKey, { at: Date.now(), payload });
+          return payload;
+        }
         throw err;
       }
       const alpacaMs = Date.now() - started;
@@ -364,6 +385,7 @@ async function main() {
           barsCacheMs: BARS_CACHE_MS,
           alpacaInteractivePriority: true,
           alpacaCredentialsPresent: hasAlpacaCredentials(alpaca),
+          marketDataAuthSoftFail: marketDataAuthSoftFailEnabled(),
           journalEnabled: journal != null,
           journalCount: journal?.count() ?? 0,
           optionsEngine: flags.optionsEngine,
