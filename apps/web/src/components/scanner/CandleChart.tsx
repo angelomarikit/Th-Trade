@@ -16,7 +16,7 @@ import {
   type TickMarkType,
 } from "lightweight-charts";
 import { Maximize2, Minimize2, Radio } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChartBar } from "../../lib/api";
 import { fmtPrice } from "../../lib/format";
 import {
@@ -45,7 +45,7 @@ const STUDY_LINE = {
   vwap: { color: "rgba(96, 165, 250, 0.82)", lineWidth: 2 as const },
   ema: { color: "rgba(251, 191, 36, 0.78)", lineWidth: 2 as const },
   bb: { color: "rgba(34, 211, 238, 0.55)", lineWidth: 1 as const },
-  rsi: { color: "rgba(148, 163, 184, 0.45)", lineWidth: 1 as const },
+  rsi: { color: "rgba(192, 132, 252, 0.92)", lineWidth: 2 as const },
 };
 
 const OVERLAY_TOGGLES = [
@@ -90,7 +90,10 @@ export function CandleChart(props: {
   onRetry?: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const rsiHostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const rsiChartRef = useRef<IChartApi | null>(null);
+  const rangeSyncRef = useRef(false);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -127,7 +130,16 @@ export function CandleChart(props: {
     bbUpperRef.current?.applyOptions({ visible: bbOn });
     bbMidRef.current?.applyOptions({ visible: bbOn });
     bbLowerRef.current?.applyOptions({ visible: bbOn });
-    rsiRef.current?.applyOptions({ visible: prefs.rsi });
+  }, []);
+
+  const syncRsiTimeRange = useCallback((from: number, to: number, barCount: number) => {
+    if (!overlaysRef.current.rsi || !rsiChartRef.current || rangeSyncRef.current) return;
+    rangeSyncRef.current = true;
+    try {
+      safeSetVisibleLogicalRange(rsiChartRef.current, from, to, barCount);
+    } finally {
+      rangeSyncRef.current = false;
+    }
   }, []);
 
   const applyLiveViewport = useCallback(() => {
@@ -140,7 +152,8 @@ export function CandleChart(props: {
     if (!live) return;
     chart.timeScale().applyOptions({ rightOffset: RIGHT_OFFSET_BARS });
     safeSetVisibleLogicalRange(chart, live.from, live.to, count);
-  }, []);
+    syncRsiTimeRange(live.from, live.to, count);
+  }, [syncRsiTimeRange]);
 
   const goLive = useCallback(() => {
     followLiveRef.current = true;
@@ -161,11 +174,41 @@ export function CandleChart(props: {
       applyLiveViewport();
       try {
         chartRef.current?.timeScale().scrollToRealTime();
+        rsiChartRef.current?.timeScale().scrollToRealTime();
       } catch {
         /* no data yet */
       }
     });
   }, [applyLiveViewport]);
+
+  useEffect(() => {
+    const showRsiPanel = overlays.rsi;
+    chartRef.current?.applyOptions({
+      timeScale: { timeVisible: !showRsiPanel, secondsVisible: false },
+    });
+    rsiChartRef.current?.applyOptions({
+      timeScale: { timeVisible: showRsiPanel, secondsVisible: false },
+    });
+    requestAnimationFrame(() => {
+      if (hostRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: hostRef.current.clientWidth,
+          height: hostRef.current.clientHeight,
+        });
+      }
+      if (showRsiPanel && rsiHostRef.current && rsiChartRef.current) {
+        rsiChartRef.current.applyOptions({
+          width: rsiHostRef.current.clientWidth,
+          height: rsiHostRef.current.clientHeight,
+        });
+        const count = seriesRef.current?.data()?.length ?? 0;
+        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+        if (range && count > 0) {
+          syncRsiTimeRange(Number(range.from), Number(range.to), count);
+        }
+      }
+    });
+  }, [overlays.rsi, syncRsiTimeRange]);
 
   useEffect(() => {
     const onFs = () => {
@@ -210,11 +253,11 @@ export function CandleChart(props: {
         vertLines: { color: "#15202c" },
         horzLines: { color: "#15202c" },
       },
-      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.4 } },
+      rightPriceScale: { borderColor: "#2a3a4d", scaleMargins: { top: 0.06, bottom: 0.28 } },
       localization: chartEtLocalization,
       timeScale: {
         borderColor: "#2a3a4d",
-        timeVisible: true,
+        timeVisible: !readJson(STORAGE_KEYS.chartOverlays, DEFAULT_CHART_OVERLAYS).rsi,
         secondsVisible: false,
         tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
           formatEtChartTick(time, tickMarkType),
@@ -254,11 +297,6 @@ export function CandleChart(props: {
       scaleMargins: { top: 0.62, bottom: 0.2 },
       borderVisible: false,
     });
-    chart.priceScale("rsi").applyOptions({
-      scaleMargins: { top: 0.88, bottom: 0.02 },
-      borderVisible: false,
-      visible: false,
-    });
     const lineCommon = {
       priceLineVisible: false as const,
       lastValueVisible: false as const,
@@ -291,17 +329,6 @@ export function CandleChart(props: {
       lineWidth: STUDY_LINE.bb.lineWidth,
       lineStyle: LineStyle.Dashed,
     });
-    const rsi = chart.addSeries(LineSeries, {
-      ...lineCommon,
-      color: STUDY_LINE.rsi.color,
-      lineWidth: STUDY_LINE.rsi.lineWidth,
-      lineStyle: LineStyle.Dotted,
-      priceScaleId: "rsi",
-    });
-    rsiLinesRef.current = [
-      rsi.createPriceLine({ price: 70, color: "#F87171", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false }),
-      rsi.createPriceLine({ price: 30, color: "#35C89A", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false }),
-    ];
     const shade = new SessionShadePrimitive();
     series.attachPrimitive(shade);
     chartRef.current = chart;
@@ -312,7 +339,6 @@ export function CandleChart(props: {
     bbUpperRef.current = bbUpper;
     bbMidRef.current = bbMid;
     bbLowerRef.current = bbLower;
-    rsiRef.current = rsi;
     shadeRef.current = shade;
 
     const ro = new ResizeObserver(() => {
@@ -346,6 +372,14 @@ export function CandleChart(props: {
         safeSetVisibleLogicalRange(chart, from, to, count);
         clampRef.current = false;
       }
+      if (overlaysRef.current.rsi && rsiChartRef.current && !rangeSyncRef.current) {
+        rangeSyncRef.current = true;
+        try {
+          safeSetVisibleLogicalRange(rsiChartRef.current, from, to, count);
+        } finally {
+          rangeSyncRef.current = false;
+        }
+      }
     });
 
     return () => {
@@ -359,16 +393,119 @@ export function CandleChart(props: {
       bbUpperRef.current = null;
       bbMidRef.current = null;
       bbLowerRef.current = null;
+      shadeRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rsiHostRef.current) return;
+    const el = rsiHostRef.current;
+    const chart = createChart(el, {
+      height: el.clientHeight || 88,
+      layout: {
+        background: { type: ColorType.Solid, color: "#080D14" },
+        textColor: "#9AA8BA",
+        fontFamily: "JetBrains Mono, ui-monospace, monospace",
+        fontSize: (el.clientWidth ?? 999) < 768 ? 12 : 11,
+      },
+      grid: {
+        vertLines: { color: "#15202c" },
+        horzLines: { color: "#1a2533" },
+      },
+      rightPriceScale: {
+        borderColor: "#2a3a4d",
+        scaleMargins: { top: 0.06, bottom: 0.06 },
+      },
+      localization: chartEtLocalization,
+      timeScale: {
+        borderColor: "#2a3a4d",
+        timeVisible: readJson(STORAGE_KEYS.chartOverlays, DEFAULT_CHART_OVERLAYS).rsi,
+        secondsVisible: false,
+        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
+          formatEtChartTick(time, tickMarkType),
+        rightOffset: RIGHT_OFFSET_BARS,
+        fixRightEdge: true,
+        fixLeftEdge: true,
+        shiftVisibleRangeOnNewBar: true,
+        barSpacing: 7,
+        minBarSpacing: 2,
+      },
+      crosshair: { mode: 1 },
+      handleScroll: false,
+      handleScale: false,
+    });
+    const rsi = chart.addSeries(LineSeries, {
+      color: STUDY_LINE.rsi.color,
+      lineWidth: STUDY_LINE.rsi.lineWidth,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+    });
+    rsiLinesRef.current = [
+      rsi.createPriceLine({
+        price: 100,
+        color: "transparent",
+        lineWidth: 1,
+        lineVisible: false,
+        axisLabelVisible: false,
+      }),
+      rsi.createPriceLine({
+        price: 70,
+        color: "rgba(248, 113, 113, 0.78)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: "70",
+      }),
+      rsi.createPriceLine({
+        price: 50,
+        color: "rgba(148, 163, 184, 0.55)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: false,
+      }),
+      rsi.createPriceLine({
+        price: 30,
+        color: "rgba(53, 200, 154, 0.78)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: "30",
+      }),
+      rsi.createPriceLine({
+        price: 0,
+        color: "transparent",
+        lineWidth: 1,
+        lineVisible: false,
+        axisLabelVisible: false,
+      }),
+    ];
+    chart.priceScale("right").applyOptions({ autoScale: true });
+    rsiChartRef.current = chart;
+    rsiRef.current = rsi;
+
+    const ro = new ResizeObserver(() => {
+      if (!rsiHostRef.current || !rsiChartRef.current) return;
+      rsiChartRef.current.applyOptions({
+        width: rsiHostRef.current.clientWidth,
+        height: rsiHostRef.current.clientHeight,
+      });
+    });
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
       for (const ln of rsiLinesRef.current) {
         try {
-          rsiRef.current?.removePriceLine(ln);
+          rsi.removePriceLine(ln);
         } catch {
           /* removed */
         }
       }
       rsiLinesRef.current = [];
+      chart.remove();
+      rsiChartRef.current = null;
       rsiRef.current = null;
-      shadeRef.current = null;
     };
   }, []);
 
@@ -493,7 +630,18 @@ export function CandleChart(props: {
 
   useEffect(() => {
     applyOverlayVisibility(overlays);
+    rsiRef.current?.applyOptions({ visible: overlays.rsi });
   }, [overlays, applyOverlayVisibility]);
+
+  const lastRsi = useMemo(() => {
+    if (!props.bars?.length) return null;
+    const { rsi14 } = studiesFromBars(props.bars);
+    for (let i = rsi14.length - 1; i >= 0; i--) {
+      const v = rsi14[i];
+      if (v != null && Number.isFinite(v)) return v;
+    }
+    return null;
+  }, [props.bars]);
 
   const lastBarEt =
     props.bars?.length && props.bars.at(-1)?.time
@@ -584,27 +732,43 @@ export function CandleChart(props: {
           </span>
         </div>
       </div>
-      <div className="chart-host" ref={hostRef}>
-        {props.error && (
-          <div className="chart-overlay-msg chart-overlay-warn" role="alert">
-            <div>
-              <p style={{ margin: "0 0 0.6rem" }}>{props.error}</p>
-              {props.onRetry && (
-                <button type="button" className="chart-action-btn" onClick={props.onRetry}>
-                  Retry
-                </button>
-              )}
+      <div className="chart-stack">
+        <div className="chart-host" ref={hostRef}>
+          {props.error && (
+            <div className="chart-overlay-msg chart-overlay-warn" role="alert">
+              <div>
+                <p style={{ margin: "0 0 0.6rem" }}>{props.error}</p>
+                {props.onRetry && (
+                  <button type="button" className="chart-action-btn" onClick={props.onRetry}>
+                    Retry
+                  </button>
+                )}
+              </div>
             </div>
+          )}
+          {props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
+            <div className="chart-overlay-msg">Loading {props.symbol}…</div>
+          )}
+          {!props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
+            <div className="chart-overlay-msg">
+              No bar data for {props.symbol} / {props.timeframe}.
+            </div>
+          )}
+        </div>
+        <div
+          className={`chart-rsi-panel${overlays.rsi ? "" : " chart-rsi-panel--hidden"}`}
+          aria-hidden={!overlays.rsi}
+        >
+          <div className="chart-rsi-head">
+            <span className="chart-rsi-title">RSI (14)</span>
+            {lastRsi != null ? (
+              <span className="chart-rsi-val">{lastRsi.toFixed(1)}</span>
+            ) : (
+              <span className="chart-rsi-val muted">—</span>
+            )}
           </div>
-        )}
-        {props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
-          <div className="chart-overlay-msg">Loading {props.symbol}…</div>
-        )}
-        {!props.loading && !props.error && (!props.bars || props.bars.length === 0) && (
-          <div className="chart-overlay-msg">
-            No bar data for {props.symbol} / {props.timeframe}.
-          </div>
-        )}
+          <div className="chart-rsi-host" ref={rsiHostRef} />
+        </div>
       </div>
     </div>
   );

@@ -53,10 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const sb = getSupabase();
-    void sb.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      void loadMe(data.session).finally(() => setLoading(false));
-    });
+    void sb.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        return loadMe(data.session);
+      })
+      .catch((err) => {
+        console.warn("[auth] getSession failed", err);
+        setSession(null);
+      })
+      .finally(() => setLoading(false));
     const { data: sub } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       void loadMe(next);
