@@ -669,7 +669,7 @@ export function CandleChart(props: {
       className={`panel chart-wrap chart-wrap-hero${fullscreen ? " chart-fullscreen" : ""}`}
     >
       <div className="chart-toolbar">
-        <div className="chart-toolbar-row chart-toolbar-tf hide-mobile-tf">
+        <div className="chart-toolbar-row chart-toolbar-tf">
           <div className="tf-group" role="group" aria-label="Chart timeframe">
             {CHART_TIMEFRAMES.map((tf) => (
               <button

@@ -2754,8 +2754,14 @@ a {
     font-weight: 600;
   }
 
-  .hide-mobile-tf {
-    display: none !important;
+  .chart-toolbar-tf .tf-group {
+    width: 100%;
+  }
+
+  .chart-toolbar-tf .tf-group button {
+    min-width: 0;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
   }
 
   .signal-panel-hero-dup,

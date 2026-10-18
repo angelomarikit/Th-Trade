@@ -7,7 +7,6 @@ import { SetupInspector } from "../components/scanner/SetupInspector";
 import { TradeSignalBar } from "../components/scanner/TradeSignalBar";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
-import { CHART_TIMEFRAMES } from "../lib/chartTimeframes";
 import { fmtCompactVolume, fmtPct, fmtPrice, formatEtTime } from "../lib/format";
 
 export function ScannerPage() {
@@ -214,21 +213,6 @@ export function ScannerPage() {
                   Day range {dayStats ? `${fmtPrice(dayStats.lo)} – ${fmtPrice(dayStats.hi)}` : "—"}
                 </span>
                 <span>Last update {lastBarAt ?? "—"}</span>
-              </div>
-              <div className="scanner-instrument-tf show-mobile-only" role="group" aria-label="Chart timeframe">
-                <div className="tf-group tf-group-mobile">
-                  {CHART_TIMEFRAMES.map((tf) => (
-                    <button
-                      key={tf.id}
-                      type="button"
-                      className={chartTf === tf.id ? "active" : ""}
-                      aria-pressed={chartTf === tf.id}
-                      onClick={() => setChartTf(tf.id)}
-                    >
-                      {tf.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </header>
