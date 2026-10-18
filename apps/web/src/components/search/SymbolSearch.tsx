@@ -21,7 +21,7 @@ export function SymbolSearch(props: {
   const userQueryRef = useRef(false);
 
   useEffect(() => {
-    userQueryRef.current = false;
+    if (userQueryRef.current) return;
     setQ(props.initial ?? "");
     setHits([]);
     setOpen(false);
@@ -29,11 +29,11 @@ export function SymbolSearch(props: {
   }, [props.initial]);
 
   useEffect(() => {
-    function onDoc(e: Event) {
+    function onDoc(e: MouseEvent) {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("pointerdown", onDoc);
-    return () => document.removeEventListener("pointerdown", onDoc);
+    document.addEventListener("click", onDoc, true);
+    return () => document.removeEventListener("click", onDoc, true);
   }, []);
 
   useEffect(() => {
@@ -109,6 +109,9 @@ export function SymbolSearch(props: {
             setQ(e.target.value);
           }}
           onKeyDown={onKeyDown}
+          onFocus={() => {
+            if (userQueryRef.current && hits.length > 0) setOpen(true);
+          }}
           placeholder={props.placeholder ?? "Search ticker or company name…"}
           aria-label="Stock search"
           aria-autocomplete="list"

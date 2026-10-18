@@ -650,6 +650,23 @@ a {
   width: 100%;
 }
 
+.chart-toolbar-indicators {
+  width: 100%;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.chart-indicators-label {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.45rem;
+  min-width: 4.75rem;
+}
+
 .chart-toolbar-right {
   display: flex;
   flex-wrap: wrap;
@@ -1807,7 +1824,7 @@ a {
 
 .symbol-search-results {
   position: absolute;
-  z-index: 40;
+  z-index: 120;
   left: 0;
   right: 0;
   top: calc(100% + 4px);
@@ -2069,6 +2086,7 @@ a {
   line-height: 1.2;
   cursor: pointer;
   min-height: 32px;
+  touch-action: manipulation;
 }
 
 .leg-toggle::before {
@@ -2446,6 +2464,20 @@ a {
     width: 100%;
   }
 
+  .chart-toolbar-indicators {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.35rem 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(8, 13, 20, 0.45);
+  }
+
+  .chart-indicators-label {
+    padding-top: 0;
+    padding-left: 0.15rem;
+  }
+
   .chart-toolbar-right {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -2455,12 +2487,11 @@ a {
   }
 
   .chart-overlay-toggles {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex: 1;
+    flex-wrap: wrap;
+    overflow: visible;
     max-width: 100%;
-    padding-bottom: 0.1rem;
+    gap: 0.4rem;
   }
 
   .leg-toggle {

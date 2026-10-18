@@ -503,7 +503,8 @@ export function CandleChart(props: {
             ))}
           </div>
         </div>
-        <div className="chart-toolbar-row chart-toolbar-right">
+        <div className="chart-toolbar-row chart-toolbar-indicators">
+          <span className="chart-indicators-label">Indicators</span>
           <div className="chart-overlay-toggles" role="group" aria-label="Chart indicators">
             {OVERLAY_TOGGLES.map((item) => (
               <button
@@ -511,7 +512,7 @@ export function CandleChart(props: {
                 type="button"
                 className={`leg-toggle ${item.className}${overlays[item.id] ? " on" : ""}`}
                 aria-pressed={overlays[item.id]}
-                title={`${overlays[item.id] ? "Hide" : "Show"} ${item.label}`}
+                aria-label={`${overlays[item.id] ? "Hide" : "Show"} ${item.label}`}
                 onClick={() => toggleOverlay(item.id)}
               >
                 {item.label}
@@ -521,6 +522,8 @@ export function CandleChart(props: {
               <span className="leg last-px chart-last-px">Last {fmtPrice(props.lastPrice)}</span>
             ) : null}
           </div>
+        </div>
+        <div className="chart-toolbar-row chart-toolbar-right">
           <button
             type="button"
             className={`chart-action-btn${props.extendedHours ? " active" : ""}`}
