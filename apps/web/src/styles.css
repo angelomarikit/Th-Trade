@@ -2845,23 +2845,8 @@ a {
     display: none !important;
   }
 
-  /* Keep page width fixed; chart host remains the touch surface for pan/zoom */
   .chart-wrap-hero .chart-host {
     touch-action: none;
-    overscroll-behavior: contain;
-    width: 100%;
-    max-width: 100%;
-    height: min(42vh, 460px);
-    min-height: 240px;
-  }
-
-  .chart-rsi-panel {
-    min-height: 168px;
-  }
-
-  .chart-rsi-host {
-    min-height: 148px;
-    height: 148px;
   }
 
   .chart-toolbar {
@@ -2974,8 +2959,137 @@ a {
   }
 
   .scanner-page-v7 {
-    padding: 0.45rem 0.5rem 0.65rem;
-    gap: 0.55rem;
+    overflow: hidden;
+    height: 100%;
+    padding: 0.3rem 0.4rem 0.2rem;
+    gap: 0.3rem;
+  }
+
+  .scanner-layout-v7 {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0.3rem;
+  }
+
+  .trade-signal-bar-slot {
+    flex: 0 0 auto;
+  }
+
+  .trade-signal-bar {
+    padding: 0.4rem 0.55rem 0.35rem;
+  }
+
+  .trade-signal-headline {
+    font-size: 0.92rem;
+  }
+
+  .trade-signal-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .trade-signal-levels {
+    margin: 0.28rem 0 0.15rem;
+    gap: 0.15rem 0.45rem;
+  }
+
+  .trade-signal-levels dt,
+  .trade-signal-levels dd {
+    font-size: 0.78rem;
+  }
+
+  .trade-signal-note {
+    font-size: 0.65rem;
+  }
+
+  .scanner-main-v7 {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0.25rem;
+  }
+
+  .scanner-instrument.panel {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .scanner-instrument h1 {
+    font-size: 1rem;
+  }
+
+  .scanner-price-row .last {
+    font-size: 1.15rem;
+  }
+
+  .scanner-price-row .chg {
+    font-size: 0.78rem;
+  }
+
+  .scanner-instrument-stats {
+    font-size: 0.58rem;
+    gap: 0.05rem;
+  }
+
+  .tf-group {
+    padding: 0.15rem;
+  }
+
+  .tf-group button {
+    min-height: 32px;
+    min-width: 0;
+    padding: 0.2rem 0.15rem;
+    font-size: 0.72rem;
+  }
+
+  .leg-toggle {
+    min-height: 32px;
+    font-size: 0.68rem;
+  }
+
+  .chart-wrap-hero {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0.2rem;
+  }
+
+  .chart-toolbar {
+    flex: 0 0 auto;
+    gap: 0.2rem;
+  }
+
+  .chart-stack {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .chart-wrap-hero .chart-host,
+  .chart-host {
+    touch-action: none;
+    overscroll-behavior: contain;
+    flex: 1 1 62%;
+    width: 100%;
+    max-width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .chart-rsi-panel {
+    flex: 1 1 38%;
+    min-height: 0;
+    max-height: 42%;
+  }
+
+  .chart-rsi-head {
+    padding: 0.15rem 0.45rem 0;
+    font-size: 0.78rem;
+  }
+
+  .chart-rsi-host {
+    flex: 1 1 auto;
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   .scanner-instrument.panel {
@@ -3006,7 +3120,7 @@ a {
     font-size: 0.82rem;
   }
 
-  .page {
+  .page:not(.scanner-page-v7) {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
