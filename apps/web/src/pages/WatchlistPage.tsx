@@ -25,6 +25,12 @@ function fmtDataTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   return formatEtTime(iso);
 }
+
+/** A missing bar used to throw inside the scan and land on the card as a JS error. */
+function missingBarCrash(error: string | null | undefined): boolean {
+  if (!error) return false;
+  return /cannot read properties of undefined/i.test(error) || /reading ['"]close['"]/i.test(error) || /price check failed/i.test(error);
+}
 export function WatchlistPage() {
   const { session, configured, plan } = useAuth();
   const openSymbol = useOpenSymbol();
@@ -121,11 +127,19 @@ export function WatchlistPage() {
   }
 
   const ordered = mergeMonitorRows(snap);
-  const planCap = snap?.planMax ?? plan?.maxWatchlist ?? snap?.maxSymbols ?? 6;
+  const serverCapacity = snap?.maxSymbols ?? 12;
+  const planLimit = snap?.planMax ?? plan?.maxWatchlist ?? null;
+  const planCap = planLimit ?? serverCapacity;
   const planNote =
-    signedIn && ordered.length >= planCap
-      ? `Watchlist full (${planCap} symbols on your plan). Remove one to add another.`
+    signedIn && planLimit != null && ordered.length >= planLimit
+      ? `Plan limit reached (${planLimit} symbols). Remove one to add another.`
       : null;
+  const limitNote =
+    planLimit != null && planLimit !== serverCapacity
+      ? `Plan limit is ${planLimit} symbols. Preview server capacity is ${serverCapacity}. The count below uses server capacity.`
+      : planLimit != null
+        ? `Plan limit and server capacity are both ${planLimit} symbols.`
+        : `Preview server capacity is ${serverCapacity} symbols.`;
 
   return (
     <div className="page">
@@ -195,10 +209,11 @@ export function WatchlistPage() {
       </form>
 
       {error ? <p className="error-banner" style={{ marginBottom: "0.75rem" }}>{error}</p> : null}
+      <p className="page-sub" style={{ margin: "0 0 0.75rem" }}>{limitNote}</p>
 
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.65rem" }}>
-          Monitored setups ({ordered.length}/{snap?.maxSymbols ?? 6})
+          Monitored setups ({ordered.length}/{serverCapacity} server capacity)
         </h2>
         {ordered.length === 0 ? (
           <p className="page-sub" style={{ margin: 0 }}>
@@ -295,7 +310,7 @@ function MonitorCard({
         </strong>
         <div className="watch-card-badges">
           <span className={`badge action-${action.toLowerCase()}`}>{action}</span>
-          <StatusBadge status={row.statusLabel || row.status} />
+          <StatusBadge status={missingBarCrash(row.error) ? "DATA NOT VERIFIED" : row.statusLabel || row.status} />
         </div>
       </div>
 
@@ -310,9 +325,14 @@ function MonitorCard({
         </p>
       ) : null}
 
-      {row.error ? <p className="watch-card-error">{row.error}</p> : null}
+      {row.error && !missingBarCrash(row.error) ? <p className="watch-card-error">{row.error}</p> : null}
+      {missingBarCrash(row.error) ? (
+        <p className="watch-card-waiting watch-card-waiting-oneline">
+          <b>DATA NOT VERIFIED</b> — no completed price bar for this symbol. No trade from this card.
+        </p>
+      ) : null}
 
-      {!row.error && !scanning ? (
+      {(!row.error || missingBarCrash(row.error)) && !scanning ? (
         <div className="watch-card-levels watch-card-levels-grid">
           <span>
             <b>Trigger</b>

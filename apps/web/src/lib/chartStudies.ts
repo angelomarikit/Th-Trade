@@ -82,7 +82,9 @@ export function rsiSeries(closes: number[], period: number): (number | null)[] {
 }
 
 export function studiesFromBars(bars: ChartBar[]) {
-  const closes = bars.map((b) => b.close);
+  const closes = bars
+    .filter((b) => b != null && Number.isFinite(b.close))
+    .map((b) => b.close);
   return {
     ema9: emaSeries(closes, 9),
     bb: bollingerSeries(closes, 20, 2),

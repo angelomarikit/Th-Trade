@@ -574,7 +574,9 @@ export function CandleChart(props: {
       return;
     }
 
-    const aligned = props.bars;
+    const aligned = props.bars.filter(
+      (b) => b != null && Number.isFinite(b.open) && Number.isFinite(b.high) && Number.isFinite(b.low) && Number.isFinite(b.close),
+    );
     const structureKey = `${props.symbol}|${props.timeframe}|${aligned.length}|${aligned[0]?.time}|${aligned.at(-1)?.time}`;
     const canPatchLast = structureKeyRef.current === structureKey && structureKey.length > 0;
 

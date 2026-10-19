@@ -33,10 +33,27 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${p}`;
 }
 
+function apiErrorField(rawMsg: string): string | null {
+  const trimmed = rawMsg.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown };
+    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error.trim();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /** Map raw fetch/parse/browser errors to short customer-safe copy. */
 export function friendlyApiError(err: unknown): string {
   const rawMsg = err instanceof Error ? err.message : String(err);
-  const lower = rawMsg.toLowerCase();
+  const extracted = apiErrorField(rawMsg) ?? rawMsg;
+  const lower = extracted.toLowerCase();
+
+  if (lower.includes("timeframe must be")) {
+    return "1-hour bars are not available on this preview API yet. 1m, 5m, 15m, and 1D still work.";
+  }
 
   if (
     lower.includes("failed to fetch") ||
@@ -79,12 +96,12 @@ export function friendlyApiError(err: unknown): string {
   ) {
     return "You've reached your current watchlist limit. Remove a stock or upgrade your plan.";
   }
-  if (lower.includes("invalid json body") || (rawMsg.includes("{") && rawMsg.includes('"error"'))) {
+  if (lower.includes("invalid json body")) {
     return "Something went wrong. Please try again.";
   }
   // Strip huge HTML / JSON dump bodies
-  if (rawMsg.length > 180 || rawMsg.trimStart().startsWith("<")) {
+  if (extracted.length > 180 || extracted.trimStart().startsWith("<") || extracted.trimStart().startsWith("{")) {
     return "Something went wrong loading market data. Please try again.";
   }
-  return rawMsg;
+  return extracted;
 }
