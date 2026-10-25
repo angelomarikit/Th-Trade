@@ -6,7 +6,6 @@ export function InstrumentHeader() {
   const {
     symbol,
     side,
-    setSide,
     scan,
     loading,
     data,
@@ -68,14 +67,20 @@ export function InstrumentHeader() {
             <button
               type="button"
               className={`buy ${side === "LONG" ? "active" : ""}`}
-              onClick={() => setSide("LONG")}
+              onClick={() => {
+                if (side === "LONG" && !loading) return;
+                void scan({ ticker: symbol, side: "LONG", brief: true });
+              }}
             >
               BUY
             </button>
             <button
               type="button"
               className={`sell ${side === "SHORT" ? "active" : ""}`}
-              onClick={() => setSide("SHORT")}
+              onClick={() => {
+                if (side === "SHORT" && !loading) return;
+                void scan({ ticker: symbol, side: "SHORT", brief: true });
+              }}
             >
               SELL
             </button>

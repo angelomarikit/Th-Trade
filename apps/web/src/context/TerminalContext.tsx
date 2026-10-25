@@ -549,6 +549,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const wantBrief = opts?.brief === true;
       if (!t) return;
       const symbolChanged = t !== symbolRef.current;
+      const sideChanged = s !== sideRef.current;
       const isPoll = opts?.poll === true;
       // Polls must not cancel a symbol switch that is still waiting on Alpaca.
       // That abort loop is what left the chart on "Loading MU…" with no price.
@@ -561,7 +562,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       const ac = new AbortController();
       abortRef.current = ac;
-      if (symbolChanged) setLoading(true);
+      if (symbolChanged || (sideChanged && !isPoll)) setLoading(true);
       if (!isPoll) setError(null);
       setSymbol(t);
       setSymbolDraft(t);
@@ -569,6 +570,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       if (symbolChanged) {
         setData(null);
         setBars(null);
+      } else if (sideChanged && !isPoll) {
+        setData(null);
       }
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : historyLimit(chartTfRef.current);

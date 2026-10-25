@@ -18,6 +18,7 @@ import {
 } from "../../lib/mockBuyNow";
 import { DEFAULT_MOCK_SHARES } from "../../lib/mockTrading";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
+import { setupCardSide, setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 /**
  * Primary trading assistant panel — same setup card as chart levels and monitor.
@@ -58,6 +59,8 @@ export function SignalSummaryPanel() {
   }
 
   const lc = viewLiveCard(data.liveCard);
+  const sideAligned = setupMatchesSelectedSide(data, side);
+  const cardSide = setupCardSide(data);
   const status = normalizeStatus(lc.status);
   const rr = lc.rewardToRisk;
   const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
@@ -73,7 +76,10 @@ export function SignalSummaryPanel() {
     loading,
   });
   const planForSymbol =
-    setupSymbol != null && setupSymbol.toUpperCase() === symbol.toUpperCase() && !loading;
+    setupSymbol != null &&
+    setupSymbol.toUpperCase() === symbol.toUpperCase() &&
+    sideAligned &&
+    !loading;
   const planStale = setupStale || lc.dataFresh === false;
   const entryMid =
     lc.entryZone != null
@@ -91,7 +97,8 @@ export function SignalSummaryPanel() {
     !openMock &&
     entryPxForMock != null &&
     Number.isFinite(entryPxForMock);
-  const engineEnter = lc.tradingAction === "ENTER" && lc.dataFresh !== false;
+  const engineEnter =
+    sideAligned && lc.tradingAction === "ENTER" && lc.dataFresh !== false;
   const briefLines = showMockBuyNow
     ? buildMockBuyNowLines({
         symbol,
@@ -104,14 +111,24 @@ export function SignalSummaryPanel() {
   const heroActionClass = showMockBuyNow
     ? mockPracticeHeroClass(side)
     : (lc.tradingAction ?? "WAIT").toLowerCase();
-  const heroActionValue = showMockBuyNow
-    ? mockPracticeHeadline(side)
-    : lc.dataFresh === false
-      ? "WAIT"
-      : (lc.tradingAction ?? "WAIT");
-  const heroActionLabel = showMockBuyNow
-    ? "Paper practice · tap Buy now below"
-    : status;
+  const heroActionValue = !sideAligned
+    ? loading
+      ? "…"
+      : "WAIT"
+    : showMockBuyNow
+      ? mockPracticeHeadline(side)
+      : lc.dataFresh === false
+        ? "WAIT"
+        : (lc.tradingAction ?? "WAIT");
+  const heroActionLabel = !sideAligned
+    ? loading
+      ? `Loading ${side} setup…`
+      : cardSide
+        ? `Showing ${cardSide} plan — tap ${side} again or Scan`
+        : status
+    : showMockBuyNow
+      ? "Paper practice · tap Buy now below"
+      : status;
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
     (lc.matrixChecklist ?? []).map((row) => ({
