@@ -29,6 +29,10 @@ export function ScannerPage() {
     displayPrice,
     dayChangePct,
     health,
+    labTestDataMode,
+    setLabTestDataMode,
+    mockTradingMode,
+    setMockTradingMode,
     scan,
     toggleWatchlist,
     watchlist,
@@ -115,6 +119,17 @@ export function ScannerPage() {
       {setupStale && (
         <p className="banner warn" role="status">
           Syncing chart and recommendation — refreshing scan.
+        </p>
+      )}
+      {labTestDataMode && health?.monitor?.wuluLabModeEnabled && (
+        <p className="banner warn" role="status">
+          {lc?.labDisclaimer ??
+            "Lab test data — off-RTH diagnostic scan only. ENTER is blocked; not a live trade signal."}
+        </p>
+      )}
+      {mockTradingMode && (
+        <p className="banner warn" role="status">
+          Mock trading ON — practice fills stay on this device. No real orders are sent.
         </p>
       )}
       {/* Weekend / unverified reason lives once in SignalSummaryPanel (avoids triple banners on mobile). */}
@@ -226,6 +241,14 @@ export function ScannerPage() {
             symbol={symbol}
             extendedHours={extendedHours}
             onExtendedHours={setExtendedHours}
+            labTestDataMode={labTestDataMode}
+            labTestDataAvailable={health?.monitor?.wuluLabModeEnabled === true}
+            onLabTestDataMode={(on) => {
+              setLabTestDataMode(on);
+              void scan({ ticker: symbol, brief: false });
+            }}
+            mockTradingMode={mockTradingMode}
+            onMockTradingMode={setMockTradingMode}
             lastPrice={last}
             onRetry={() => void scan({ ticker: symbol, fast: true })}
             chartExtras={{

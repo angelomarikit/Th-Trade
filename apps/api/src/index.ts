@@ -21,6 +21,7 @@ import {
 } from "@wulu/domain";
 import {
   barEffectiveEndTime,
+  classifyUsEquitySession,
   EXECUTION_POLICY,
   hasAlpacaCredentials,
   isAlpacaMarketDataAuthError,
@@ -56,7 +57,11 @@ import {
   getSupabaseAdmin,
 } from "./billing/supabaseAdmin.js";
 import { HybridAlertEventStore } from "./monitor/alertStore.js";
-import { isPreviewDevWatchlist, resolveWatchlistPlanMax } from "./monitor/planCap.js";
+import {
+  isPreviewDevWatchlist,
+  isWuluLabModeEnabled,
+  resolveWatchlistPlanMax,
+} from "./monitor/planCap.js";
 import {
   loadAllMonitorWatchlists,
   loadMonitorWatchlist,
@@ -406,6 +411,7 @@ async function main() {
             intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
             automaticOrders: false,
             previewDevWatchlist: isPreviewDevWatchlist(),
+            wuluLabModeEnabled: isWuluLabModeEnabled(),
             effectiveWatchlistMax: resolveWatchlistPlanMax(null),
           },
         });
@@ -702,13 +708,22 @@ async function main() {
           return json(res, 400, { error: "side must be LONG or SHORT" });
         }
         const side = sideParam as TradeSide;
+        const wantLab =
+          url.searchParams.get("lab") === "1" || url.searchParams.get("lab") === "true";
+        const labMode = wantLab && isWuluLabModeEnabled();
         const useFastSnapshot =
           url.searchParams.get("fast") === "1" || url.searchParams.get("fast") === "true";
         let card: Awaited<ReturnType<typeof scanner.scanWithJournal>>["card"];
         let journalEntry: Awaited<ReturnType<typeof scanner.scanWithJournal>>["journalEntry"];
-        if (useFastSnapshot) {
+        const rthBarsOnly = !labMode;
+        if (useFastSnapshot || labMode) {
           const [bars5m, quote] = await Promise.all([
-            marketData.getBars({ symbol: sym, timeframe: "5Min", limit: 45, regularHoursOnly: true }),
+            marketData.getBars({
+              symbol: sym,
+              timeframe: "5Min",
+              limit: labMode ? 120 : 45,
+              regularHoursOnly: rthBarsOnly,
+            }),
             marketData.getQuote(sym),
           ]);
           const lastBar = bars5m.at(-1);
@@ -719,8 +734,8 @@ async function main() {
           const bars1m = await marketData.getBars({
             symbol: sym,
             timeframe: "1Min",
-            limit: 30,
-            regularHoursOnly: true,
+            limit: labMode ? 120 : 30,
+            regularHoursOnly: rthBarsOnly,
           });
           const last1m = bars1m.at(-1) ?? lastBar;
           const snapshot = {
@@ -739,6 +754,7 @@ async function main() {
             side,
             preloadedSnapshot: snapshot,
             previousState: interactiveSetupState.get(stateKey),
+            labMode,
           }));
           interactiveSetupState.set(stateKey, card.state);
         } else {
@@ -823,10 +839,10 @@ async function main() {
 
         const setupTrack = outcomeTracker.onCard(card, null, "LIVE", card.lastCompletedBar);
         const resolvedDetail = setupTrack.resolution?.detail ?? null;
-        const displayStatus = resolvedDetail
+        let displayStatus = resolvedDetail
           ? outcomeDetailToStatusLabel(resolvedDetail)
           : card.statusLabel;
-        const tradingAction = deriveTradingAction({
+        let tradingAction = deriveTradingAction({
           state: card.state,
           statusLabel: displayStatus,
           userStatus: displayStatus,
@@ -835,6 +851,12 @@ async function main() {
           outcomeDetail: resolvedDetail,
           rewardToRisk: card.rewardToRisk,
         });
+        if (labMode && !classifyUsEquitySession().isRegularHours) {
+          tradingAction = "WAIT";
+          if (!displayStatus.toUpperCase().includes("LAB TEST")) {
+            displayStatus = `LAB TEST · ${displayStatus}`;
+          }
+        }
         const strategyName =
           card.matchedStrategies[0]?.strategyName ??
           card.historicalEdge?.strategyName ??
@@ -895,6 +917,8 @@ async function main() {
             rewardToRisk: card.rewardToRisk,
             dataFresh: card.dataFresh,
             dataFreshReason: card.dataFreshReason ?? null,
+            labMode: card.labMode ?? false,
+            labDisclaimer: card.labDisclaimer ?? null,
             marketDataStatus: card.marketDataStatus ?? null,
             evaluatedAt: card.evaluatedAt,
             setupScore: `${card.setupScore.total} / 100`,

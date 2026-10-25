@@ -80,6 +80,11 @@ export function CandleChart(props: {
   symbol: string;
   extendedHours?: boolean;
   onExtendedHours?: (on: boolean) => void;
+  labTestDataMode?: boolean;
+  labTestDataAvailable?: boolean;
+  onLabTestDataMode?: (on: boolean) => void;
+  mockTradingMode?: boolean;
+  onMockTradingMode?: (on: boolean) => void;
   lastPrice?: number | null;
   onRetry?: () => void;
   chartExtras?: {
@@ -805,6 +810,24 @@ export function CandleChart(props: {
           >
             Extended hours {props.extendedHours ? "ON" : "OFF"}
           </button>
+          {props.labTestDataAvailable ? (
+            <button
+              type="button"
+              className={`chart-action-btn${props.labTestDataMode ? " active" : ""}`}
+              onClick={() => props.onLabTestDataMode?.(!props.labTestDataMode)}
+            >
+              Lab test data {props.labTestDataMode ? "ON" : "OFF"}
+            </button>
+          ) : null}
+          {props.onMockTradingMode ? (
+            <button
+              type="button"
+              className={`chart-action-btn${props.mockTradingMode ? " active" : ""}`}
+              onClick={() => props.onMockTradingMode?.(!props.mockTradingMode)}
+            >
+              Mock trading {props.mockTradingMode ? "ON" : "OFF"}
+            </button>
+          ) : null}
           <button type="button" className="chart-action-btn" onClick={() => goLive()}>
             Return to Live
           </button>

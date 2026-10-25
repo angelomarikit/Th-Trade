@@ -22,6 +22,17 @@ import {
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
 import { barsForChart, historyLimit } from "../lib/regularSession";
 import { isUserVisibleMonitorTransition } from "../lib/monitorDisplay";
+import {
+  closeMockPosition,
+  openMockPosition,
+  readMockPortfolio,
+  readMockTradingMode,
+  resetMockPortfolio,
+  updateMockMarks,
+  writeMockTradingMode,
+  DEFAULT_MOCK_SHARES,
+  type MockPortfolio,
+} from "../lib/mockTrading";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -82,6 +93,19 @@ interface TerminalContextValue {
   setChartTf: (tf: string) => void;
   extendedHours: boolean;
   setExtendedHours: (on: boolean) => void;
+  /** Preview: off-RTH diagnostic scan via API `lab=1` (ENTER still blocked). */
+  labTestDataMode: boolean;
+  setLabTestDataMode: (on: boolean) => void;
+  /** Local paper portfolio — no broker orders. */
+  mockTradingMode: boolean;
+  setMockTradingMode: (on: boolean) => void;
+  mockPortfolio: MockPortfolio;
+  simulateMockEntry: () => { ok: boolean; message: string };
+  closeMockPositionById: (positionId: string, exitPrice: number, reason?: string) => {
+    ok: boolean;
+    message: string;
+  };
+  resetMockTrading: () => void;
   loading: boolean;
   barsLoading: boolean;
   error: string | null;
@@ -125,6 +149,15 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       return false;
     }
   });
+  const [labTestDataMode, setLabTestDataModeState] = useState(() => {
+    try {
+      return localStorage.getItem("wulu:lab-test-data") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [mockTradingMode, setMockTradingModeState] = useState(() => readMockTradingMode());
+  const [mockPortfolio, setMockPortfolio] = useState<MockPortfolio>(() => readMockPortfolio());
   const [loading, setLoading] = useState(false);
   const [barsLoading, setBarsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +195,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const sideRef = useRef(side);
   const chartTfRef = useRef(chartTf);
   const extendedRef = useRef(false);
+  const labTestRef = useRef(false);
+  const healthRef = useRef<HealthResponse | null>(null);
   symbolRef.current = symbol;
   sideRef.current = side;
   chartTfRef.current = chartTf;
   extendedRef.current = extendedHours;
+  labTestRef.current = labTestDataMode;
+  healthRef.current = health;
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
     setSidebarCollapsedState(v);
@@ -307,6 +344,84 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     if (sym) void loadBars(sym, chartTfRef.current);
   }, [loadBars]);
 
+  const setLabTestDataMode = useCallback(
+    (on: boolean) => {
+      setLabTestDataModeState(on);
+      try {
+        localStorage.setItem("wulu:lab-test-data", on ? "1" : "0");
+      } catch {
+        /* private mode */
+      }
+      if (on) setExtendedHours(true);
+    },
+    [setExtendedHours],
+  );
+
+  const setMockTradingMode = useCallback((on: boolean) => {
+    setMockTradingModeState(on);
+    writeMockTradingMode(on);
+  }, []);
+
+  const resetMockTrading = useCallback(() => {
+    setMockPortfolio(resetMockPortfolio());
+  }, []);
+
+  const simulateMockEntry = useCallback((): { ok: boolean; message: string } => {
+    if (!mockTradingMode) {
+      return { ok: false, message: "Turn on mock trading in Settings first." };
+    }
+    const lc = data?.liveCard;
+    if (!lc) return { ok: false, message: "Run a scan before simulating entry." };
+    const sym = (lc.symbol ?? symbolRef.current).trim().toUpperCase();
+    const s = sideRef.current;
+    const entryMid =
+      lc.entryZone != null ? (lc.entryZone.low + lc.entryZone.high) / 2 : null;
+    const chartClose =
+      bars?.symbol?.toUpperCase() === sym ? bars.bars.at(-1)?.close : null;
+    const px =
+      (chartClose != null && Number.isFinite(chartClose) ? chartClose : null) ??
+      entryMid ??
+      lc.lastPrice ??
+      lc.alertAt;
+    const action = lc.tradingAction ?? "WAIT";
+    const practiceNote =
+      action === "ENTER"
+        ? "Practice entry at setup levels (rules said ENTER — still not a real order)."
+        : `Practice entry while engine shows ${action} — learning only, not permission.`;
+    const { portfolio, error } = openMockPosition({
+      symbol: sym,
+      side: s,
+      shares: DEFAULT_MOCK_SHARES,
+      entryPrice: px,
+      stop: lc.stop,
+      t1: lc.t1,
+      t2: lc.t2,
+      setupAction: action,
+      practiceNote,
+    });
+    setMockPortfolio(portfolio);
+    if (error) return { ok: false, message: error };
+    return {
+      ok: true,
+      message: `Simulated ${s} ${DEFAULT_MOCK_SHARES} sh ${sym} @ ${px.toFixed(2)}. See Positions.`,
+    };
+  }, [mockTradingMode, data, bars]);
+
+  const closeMockPositionById = useCallback(
+    (positionId: string, exitPrice: number, reason?: string) => {
+      const { portfolio, error, pnl } = closeMockPosition({
+        positionId,
+        exitPrice,
+        reason,
+      });
+      setMockPortfolio(portfolio);
+      if (error) return { ok: false, message: error };
+      const pnlStr = pnl != null && Number.isFinite(pnl) ? ` P/L ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}.` : "";
+      return { ok: true, message: `Closed practice position.${pnlStr}` };
+    },
+    [],
+  );
+
   const scan = useCallback(
     async (opts?: {
       ticker?: string;
@@ -356,9 +471,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       setupInflightRef.current = true;
       try {
+        const useLab =
+          labTestRef.current &&
+          healthRef.current?.monitor?.wuluLabModeEnabled === true;
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
           fast: useFastPath,
+          lab: useLab,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
         });
@@ -543,6 +662,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return pct != null && Number.isFinite(pct) ? pct : null;
   }, [data]);
 
+  useEffect(() => {
+    if (!mockTradingMode || displayPrice == null || !Number.isFinite(displayPrice)) return;
+    setMockPortfolio(updateMockMarks(symbol, displayPrice));
+  }, [mockTradingMode, symbol, displayPrice]);
+
   const value = useMemo<TerminalContextValue>(
     () => ({
       symbol,
@@ -559,6 +683,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setChartTf,
       extendedHours,
       setExtendedHours,
+      labTestDataMode,
+      setLabTestDataMode,
+      mockTradingMode,
+      setMockTradingMode,
+      mockPortfolio,
+      simulateMockEntry,
+      closeMockPositionById,
+      resetMockTrading,
       loading,
       barsLoading,
       error,
@@ -594,6 +726,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       chartTf,
       extendedHours,
       setExtendedHours,
+      labTestDataMode,
+      setLabTestDataMode,
+      mockTradingMode,
+      setMockTradingMode,
+      mockPortfolio,
+      simulateMockEntry,
+      closeMockPositionById,
+      resetMockTrading,
       loading,
       barsLoading,
       error,

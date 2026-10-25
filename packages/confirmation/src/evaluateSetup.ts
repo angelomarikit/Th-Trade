@@ -53,13 +53,21 @@ export interface EvaluateSetupInput {
   marketAlignmentScore?: number;
   sectorAlignmentScore?: number;
   relativeMomentum?: RelativeMomentumCardInfo | null;
+  /** Preview-only: relax stale-data limits off RTH so gates can be exercised on latest SIP snapshot. */
+  labMode?: boolean;
 }
 
 export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const now = input.now ?? new Date();
+  const labMode = input.labMode === true;
   const session = classifyUsEquitySession(now);
   const profile = confirmationProfileForSession(session);
-  let freshness = assessFreshness(input.snapshot, now, profile.maxDataAgeMs, session);
+  let freshnessMax = profile.maxDataAgeMs;
+  if (labMode && !session.isRegularHours) {
+    if (session.maxDataAgeMs === 0) freshnessMax = 600_000;
+    else freshnessMax = Math.max(freshnessMax, 300_000);
+  }
+  let freshness = assessFreshness(input.snapshot, now, freshnessMax, session);
   const quoteOk = isQuoteUsableForEntry(input.snapshot, profile.maxSpreadPct);
   const priceSource = resolvePriceSource(input.snapshot);
   const referencePriceOnly = priceSource !== "quote_mid";
@@ -283,6 +291,11 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       referencePriceOnly,
       priceBasis: referencePriceExplanation(priceSource),
     },
+    labMode: labMode && !session.isRegularHours ? true : undefined,
+    labDisclaimer:
+      labMode && !session.isRegularHours
+        ? "LAB TEST — not live RTH. Latest SIP snapshot for gate preview only; live ENTRY remains blocked."
+        : undefined,
   };
 }
 

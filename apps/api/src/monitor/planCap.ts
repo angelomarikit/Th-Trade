@@ -6,6 +6,12 @@ export function isPreviewDevWatchlist(): boolean {
   return process.env.WULU_PREVIEW_DEV_WATCHLIST === "1";
 }
 
+/** Preview-only: allow `?lab=1` setup scans off RTH (diagnostic; ENTER still blocked). */
+export function isWuluLabModeEnabled(): boolean {
+  const v = (process.env.WULU_LAB_MODE ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 /** Effective watchlist cap for monitor mutations (preview can raise floor via env). */
 export function resolveWatchlistPlanMax(planTier?: PlanTier | null): number {
   const hubMax = Number(process.env.MONITOR_MAX_SYMBOLS ?? 12);

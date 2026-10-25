@@ -10,7 +10,14 @@ export function SettingsPage() {
     setInspectorOpen,
     bottomDockOpen,
     setBottomDockOpen,
+    labTestDataMode,
+    setLabTestDataMode,
+    mockTradingMode,
+    setMockTradingMode,
+    resetMockTrading,
+    health,
   } = useTerminal();
+  const labServerOn = health?.monitor?.wuluLabModeEnabled === true;
   const { configured, profile, plan, user, signOut } = useAuth();
 
   return (
@@ -82,6 +89,53 @@ export function SettingsPage() {
           <p className="disclaimer">
             Preferences stay on this device.{" "}
             <Link to="/admin">Diagnostics</Link>
+          </p>
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: "0.75rem" }}>
+        <div className="panel-h">
+          <h3>Mock trading (paper)</h3>
+        </div>
+        <div className="tab-body" style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={mockTradingMode}
+              onChange={(e) => setMockTradingMode(e.target.checked)}
+            />{" "}
+            Mock trading mode
+          </label>
+          <p className="disclaimer">
+            Practice entries and exits on this device only. No broker connection — Alpaca stays data-only.
+            Use Scanner → Simulate practice entry, then track under Positions and Orders.
+          </p>
+          {mockTradingMode ? (
+            <button type="button" className="icon-btn" onClick={() => resetMockTrading()}>
+              Reset paper account
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: "0.75rem" }}>
+        <div className="panel-h">
+          <h3>Preview testing</h3>
+        </div>
+        <div className="tab-body" style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+          <label style={{ opacity: labServerOn ? 1 : 0.65 }}>
+            <input
+              type="checkbox"
+              checked={labTestDataMode}
+              disabled={!labServerOn}
+              onChange={(e) => setLabTestDataMode(e.target.checked)}
+            />{" "}
+            Lab test data (off-RTH scans)
+          </label>
+          <p className="disclaimer">
+            {labServerOn
+              ? "Uses real SIP bars outside regular hours for diagnostics. ENTER is blocked; cards show LAB TEST. Rescan from Scanner after toggling."
+              : "Not enabled on this API — set WULU_LAB_MODE on the preview backend (see Diagnostics)."}
           </p>
         </div>
       </div>

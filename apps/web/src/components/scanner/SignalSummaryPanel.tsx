@@ -16,8 +16,22 @@ import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecomme
  * Primary trading assistant panel — same setup card as chart levels and monitor.
  */
 export function SignalSummaryPanel() {
-  const { data, symbol, side, setSide, scan, loading, toggleWatchlist, watchlist, displayPrice, bars } =
-    useTerminal();
+  const {
+    data,
+    symbol,
+    side,
+    setSide,
+    scan,
+    loading,
+    toggleWatchlist,
+    watchlist,
+    displayPrice,
+    bars,
+    mockTradingMode,
+    simulateMockEntry,
+    mockPortfolio,
+  } = useTerminal();
+  const [mockMsg, setMockMsg] = useState<string | null>(null);
   const { session, configured } = useAuth();
   const navigate = useNavigate();
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -212,6 +226,34 @@ export function SignalSummaryPanel() {
         Signals only — no orders sent. Entry requires completed 5m confirmation, ~2R, fresh data, and
         full checklist. News never authorizes entry alone.
       </p>
+
+      {mockTradingMode ? (
+        <>
+          <button
+            type="button"
+            className="scan-btn"
+            style={{ marginTop: "0.5rem" }}
+            onClick={() => {
+              const res = simulateMockEntry();
+              setMockMsg(res.message);
+            }}
+          >
+            Simulate practice entry
+          </button>
+          {mockPortfolio.positions.some(
+            (p) => p.symbol === symbol.toUpperCase() && p.side === side,
+          ) ? (
+            <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
+              Open practice {side} on {symbol} — close from Positions.
+            </p>
+          ) : null}
+          {mockMsg ? (
+            <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
+              {mockMsg}
+            </p>
+          ) : null}
+        </>
+      ) : null}
 
       <button
         type="button"

@@ -96,6 +96,8 @@ export interface SetupLiveCard {
   marketDataAt?: string | null;
   dataFeed?: string | null;
   dataFreshReason?: string | null;
+  labMode?: boolean;
+  labDisclaimer?: string | null;
   marketDataStatus?: {
     session: string;
     barsFresh: boolean;
@@ -263,6 +265,9 @@ export interface HealthResponse {
   accountEnvironment?: string;
   supabaseConfigured?: boolean;
   openaiConfigured?: boolean;
+  monitor?: {
+    wuluLabModeEnabled?: boolean;
+  };
   execution: {
     automaticOrders: boolean;
     platform: string;
@@ -381,6 +386,7 @@ export function fetchSetup(
   opts?: {
     brief?: boolean;
     fast?: boolean;
+    lab?: boolean;
     accessToken?: string | null;
     timeoutMs?: number;
     signal?: AbortSignal;
@@ -392,6 +398,7 @@ export function fetchSetup(
   });
   if (opts?.brief) qs.set("brief", "1");
   if (opts?.fast) qs.set("fast", "1");
+  if (opts?.lab) qs.set("lab", "1");
   const headers: Record<string, string> = {};
   if (opts?.accessToken) {
     headers.Authorization = `Bearer ${opts.accessToken}`;

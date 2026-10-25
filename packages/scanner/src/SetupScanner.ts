@@ -39,6 +39,8 @@ export interface ScanSetupRequest {
   skipOptions?: boolean;
   /** Prior lifecycle state — enables MISSED / INVALIDATED transitions on monitor ticks. */
   previousState?: SetupState;
+  /** Preview lab scan (API `lab=1` only). */
+  labMode?: boolean;
 }
 
 export interface ScanSetupResult {
@@ -163,6 +165,7 @@ export class SetupScanner {
       side: request.side,
       snapshot,
       previousState: request.previousState,
+      labMode: request.labMode,
       whyMoving: why,
       marketRegime: {
         status: regimeCtx.marketRegime.status,
