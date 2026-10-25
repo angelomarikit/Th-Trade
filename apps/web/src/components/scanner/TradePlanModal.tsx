@@ -5,6 +5,7 @@ import { fetchSetup, fetchWuluPlan, type ChartBar, type TradePlanPayload } from 
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { isWuluPlanRouteMissing } from "../../lib/clientChartRead";
 import { fallbackTradePlanFromLiveCard } from "../../lib/fallbackTradePlan";
+import { resolveLabScanFlags } from "../../lib/labScanFlags";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 export function TradePlanModalTrigger() {
@@ -48,11 +49,12 @@ function labFlagsFromTerminal(
   mockTradingMode: boolean,
   mockLiveRthMode: boolean,
 ) {
-  const labOk = health?.monitor?.wuluLabModeEnabled === true;
-  const useLab = labOk && (labTestDataMode || (mockTradingMode && mockLiveRthMode));
-  const useMockRth = useLab && mockLiveRthMode;
-  const useMockEnter = useMockRth && mockTradingMode;
-  return { lab: useLab, mockRth: useMockRth, mockEnter: useMockEnter };
+  return resolveLabScanFlags({
+    wuluLabModeEnabled: health?.monitor?.wuluLabModeEnabled === true,
+    labTestDataMode,
+    mockTradingMode,
+    mockLiveRthMode,
+  });
 }
 
 function planSourceLabel(briefSource: TradePlanPayload["briefSource"]): string {

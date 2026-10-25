@@ -147,6 +147,14 @@ export function ScannerPage() {
           if (mockLiveRthMode && labTestDataMode) {
             mockParts.push(`tape ${mockTapeCadenceLabel(chartTf)}`);
           }
+          if (
+            mockLiveRthMode &&
+            labTestDataMode &&
+            lc?.session?.session === "RTH" &&
+            !lc?.mockRth
+          ) {
+            mockParts.push("live RTH setup (lab sim paused until close)");
+          }
           lines.push(mockParts.join(" · "));
         }
         if (lines.length === 0) return null;

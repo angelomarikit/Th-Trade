@@ -1,6 +1,6 @@
 /** Regular session 09:30–16:00 America/New_York. Bars that start at 16:00 or later are after the close. */
 
-export function isRegularSessionBarStart(unixSeconds: number): boolean {
+function etSessionParts(date: Date): { weekday: string; mins: number } {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     weekday: "short",
@@ -8,14 +8,25 @@ export function isRegularSessionBarStart(unixSeconds: number): boolean {
     minute: "2-digit",
     hourCycle: "h23",
   });
-  const bag = Object.fromEntries(
-    fmt.formatToParts(new Date(unixSeconds * 1000)).map((p) => [p.type, p.value]),
-  ) as Record<string, string>;
-  const weekday = bag.weekday ?? "";
-  if (weekday === "Sat" || weekday === "Sun") return false;
+  const bag = Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value])) as Record<
+    string,
+    string
+  >;
   let hour = Number(bag.hour);
   if (hour === 24) hour = 0;
-  const mins = hour * 60 + Number(bag.minute);
+  return { weekday: bag.weekday ?? "", mins: hour * 60 + Number(bag.minute) };
+}
+
+/** True when US equity regular hours are open right now (ET). */
+export function isUsEquityRthNow(now = new Date()): boolean {
+  const { weekday, mins } = etSessionParts(now);
+  if (weekday === "Sat" || weekday === "Sun") return false;
+  return mins >= 9 * 60 + 30 && mins < 16 * 60;
+}
+
+export function isRegularSessionBarStart(unixSeconds: number): boolean {
+  const { weekday, mins } = etSessionParts(new Date(unixSeconds * 1000));
+  if (weekday === "Sat" || weekday === "Sun") return false;
   return mins >= 9 * 60 + 30 && mins < 16 * 60;
 }
 

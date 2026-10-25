@@ -45,6 +45,7 @@ import {
   DEFAULT_MOCK_SHARES,
   type MockPortfolio,
 } from "../lib/mockTrading";
+import { resolveLabScanFlags } from "../lib/labScanFlags";
 import { readCachedSetup, writeCachedSetup } from "../lib/setupCache";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
@@ -609,8 +610,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       const ac = new AbortController();
       abortRef.current = ac;
-      const needsSetup = !dataRef.current?.liveCard;
-      if (symbolChanged || (sideChanged && !isPoll) || needsSetup) setLoading(true);
+      if (symbolChanged || (sideChanged && !isPoll)) setLoading(true);
       if (!isPoll) setError(null);
       setSymbol(t);
       setSymbolDraft(t);
@@ -629,13 +629,15 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       setupInflightRef.current = true;
       try {
-        const labOk = healthRef.current?.monitor?.wuluLabModeEnabled === true;
-        const useLab =
-          labOk &&
-          (labTestRef.current ||
-            (mockTradingRef.current && mockLiveRthRef.current));
-        const useMockRth = useLab && mockLiveRthRef.current;
-        const useMockEnter = useMockRth && mockTradingRef.current;
+        const labFlags = resolveLabScanFlags({
+          wuluLabModeEnabled: healthRef.current?.monitor?.wuluLabModeEnabled === true,
+          labTestDataMode: labTestRef.current,
+          mockTradingMode: mockTradingRef.current,
+          mockLiveRthMode: mockLiveRthRef.current,
+        });
+        const useLab = labFlags.lab;
+        const useMockRth = labFlags.mockRth;
+        const useMockEnter = labFlags.mockEnter;
         let referencePrice = opts?.referencePrice;
         if (
           (referencePrice == null || !Number.isFinite(referencePrice)) &&
@@ -721,12 +723,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           return nextList;
         });
       } catch (err) {
-        if (!ac.signal.aborted && !isPoll) {
+        if (!ac.signal.aborted) {
           setError(friendlyApiError(err));
         }
       } finally {
         setupInflightRef.current = false;
-        if (!isPoll) setLoading(false);
+        setLoading(false);
       }
     },
     [loadBars, pushAlert, session?.access_token, setCreditsLocal],
@@ -816,9 +818,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       void scan({ brief: false, fast: true, poll: true, refreshBars: true });
       const labOk = healthRef.current?.monitor?.wuluLabModeEnabled === true;
-      const labPoll =
-        labOk &&
-        (labTestRef.current || (mockTradingRef.current && mockLiveRthRef.current));
+      const labPoll = resolveLabScanFlags({
+        wuluLabModeEnabled: labOk,
+        labTestDataMode: labTestRef.current,
+        mockTradingMode: mockTradingRef.current,
+        mockLiveRthMode: mockLiveRthRef.current,
+      }).lab;
       const ms = labPoll
         ? mockTapeFastRef.current
           ? POLL_MS_LAB_FAST
@@ -865,7 +870,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     [extendedHours, labTestDataMode, mockTradingMode, mockLiveRthMode],
   );
 
-  const liveTapeOn = mockTapeActive(mockTradingMode, mockLiveRthMode, labTestDataMode);
+  const liveTapeOn = useMemo(() => {
+    const flags = resolveLabScanFlags({
+      wuluLabModeEnabled: health?.monitor?.wuluLabModeEnabled === true,
+      labTestDataMode,
+      mockTradingMode,
+      mockLiveRthMode,
+    });
+    return (
+      mockTapeActive(mockTradingMode, mockLiveRthMode, labTestDataMode) && flags.mockRth
+    );
+  }, [health, labTestDataMode, mockTradingMode, mockLiveRthMode]);
 
   useEffect(() => {
     tapeStepRef.current = 0;

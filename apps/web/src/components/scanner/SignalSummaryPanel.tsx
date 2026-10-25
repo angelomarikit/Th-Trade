@@ -61,12 +61,12 @@ export function SignalSummaryPanel() {
         ) : null}
         <p className="muted" style={{ margin: 0 }}>
           {loading
-            ? `Loading ${symbol} ${side} setup… (market data can take up to a minute when the API is busy).`
+            ? `Loading ${symbol} ${side} setup…`
             : error
-              ? "Tap Scan in the top bar or pick a symbol from Recent to retry."
+              ? "Tap Retry or pick a symbol from Recent."
               : "Search a symbol to load chart and trading recommendation."}
         </p>
-        {!loading && error ? (
+        {loading || error ? (
           <button
             type="button"
             className="icon-btn"
