@@ -84,6 +84,7 @@ import {
 } from "./monitor/signalHistory.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
 import { openAiConfigured } from "./recommend/openaiEnv.js";
+import { buildTradePlan } from "./recommend/tradePlan.js";
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -797,45 +798,53 @@ async function main() {
         const wantBrief =
           url.searchParams.get("brief") === "1" ||
           url.searchParams.get("brief") === "true";
+        const wantPlan =
+          url.searchParams.get("plan") === "1" ||
+          url.searchParams.get("plan") === "true";
         const openaiReady = openAiConfigured();
-        let withModel = wantBrief && openaiReady;
+        let withModelBrief = wantBrief && openaiReady;
+        let withModelPlan = wantPlan && openaiReady;
         let creditsCharged = 0;
         let creditsRemaining: number | null = null;
 
-        if (wantBrief && openaiReady && supabaseReady && req.headers.authorization) {
+        if ((wantBrief || wantPlan) && openaiReady && supabaseReady && req.headers.authorization) {
           try {
             const user = await requireUser(req.headers.authorization);
             const profile = await getOrCreateProfile(user);
-            const plan = getPlan(profile.plan_tier);
-            if (!plan.aiEnabled) {
-              withModel = false;
+            const planTier = getPlan(profile.plan_tier);
+            if (!planTier.aiEnabled) {
+              withModelBrief = false;
+              withModelPlan = false;
             } else {
-              const cost = plan.aiCreditCost;
+              const cost = wantPlan ? planTier.deepAiCreditCost : planTier.aiCreditCost;
               if (profile.credits_balance >= cost) {
                 const updated = await spendCredits({
                   userId: user.id,
                   cost,
-                  reason: "signal_recommend",
+                  reason: wantPlan ? "trade_plan" : "signal_recommend",
                   meta: { symbol: ticker.toUpperCase(), side, via: "setup" },
                 });
                 creditsCharged = cost;
                 creditsRemaining = updated.credits_balance;
               } else {
-                withModel = false;
+                withModelBrief = false;
+                withModelPlan = false;
               }
             }
           } catch {
-            withModel = false;
+            withModelBrief = false;
+            withModelPlan = false;
           }
-        } else if (!wantBrief) {
-          withModel = false;
+        } else if (!wantBrief && !wantPlan) {
+          withModelBrief = false;
+          withModelPlan = false;
         }
-        // wantBrief + OpenAI, no auth session → still narrate (same as /v1/recommend)
+        // wantBrief/plan + OpenAI, no auth session → still narrate (same as /v1/recommend)
 
         const signal = await buildAutomaticSignal({
           card,
           side,
-          withModelBrief: withModel,
+          withModelBrief: withModelBrief,
         });
 
         const signalRecommendation = {
@@ -899,6 +908,15 @@ async function main() {
           tradingAction,
           rewardToRisk: card.rewardToRisk,
         });
+
+        const tradePlan = wantPlan
+          ? await buildTradePlan({
+              card,
+              side,
+              tradingAction,
+              withModel: withModelPlan,
+            })
+          : undefined;
 
         return json(res, 200, {
           liveCard: {
@@ -979,6 +997,7 @@ async function main() {
             relativeMomentum: card.relativeMomentum,
           },
           signalRecommendation,
+          tradePlan: tradePlan ?? null,
           card,
           journalEntryId: journalEntry?.id ?? null,
           positionSizing: sizing,

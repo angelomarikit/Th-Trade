@@ -5,6 +5,7 @@ import { CandleChart } from "../components/scanner/CandleChart";
 import { SignalSummaryPanel } from "../components/scanner/SignalSummaryPanel";
 import { SetupInspector } from "../components/scanner/SetupInspector";
 import { TradeSignalBar } from "../components/scanner/TradeSignalBar";
+import { TradePlanModalTrigger } from "../components/scanner/TradePlanModal";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
 import { fmtCompactVolume, fmtPct, fmtPrice, formatEtTime } from "../lib/format";
@@ -246,6 +247,8 @@ export function ScannerPage() {
               </div>
             </div>
           </header>
+
+          <TradePlanModalTrigger />
 
           <CandleChart
             bars={bars?.bars ?? null}

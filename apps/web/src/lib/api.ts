@@ -40,6 +40,32 @@ export interface SignalRecommendation {
   creditsRemaining?: number | null;
 }
 
+export interface TradePlanPayload {
+  symbol: string;
+  side: "LONG" | "SHORT";
+  action: "BUY" | "SELL" | "WAIT";
+  tradingAction: "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
+  sections: {
+    whyThisZone: string;
+    whatToDoNow: string;
+    gatesAndNews: string;
+    risks: string[];
+    outlook: string;
+  };
+  successRate: {
+    winRatePct: number | null;
+    sampleSize: number;
+    strategyName: string | null;
+    expectancyR: number | null;
+    qualityScore10: number | null;
+    qualityDisclaimer: string;
+    headline: string;
+  };
+  briefSource: "rules" | "model";
+  gatesPassed: Array<{ label: string; reason: string }>;
+  gatesBlocking: Array<{ label: string; reason: string; status: string }>;
+}
+
 export interface SetupHistoricalEdge {
   strategyName: string;
   sampleSize: number;
@@ -196,6 +222,7 @@ export interface SetupLiveCard {
 
 export interface SetupResponse {
   signalRecommendation?: SignalRecommendation;
+  tradePlan?: TradePlanPayload | null;
   liveCard: SetupLiveCard;
   card: {
     symbol?: string;
@@ -388,10 +415,11 @@ export function fetchSetup(
   side: "LONG" | "SHORT",
   opts?: {
     brief?: boolean;
+    plan?: boolean;
     fast?: boolean;
     lab?: boolean;
     mockRth?: boolean;
-  mockEnter?: boolean;
+    mockEnter?: boolean;
   labMockEnterAuthorizedSide?: "LONG" | "SHORT" | null;
     accessToken?: string | null;
     timeoutMs?: number;
@@ -403,6 +431,7 @@ export function fetchSetup(
     side,
   });
   if (opts?.brief) qs.set("brief", "1");
+  if (opts?.plan) qs.set("plan", "1");
   if (opts?.fast) qs.set("fast", "1");
   if (opts?.lab) qs.set("lab", "1");
   if (opts?.mockRth) qs.set("mockRth", "1");

@@ -2320,6 +2320,246 @@ a {
   margin: 0.2rem 0;
 }
 
+.trade-playbook-note {
+  padding: 0.65rem 0.75rem;
+  margin: 0;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--raised) 0%, var(--panel) 100%);
+}
+
+.trade-playbook-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.trade-playbook-head h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.trade-playbook-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.trade-playbook-block {
+  margin-bottom: 0.55rem;
+}
+
+.trade-playbook-block h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trade-playbook-block p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.trade-playbook-do {
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--border));
+  background: color-mix(in srgb, var(--blue) 8%, var(--raised));
+}
+
+.trade-playbook-meta {
+  margin-top: 0.35rem !important;
+  font-size: 0.78rem !important;
+  color: var(--muted) !important;
+}
+
+.trade-playbook-gates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.trade-playbook-gates h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .trade-playbook-gates {
+    grid-template-columns: 1fr;
+  }
+
+  .trade-playbook-note {
+    max-height: 42vh;
+    overflow: auto;
+  }
+}
+
+.trade-plan-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  margin: 0;
+}
+
+.trade-plan-trigger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.trade-plan-trigger-copy strong {
+  font-size: 0.82rem;
+}
+
+.trade-plan-open-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.trade-plan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.trade-plan-modal {
+  width: min(520px, 100%);
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trade-plan-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.trade-plan-modal-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.trade-plan-modal-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+}
+
+.trade-plan-modal-body {
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  flex: 1;
+}
+
+.trade-plan-modal-body section {
+  margin-bottom: 0.85rem;
+}
+
+.trade-plan-modal-body h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trade-plan-modal-body h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.trade-plan-modal-body p {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.trade-plan-do {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--teal) 35%, var(--border));
+  background: color-mix(in srgb, var(--teal) 8%, var(--raised));
+}
+
+.trade-plan-success {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  margin-bottom: 1rem !important;
+}
+
+.trade-plan-success-headline {
+  font-weight: 650;
+  margin-bottom: 0.5rem !important;
+}
+
+.trade-plan-success-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.trade-plan-success-grid label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.trade-plan-gates-details {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.trade-plan-modal-foot {
+  padding: 0.65rem 1rem 0.85rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.trade-plan-modal-foot .scan-btn {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .trade-plan-success-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .signal-checklist {
   list-style: none;
   margin: 0;

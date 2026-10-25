@@ -1,0 +1,292 @@
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { useTerminal } from "../../context/TerminalContext";
+import { fetchSetup, type TradePlanPayload } from "../../lib/api";
+import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
+import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
+
+export function TradePlanModalTrigger() {
+  const { data, symbol, side, loading } = useTerminal();
+  const { session, plan, setCreditsLocal } = useAuth();
+  const lc = data?.liveCard;
+  const aligned = lc && setupMatchesSelectedSide(data, side);
+  const action = aligned ? effectiveTradingAction(lc, side) : null;
+  const [open, setOpen] = useState(false);
+
+  const hint = !lc
+    ? "Scan a symbol first"
+    : !aligned
+      ? `Rescan ${side} to open plan`
+      : `${action} · tap for AI explanation`;
+
+  return (
+    <>
+      <div className="trade-plan-trigger panel">
+        <div className="trade-plan-trigger-copy">
+          <strong>Trade plan</strong>
+          <span className="muted">{hint}</span>
+        </div>
+        <button
+          type="button"
+          className="scan-btn trade-plan-open-btn"
+          disabled={!symbol || loading}
+          onClick={() => setOpen(true)}
+        >
+          Open AI plan
+        </button>
+      </div>
+      {open ? (
+        <TradePlanModal
+          onClose={() => setOpen(false)}
+          creditsHint={
+            session && plan?.aiEnabled
+              ? `Uses ${plan.deepAiCreditCost} credits when OpenAI is enabled`
+              : undefined
+          }
+        />
+      ) : null}
+    </>
+  );
+}
+
+function labFlagsFromTerminal(
+  health: { monitor?: { wuluLabModeEnabled?: boolean } } | null | undefined,
+  labTestDataMode: boolean,
+  mockTradingMode: boolean,
+  mockLiveRthMode: boolean,
+) {
+  const labOk = health?.monitor?.wuluLabModeEnabled === true;
+  const useLab = labOk && (labTestDataMode || (mockTradingMode && mockLiveRthMode));
+  const useMockRth = useLab && mockLiveRthMode;
+  const useMockEnter = useMockRth && mockTradingMode;
+  return { lab: useLab, mockRth: useMockRth, mockEnter: useMockEnter };
+}
+
+function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
+  const titleId = useId();
+  const { symbol, side, health, labTestDataMode, mockTradingMode, mockLiveRthMode } =
+    useTerminal();
+  const { session, setCreditsLocal } = useAuth();
+  const [plan, setPlan] = useState<TradePlanPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const flags = labFlagsFromTerminal(
+        health,
+        labTestDataMode,
+        mockTradingMode,
+        mockLiveRthMode,
+      );
+      const res = await fetchSetup(symbol, side, {
+        plan: true,
+        lab: flags.lab,
+        mockRth: flags.mockRth,
+        mockEnter: flags.mockEnter,
+        accessToken: session?.access_token ?? null,
+        timeoutMs: 90_000,
+      });
+      if (!res.tradePlan) {
+        throw new Error("No trade plan returned from API.");
+      }
+      setPlan(res.tradePlan);
+      const charged = res.signalRecommendation?.creditsCharged ?? 0;
+      const remaining = res.signalRecommendation?.creditsRemaining;
+      if (charged > 0 && remaining != null) {
+        setCreditsLocal(remaining);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load trade plan.");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    health?.monitor?.wuluLabModeEnabled,
+    labTestDataMode,
+    mockLiveRthMode,
+    mockTradingMode,
+    session?.access_token,
+    side,
+    symbol,
+    setCreditsLocal,
+  ]);
+
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") props.onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [props]);
+
+  return (
+    <div className="trade-plan-overlay" role="presentation" onClick={props.onClose}>
+      <div
+        className="trade-plan-modal panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="trade-plan-modal-head">
+          <div>
+            <h2 id={titleId}>
+              {symbol} {side} — AI trade plan
+            </h2>
+            {plan ? (
+              <p className="muted trade-plan-modal-sub">
+                Engine {plan.tradingAction} · Signal {plan.action} ·{" "}
+                {plan.briefSource === "model" ? "OpenAI" : "Rules fallback"}
+              </p>
+            ) : null}
+          </div>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={props.onClose}>
+            ×
+          </button>
+        </header>
+
+        {loading ? (
+          <p className="trade-plan-modal-body muted">Building plan from live gates, chart levels, and news…</p>
+        ) : error ? (
+          <div className="trade-plan-modal-body">
+            <p className="check-fail">{error}</p>
+            <button type="button" className="scan-btn" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        ) : plan ? (
+          <div className="trade-plan-modal-body">
+            <section className="trade-plan-success panel-inset">
+              <h3>Success rate (historical)</h3>
+              <p className="trade-plan-success-headline">{plan.successRate.headline}</p>
+              <div className="trade-plan-success-grid">
+                <div>
+                  <label>Win rate</label>
+                  <strong>
+                    {plan.successRate.winRatePct != null
+                      ? `${plan.successRate.winRatePct.toFixed(0)}%`
+                      : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <label>Sample</label>
+                  <strong>{plan.successRate.sampleSize > 0 ? plan.successRate.sampleSize : "—"}</strong>
+                </div>
+                <div>
+                  <label>Expectancy</label>
+                  <strong>
+                    {plan.successRate.expectancyR != null
+                      ? `${plan.successRate.expectancyR.toFixed(2)}R`
+                      : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <label>Setup score</label>
+                  <strong>
+                    {plan.successRate.qualityScore10 != null
+                      ? `${plan.successRate.qualityScore10}/10`
+                      : "—"}
+                  </strong>
+                </div>
+              </div>
+              <p className="disclaimer">{plan.successRate.qualityDisclaimer}</p>
+              {plan.successRate.strategyName ? (
+                <p className="muted">Pattern: {plan.successRate.strategyName}</p>
+              ) : null}
+            </section>
+
+            <section>
+              <h3>Why this zone</h3>
+              <p>{plan.sections.whyThisZone}</p>
+            </section>
+
+            <section className="trade-plan-do">
+              <h3>What to do now</h3>
+              <p>{plan.sections.whatToDoNow}</p>
+            </section>
+
+            <section>
+              <h3>Gates & news</h3>
+              <p>{plan.sections.gatesAndNews}</p>
+            </section>
+
+            {plan.sections.risks.length > 0 ? (
+              <section>
+                <h3>Risks</h3>
+                <ul className="ai-blockers">
+                  {plan.sections.risks.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <section>
+              <h3>Outlook</h3>
+              <p>{plan.sections.outlook}</p>
+            </section>
+
+            <details className="trade-plan-gates-details">
+              <summary>Gate checklist</summary>
+              <div className="trade-playbook-gates">
+                <div>
+                  <h4>Passed</h4>
+                  {plan.gatesPassed.length === 0 ? (
+                    <p className="muted">None</p>
+                  ) : (
+                    <ul className="signal-checklist">
+                      {plan.gatesPassed.map((g) => (
+                        <li key={g.label} className="check-pass">
+                          {g.label}: {g.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <h4>Blocking / waiting</h4>
+                  {plan.gatesBlocking.length === 0 ? (
+                    <p className="muted">None</p>
+                  ) : (
+                    <ul className="signal-checklist">
+                      {plan.gatesBlocking.map((g) => (
+                        <li
+                          key={g.label}
+                          className={g.status === "FAIL" ? "check-fail" : "check-waiting"}
+                        >
+                          {g.label}: {g.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </details>
+          </div>
+        ) : null}
+
+        <footer className="trade-plan-modal-foot">
+          {props.creditsHint ? <p className="disclaimer">{props.creditsHint}</p> : null}
+          <p className="disclaimer">
+            Signals only — no orders placed. Not financial advice.{" "}
+            <Link to="/billing">Credits & plans</Link>
+          </p>
+          <button type="button" className="scan-btn" disabled={loading} onClick={() => void load()}>
+            Refresh plan
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}

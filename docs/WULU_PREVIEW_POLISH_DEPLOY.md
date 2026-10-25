@@ -33,6 +33,14 @@ node scripts/demo-lifecycle-simulation.mjs
 
 Runs confirmation lifecycle vitest plus monitor alert + chart-sync unit tests.
 
+## Deploy record (2026-10-16)
+
+| Target | Commit | Verification |
+| --- | --- | --- |
+| Git `phase7/scanner-v2-preview` | **`1085ad7`** | pushed to `origin` |
+| Railway preview API | **`1085ad7`** (local `railway up`) | `liveCard.symbol=SPY` on `/v1/setup` |
+| Vercel preview web | Pending auto-build | Expect JS bundle `index-BFwNEE9G.js` (was `CVPxWeS8`) — redeploy preview in Vercel if Git hook did not fire |
+
 ## Wulu RTH acceptance
 
 See `docs/WULU_RTH_MILESTONE_CHECKLIST.md`. Paper trading remains on hold until signed-in RTH recording passes.
