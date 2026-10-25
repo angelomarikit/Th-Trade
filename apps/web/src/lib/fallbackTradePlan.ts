@@ -64,6 +64,9 @@ export function fallbackTradePlanFromLiveCard(input: {
       whyThisZone: playbook.whyThisZone,
       whatToDoNow: playbook.doNow,
       gatesAndNews: gatesAndNews || "See gate checklist below.",
+      chartRead:
+        playbook.chartSessionLine ??
+        "Chart read requires WULU Plan API — redeploy preview Railway or retry after deploy.",
       risks: playbook.gatesBlocking.slice(0, 4).map((g) => `${g.label}: ${g.reason}`),
       outlook: `${liveCard.status} · follow gates before entry.`,
     },

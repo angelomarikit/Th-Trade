@@ -19,6 +19,7 @@ export interface TradePlanSections {
   whyThisZone: string;
   whatToDoNow: string;
   gatesAndNews: string;
+  chartRead: string;
   risks: string[];
   outlook: string;
 }
@@ -128,6 +129,7 @@ function buildFallbackSections(input: {
     whyThisZone,
     whatToDoNow,
     gatesAndNews,
+    chartRead: "Chart context not available in rules mode.",
     risks,
     outlook: `${card.statusLabel} · ${action} bias · ${card.session?.session ?? "session unknown"}. Follow gates, not narrative alone.`,
   };
@@ -138,8 +140,9 @@ export async function buildTradePlan(input: {
   side: TradeSide;
   tradingAction: TradePlanPayload["tradingAction"];
   withModel: boolean;
+  chartContext?: Record<string, unknown> | null;
 }): Promise<TradePlanPayload> {
-  const { card, side, tradingAction, withModel } = input;
+  const { card, side, tradingAction, withModel, chartContext } = input;
   const { action, snapshot } = signalFromCard(card, side);
   const successRate = successRateFromCard(card);
   const gates = gateRows(card);
@@ -172,6 +175,26 @@ export async function buildTradePlan(input: {
       successRateHeadline: successRate.headline,
       winRatePct: successRate.winRatePct,
       sampleSize: successRate.sampleSize,
+      chartContext: chartContext ?? null,
+      relativeMomentum: card.relativeMomentum,
+      indicatorChecklist: card.indicatorChecklist?.map((r) => ({
+        label: r.label,
+        bias: r.bias,
+        gateStatus: r.gateStatus,
+        explanation: r.explanation,
+      })),
+      signalIntelligence: card.signalIntelligence
+        ? {
+            falseBreakoutRisk: card.signalIntelligence.falseBreakoutRisk,
+            actionHint: card.signalIntelligence.actionHint,
+            entryModel: card.signalIntelligence.entryModel,
+            fakeBreakoutWarnings: card.signalIntelligence.fakeBreakoutWarnings?.map((w) => ({
+              pattern: w.pattern,
+              severity: w.severity,
+              evidence: w.evidence,
+            })),
+          }
+        : null,
     },
   });
 
@@ -198,18 +221,15 @@ async function narrateTradePlanSections(input: {
   const apiKey = readOpenAiApiKey();
   if (!apiKey) return null;
 
-  const system = `You explain WULU scanner trade plans for human traders.
+  const system = `You are WULU desk — explain trade plans from scanner + chart context JSON.
 Rules:
-- Use ONLY fields in scannerSetup JSON. Do not invent prices, news, or win-rate percentages.
-- winRatePct and successRateHeadline in the payload are authoritative for historical stats; reference them but do not change numbers.
-- tradingAction (WAIT/ENTER/SKIP/INVALIDATED) and action (BUY/SELL/WAIT) are fixed — do not upgrade WAIT to ENTER.
+- Use ONLY fields in scannerSetup (including chartContext when present). Do not invent prices, news, or win-rate percentages.
+- winRatePct and successRateHeadline are authoritative; do not change numbers.
+- tradingAction and action are fixed — never upgrade WAIT to ENTER.
 - News never alone justifies entry.
-- Respond with a single JSON object (no markdown) with keys:
-  whyThisZone (string, 2-4 sentences),
-  whatToDoNow (string, clear steps),
-  gatesAndNews (string, gates + catalyst context),
-  risks (array of 2-4 short strings),
-  outlook (string, 1-2 sentences).`;
+- chartRead must describe structure from chartContext (trend, VWAP side, zone vs price, recent bars). If chartContext.barCount is 0, say chart data was not attached.
+- Respond with one JSON object (no markdown):
+  whyThisZone, whatToDoNow, gatesAndNews, chartRead, risks (array), outlook.`;
 
   const user = JSON.stringify(
     {
@@ -244,7 +264,11 @@ Rules:
         ],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.warn(`[wulu-plan] OpenAI HTTP ${res.status}: ${body.slice(0, 200)}`);
+      return null;
+    }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
@@ -256,10 +280,12 @@ Rules:
       whyThisZone: String(parsed.whyThisZone),
       whatToDoNow: String(parsed.whatToDoNow),
       gatesAndNews: String(parsed.gatesAndNews ?? ""),
+      chartRead: String(parsed.chartRead ?? ""),
       risks: Array.isArray(parsed.risks) ? parsed.risks.map(String) : [],
       outlook: String(parsed.outlook ?? ""),
     };
-  } catch {
+  } catch (err) {
+    console.warn("[wulu-plan] OpenAI parse failed", err);
     return null;
   }
 }

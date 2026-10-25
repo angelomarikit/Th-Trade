@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
-import { fetchSetup, type TradePlanPayload } from "../../lib/api";
+import { fetchSetup, fetchWuluPlan, type ChartBar, type TradePlanPayload } from "../../lib/api";
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { fallbackTradePlanFromLiveCard } from "../../lib/fallbackTradePlan";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
@@ -60,8 +60,17 @@ function planSourceLabel(briefSource: TradePlanPayload["briefSource"]): string {
 
 function TradePlanModal(props: { onClose: () => void; sessionToken: string | null }) {
   const titleId = useId();
-  const { symbol, side, health, labTestDataMode, mockTradingMode, mockLiveRthMode, displayPrice } =
-    useTerminal();
+  const {
+    symbol,
+    side,
+    health,
+    labTestDataMode,
+    mockTradingMode,
+    mockLiveRthMode,
+    displayPrice,
+    bars,
+    chartTf,
+  } = useTerminal();
   const [plan, setPlan] = useState<TradePlanPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +86,31 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
         mockTradingMode,
         mockLiveRthMode,
       );
+      const chartBars: ChartBar[] | null =
+        bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? (bars.bars ?? null) : null;
+
+      try {
+        const planRes = await fetchWuluPlan(symbol, side, {
+          lab: flags.lab,
+          mockRth: flags.mockRth,
+          mockEnter: flags.mockEnter,
+          chart: chartBars?.length
+            ? { timeframe: chartTf, bars: chartBars }
+            : undefined,
+          accessToken: props.sessionToken,
+          timeoutMs: 120_000,
+        });
+        if (planRes.tradePlan) {
+          setPlan(planRes.tradePlan);
+          return;
+        }
+      } catch (postErr) {
+        const msg = postErr instanceof Error ? postErr.message : "";
+        if (!msg.includes("404") && !msg.includes("Not Found")) {
+          throw postErr;
+        }
+      }
+
       const res = await fetchSetup(symbol, side, {
         plan: true,
         lab: flags.lab,
@@ -97,9 +131,7 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
           }),
         );
       } else {
-        throw new Error(
-          "WULU Plan unavailable — setup did not return card data. Redeploy preview API (needs commit 84cd395+).",
-        );
+        throw new Error("WULU Plan unavailable — preview API needs redeploy (POST /v1/wulu-plan).");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load WULU Plan.");
@@ -111,6 +143,8 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
     labTestDataMode,
     mockLiveRthMode,
     mockTradingMode,
+    bars,
+    chartTf,
     displayPrice,
     props.sessionToken,
     side,
@@ -216,6 +250,11 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
             <section className="trade-plan-do">
               <h3>What to do now</h3>
               <p>{plan.sections.whatToDoNow}</p>
+            </section>
+
+            <section>
+              <h3>Chart read</h3>
+              <p>{plan.sections.chartRead || "—"}</p>
             </section>
 
             <section>

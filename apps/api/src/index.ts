@@ -84,7 +84,8 @@ import {
 } from "./monitor/signalHistory.js";
 import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.js";
 import { openAiConfigured } from "./recommend/openaiEnv.js";
-import { buildTradePlan } from "./recommend/tradePlan.js";
+import { buildWuluPlanForCard } from "./wuluPlan/buildWuluPlan.js";
+import { handleWuluPlanPost } from "./wuluPlan/handleWuluPlanRequest.js";
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -691,6 +692,25 @@ async function main() {
         });
       }
 
+      if (url.pathname === "/v1/wulu-plan" && req.method === "POST") {
+        try {
+          const body = (await readJson(req)) as Parameters<typeof handleWuluPlanPost>[0]["body"];
+          await handleWuluPlanPost({
+            body,
+            scanner,
+            marketData,
+            outcomeTracker,
+            interactiveSetupState,
+            setupStateKey,
+            json,
+            res,
+          });
+        } catch (err) {
+          return authError(res, err);
+        }
+        return;
+      }
+
       if (url.pathname === "/v1/setup" && req.method === "GET") {
         await withAlpacaPriority("interactive", async () => {
         try {
@@ -802,8 +822,6 @@ async function main() {
           url.searchParams.get("plan") === "1" ||
           url.searchParams.get("plan") === "true";
         const openaiReady = openAiConfigured();
-        /** WULU Plan (?plan=1): free — no credits; narrate when OpenAI is configured. */
-        let withModelPlan = wantPlan && openaiReady;
         let withModelBrief = wantBrief && openaiReady;
         let creditsCharged = 0;
         let creditsRemaining: number | null = null;
@@ -835,9 +853,6 @@ async function main() {
           }
         } else if (!wantBrief) {
           withModelBrief = false;
-        }
-        if (!wantPlan) {
-          withModelPlan = false;
         }
         // wantBrief + OpenAI, no auth session → still narrate brief (same as /v1/recommend)
 
@@ -910,12 +925,15 @@ async function main() {
         });
 
         const tradePlan = wantPlan
-          ? await buildTradePlan({
-              card,
-              side,
-              tradingAction,
-              withModel: withModelPlan,
-            })
+          ? (
+              await buildWuluPlanForCard({
+                card,
+                side,
+                mockRth,
+                labMode,
+                outcomeTracker,
+              })
+            ).tradePlan
           : undefined;
 
         return json(res, 200, {
@@ -1835,6 +1853,7 @@ async function main() {
     console.log("  GET /v1/me");
     console.log("  POST /v1/billing/select-plan");
     console.log("  POST /v1/recommend");
+    console.log("  POST /v1/wulu-plan");
     console.log("  GET /v1/bars?ticker=NVDA&timeframe=5m");
     console.log("  GET /v1/setup?ticker=NVDA&side=LONG");
     console.log("  GET /v1/monitor");

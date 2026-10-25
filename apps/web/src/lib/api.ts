@@ -49,6 +49,7 @@ export interface TradePlanPayload {
     whyThisZone: string;
     whatToDoNow: string;
     gatesAndNews: string;
+    chartRead: string;
     risks: string[];
     outlook: string;
   };
@@ -373,6 +374,41 @@ export interface EdgeResponse {
 
 const DEFAULT_MARKET_TIMEOUT_MS = 22_000;
 
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  headers?: Record<string, string>,
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
+): Promise<T> {
+  const timeoutMs = opts?.timeoutMs ?? 120_000;
+  const ac = new AbortController();
+  const timer = window.setTimeout(() => ac.abort(), timeoutMs);
+  if (opts?.signal) {
+    if (opts.signal.aborted) ac.abort();
+    else opts.signal.addEventListener("abort", () => ac.abort(), { once: true });
+  }
+  try {
+    const res = await fetch(apiUrl(path), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(headers ?? {}),
+      },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    return JSON.parse(text) as T;
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function getJson<T>(
   path: string,
   headers?: Record<string, string>,
@@ -444,6 +480,51 @@ export function fetchSetup(
     timeoutMs: opts?.timeoutMs,
     signal: opts?.signal,
   });
+}
+
+export function fetchWuluPlan(
+  ticker: string,
+  side: "LONG" | "SHORT",
+  opts?: {
+    lab?: boolean;
+    mockRth?: boolean;
+    mockEnter?: boolean;
+    chart?: { timeframe: string; bars: ChartBar[] };
+    accessToken?: string | null;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+  },
+) {
+  const headers: Record<string, string> = {};
+  if (opts?.accessToken) {
+    headers.Authorization = `Bearer ${opts.accessToken}`;
+  }
+  return postJson<{ tradePlan: TradePlanPayload; source?: string }>(
+    "/v1/wulu-plan",
+    {
+      symbol: ticker,
+      side,
+      lab: opts?.lab === true,
+      mockRth: opts?.mockRth === true,
+      mockEnter: opts?.mockEnter === true,
+      chart: opts?.chart
+        ? {
+            timeframe: opts.chart.timeframe,
+            bars: opts.chart.bars.slice(-24).map((b) => ({
+              time: b.time,
+              open: b.open,
+              high: b.high,
+              low: b.low,
+              close: b.close,
+              volume: b.volume,
+              vwap: b.vwap,
+            })),
+          }
+        : undefined,
+    },
+    headers,
+    { timeoutMs: opts?.timeoutMs ?? 120_000, signal: opts?.signal },
+  );
 }
 
 export function fetchBars(
