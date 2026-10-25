@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
 import { fetchSetup, type TradePlanPayload } from "../../lib/api";
@@ -8,7 +7,7 @@ import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 export function TradePlanModalTrigger() {
   const { data, symbol, side, loading } = useTerminal();
-  const { session, plan, setCreditsLocal } = useAuth();
+  const { session } = useAuth();
   const lc = data?.liveCard;
   const aligned = lc && setupMatchesSelectedSide(data, side);
   const action = aligned ? effectiveTradingAction(lc, side) : null;
@@ -18,13 +17,13 @@ export function TradePlanModalTrigger() {
     ? "Scan a symbol first"
     : !aligned
       ? `Rescan ${side} to open plan`
-      : `${action} · tap for AI explanation`;
+      : `${action} · open WULU Plan for this setup`;
 
   return (
     <>
       <div className="trade-plan-trigger panel">
         <div className="trade-plan-trigger-copy">
-          <strong>Trade plan</strong>
+          <strong>WULU Plan for trade</strong>
           <span className="muted">{hint}</span>
         </div>
         <button
@@ -33,19 +32,10 @@ export function TradePlanModalTrigger() {
           disabled={!symbol || loading}
           onClick={() => setOpen(true)}
         >
-          Open AI plan
+          WULU Plan
         </button>
       </div>
-      {open ? (
-        <TradePlanModal
-          onClose={() => setOpen(false)}
-          creditsHint={
-            session && plan?.aiEnabled
-              ? `Uses ${plan.deepAiCreditCost} credits when OpenAI is enabled`
-              : undefined
-          }
-        />
-      ) : null}
+      {open ? <TradePlanModal onClose={() => setOpen(false)} sessionToken={session?.access_token ?? null} /> : null}
     </>
   );
 }
@@ -63,11 +53,14 @@ function labFlagsFromTerminal(
   return { lab: useLab, mockRth: useMockRth, mockEnter: useMockEnter };
 }
 
-function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
+function planSourceLabel(briefSource: TradePlanPayload["briefSource"]): string {
+  return briefSource === "model" ? "WULU desk" : "Rules";
+}
+
+function TradePlanModal(props: { onClose: () => void; sessionToken: string | null }) {
   const titleId = useId();
   const { symbol, side, health, labTestDataMode, mockTradingMode, mockLiveRthMode } =
     useTerminal();
-  const { session, setCreditsLocal } = useAuth();
   const [plan, setPlan] = useState<TradePlanPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,20 +81,15 @@ function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
         lab: flags.lab,
         mockRth: flags.mockRth,
         mockEnter: flags.mockEnter,
-        accessToken: session?.access_token ?? null,
+        accessToken: props.sessionToken,
         timeoutMs: 90_000,
       });
       if (!res.tradePlan) {
-        throw new Error("No trade plan returned from API.");
+        throw new Error("No WULU Plan returned from API.");
       }
       setPlan(res.tradePlan);
-      const charged = res.signalRecommendation?.creditsCharged ?? 0;
-      const remaining = res.signalRecommendation?.creditsRemaining;
-      if (charged > 0 && remaining != null) {
-        setCreditsLocal(remaining);
-      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load trade plan.");
+      setError(e instanceof Error ? e.message : "Could not load WULU Plan.");
     } finally {
       setLoading(false);
     }
@@ -110,10 +98,9 @@ function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
     labTestDataMode,
     mockLiveRthMode,
     mockTradingMode,
-    session?.access_token,
+    props.sessionToken,
     side,
     symbol,
-    setCreditsLocal,
   ]);
 
   useEffect(() => {
@@ -142,12 +129,11 @@ function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
         <header className="trade-plan-modal-head">
           <div>
             <h2 id={titleId}>
-              {symbol} {side} — AI trade plan
+              {symbol} {side} — WULU Plan
             </h2>
             {plan ? (
               <p className="muted trade-plan-modal-sub">
-                Engine {plan.tradingAction} · Signal {plan.action} ·{" "}
-                {plan.briefSource === "model" ? "OpenAI" : "Rules fallback"}
+                Engine {plan.tradingAction} · Signal {plan.action} · {planSourceLabel(plan.briefSource)}
               </p>
             ) : null}
           </div>
@@ -157,7 +143,9 @@ function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
         </header>
 
         {loading ? (
-          <p className="trade-plan-modal-body muted">Building plan from live gates, chart levels, and news…</p>
+          <p className="trade-plan-modal-body muted">
+            Building WULU Plan from live gates, chart levels, and news…
+          </p>
         ) : error ? (
           <div className="trade-plan-modal-body">
             <p className="check-fail">{error}</p>
@@ -277,13 +265,9 @@ function TradePlanModal(props: { onClose: () => void; creditsHint?: string }) {
         ) : null}
 
         <footer className="trade-plan-modal-foot">
-          {props.creditsHint ? <p className="disclaimer">{props.creditsHint}</p> : null}
-          <p className="disclaimer">
-            Signals only — no orders placed. Not financial advice.{" "}
-            <Link to="/billing">Credits & plans</Link>
-          </p>
+          <p className="disclaimer">Signals only — no orders placed. Not financial advice.</p>
           <button type="button" className="scan-btn" disabled={loading} onClick={() => void load()}>
-            Refresh plan
+            Refresh WULU Plan
           </button>
         </footer>
       </div>

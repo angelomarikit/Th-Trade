@@ -802,44 +802,44 @@ async function main() {
           url.searchParams.get("plan") === "1" ||
           url.searchParams.get("plan") === "true";
         const openaiReady = openAiConfigured();
-        let withModelBrief = wantBrief && openaiReady;
+        /** WULU Plan (?plan=1): free — no credits; narrate when OpenAI is configured. */
         let withModelPlan = wantPlan && openaiReady;
+        let withModelBrief = wantBrief && openaiReady;
         let creditsCharged = 0;
         let creditsRemaining: number | null = null;
 
-        if ((wantBrief || wantPlan) && openaiReady && supabaseReady && req.headers.authorization) {
+        if (wantBrief && openaiReady && supabaseReady && req.headers.authorization) {
           try {
             const user = await requireUser(req.headers.authorization);
             const profile = await getOrCreateProfile(user);
             const planTier = getPlan(profile.plan_tier);
             if (!planTier.aiEnabled) {
               withModelBrief = false;
-              withModelPlan = false;
             } else {
-              const cost = wantPlan ? planTier.deepAiCreditCost : planTier.aiCreditCost;
+              const cost = planTier.aiCreditCost;
               if (profile.credits_balance >= cost) {
                 const updated = await spendCredits({
                   userId: user.id,
                   cost,
-                  reason: wantPlan ? "trade_plan" : "signal_recommend",
+                  reason: "signal_recommend",
                   meta: { symbol: ticker.toUpperCase(), side, via: "setup" },
                 });
                 creditsCharged = cost;
                 creditsRemaining = updated.credits_balance;
               } else {
                 withModelBrief = false;
-                withModelPlan = false;
               }
             }
           } catch {
             withModelBrief = false;
-            withModelPlan = false;
           }
-        } else if (!wantBrief && !wantPlan) {
+        } else if (!wantBrief) {
           withModelBrief = false;
+        }
+        if (!wantPlan) {
           withModelPlan = false;
         }
-        // wantBrief/plan + OpenAI, no auth session → still narrate (same as /v1/recommend)
+        // wantBrief + OpenAI, no auth session → still narrate brief (same as /v1/recommend)
 
         const signal = await buildAutomaticSignal({
           card,
