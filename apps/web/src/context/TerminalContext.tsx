@@ -20,6 +20,11 @@ import {
   type SetupResponse,
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
+import {
+  MOCK_TAPE_INTERVAL_MS,
+  mockTapeActive,
+  tickSimulatedPrice,
+} from "../lib/mockLiveTape";
 import { barsForChart, chartUsesExtendedSession, historyLimit } from "../lib/regularSession";
 import { isUserVisibleMonitorTransition } from "../lib/monitorDisplay";
 import {
@@ -278,6 +283,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const barsAbortRef = useRef<AbortController | null>(null);
   const barsSeqRef = useRef(0);
   const barsInflightKeyRef = useRef("");
+  const tapeStepRef = useRef(0);
+  const tapeAnchorRef = useRef<number | null>(null);
+  const tapeBarTimeRef = useRef<number | null>(null);
 
   const FAST_BAR_LIMIT = 40;
 
@@ -772,6 +780,61 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       ),
     [extendedHours, labTestDataMode, mockTradingMode, mockLiveRthMode],
   );
+
+  const liveTapeOn = mockTapeActive(mockTradingMode, mockLiveRthMode, labTestDataMode);
+
+  useEffect(() => {
+    tapeStepRef.current = 0;
+    tapeAnchorRef.current = null;
+    tapeBarTimeRef.current = null;
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!liveTapeOn || !symbol) return;
+    const sym = symbol.toUpperCase();
+    const id = window.setInterval(() => {
+      setBars((prev) => {
+        if (!prev || prev.symbol.toUpperCase() !== sym || !prev.bars.length) return prev;
+        const last = prev.bars[prev.bars.length - 1]!;
+        if (tapeBarTimeRef.current !== last.time) {
+          tapeBarTimeRef.current = last.time;
+          tapeAnchorRef.current = last.close;
+          tapeStepRef.current = 0;
+        }
+        const anchor = tapeAnchorRef.current ?? last.close;
+        tapeStepRef.current += 1;
+        const nextClose = tickSimulatedPrice({
+          symbol: sym,
+          step: tapeStepRef.current,
+          prevClose: last.close,
+          anchor,
+        });
+        const volBump = 800 + (tapeStepRef.current % 7) * 400;
+        const nextBar = {
+          ...last,
+          close: nextClose,
+          high: Math.max(last.high, nextClose),
+          low: Math.min(last.low, nextClose),
+          volume: (last.volume ?? 0) + volBump,
+        };
+        const nextBars = [...prev.bars.slice(0, -1), nextBar];
+        const extended = sessionAllForChart();
+        const sessionBars = { ...prev, bars: nextBars, count: nextBars.length };
+        writeBarsCache(sym, chartTfRef.current, sessionBars, extended);
+        setMockPortfolio(updateMockMarks(sym, nextClose));
+        setData((scan) => {
+          if (!scan?.liveCard || scan.liveCard.symbol?.toUpperCase() !== sym) return scan;
+          return {
+            ...scan,
+            liveCard: { ...scan.liveCard, lastPrice: nextClose },
+            card: { ...scan.card, lastPrice: nextClose },
+          };
+        });
+        return sessionBars;
+      });
+    }, MOCK_TAPE_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [liveTapeOn, symbol]);
 
   const displayPrice = useMemo(() => {
     // Header price is the active chart's last candle close, not a quote patched onto the bar.

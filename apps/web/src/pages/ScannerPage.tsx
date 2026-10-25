@@ -35,6 +35,7 @@ export function ScannerPage() {
     setLabTestDataMode,
     mockTradingMode,
     setMockTradingMode,
+    mockLiveRthMode,
     scan,
     toggleWatchlist,
     watchlist,
@@ -133,6 +134,9 @@ export function ScannerPage() {
         <p className="banner warn" role="status">
           Mock trading ON — practice fills stay on this device. No real orders are sent.
           {lc?.mockRth ? " Simulated RTH rules active on last SIP snapshot." : ""}
+          {mockLiveRthMode && labTestDataMode
+            ? " Price ticks every ~2.5s on the last candle (lab tape — not live NBBO)."
+            : ""}
         </p>
       )}
       {/* Weekend / unverified reason lives once in SignalSummaryPanel (avoids triple banners on mobile). */}
