@@ -3,7 +3,20 @@ import { CandleChart } from "../components/scanner/CandleChart";
 import { useTerminal } from "../context/TerminalContext";
 
 export function ChartsPage() {
-  const { bars, barsLoading, barsError, chartTf, setChartTf, extendedHours, setExtendedHours, symbol, data, scan } = useTerminal();
+  const {
+    bars,
+    barsLoading,
+    barsError,
+    chartTf,
+    setChartTf,
+    chartExtendedHours,
+    setExtendedHours,
+    symbol,
+    labTestDataMode,
+    mockTradingMode,
+    reloadChart,
+    scan,
+  } = useTerminal();
   return (
     <div className="page">
       <h1 className="page-title">Charts · {symbol}</h1>
@@ -20,9 +33,13 @@ export function ChartsPage() {
         timeframe={chartTf}
         onTimeframe={setChartTf}
         symbol={symbol}
-        extendedHours={extendedHours}
+        extendedHours={chartExtendedHours}
         onExtendedHours={setExtendedHours}
-        onRetry={() => void scan({ ticker: symbol, fast: true })}
+        chartPreviewMode={labTestDataMode || mockTradingMode}
+        onRetry={() => {
+          reloadChart();
+          void scan({ ticker: symbol, fast: true });
+        }}
       />
     </div>
   );

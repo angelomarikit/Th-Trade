@@ -20,7 +20,7 @@ import {
   type SetupResponse,
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
-import { barsForChart, historyLimit } from "../lib/regularSession";
+import { barsForChart, chartUsesExtendedSession, historyLimit } from "../lib/regularSession";
 import { isUserVisibleMonitorTransition } from "../lib/monitorDisplay";
 import {
   closeMockPosition,
@@ -93,6 +93,8 @@ interface TerminalContextValue {
   setChartTf: (tf: string) => void;
   extendedHours: boolean;
   setExtendedHours: (on: boolean) => void;
+  /** True when chart fetches/filters extended session (incl. mock + lab preview). */
+  chartExtendedHours: boolean;
   /** Preview: off-RTH diagnostic scan via API `lab=1` (ENTER still blocked). */
   labTestDataMode: boolean;
   setLabTestDataMode: (on: boolean) => void;
@@ -128,6 +130,7 @@ interface TerminalContextValue {
   clearAlerts: () => void;
   recentScans: RecentScan[];
   selectSymbol: (sym: string, opts?: { brief?: boolean }) => void;
+  reloadChart: () => void;
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null);
@@ -196,12 +199,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const chartTfRef = useRef(chartTf);
   const extendedRef = useRef(false);
   const labTestRef = useRef(false);
+  const mockTradingRef = useRef(false);
   const healthRef = useRef<HealthResponse | null>(null);
   symbolRef.current = symbol;
   sideRef.current = side;
   chartTfRef.current = chartTf;
   extendedRef.current = extendedHours;
   labTestRef.current = labTestDataMode;
+  mockTradingRef.current = mockTradingMode;
   healthRef.current = health;
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
@@ -263,10 +268,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const FAST_BAR_LIMIT = 40;
 
+  const sessionAllForChart = () =>
+    extendedRef.current || labTestRef.current || mockTradingRef.current;
+
   const loadBars = useCallback(async (sym: string, tf: string, opts?: { soft?: boolean; limit?: number }) => {
     const target = sym.trim().toUpperCase();
     if (!target) return;
-    const extended = extendedRef.current;
+    const extended = sessionAllForChart();
+    const preview = labTestRef.current || mockTradingRef.current;
     const key = `${target}|${tf}|${extended ? "all" : "rth"}`;
     if (barsAbortRef.current && barsInflightKeyRef.current === key) {
       return;
@@ -292,10 +301,18 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     }
     setBarsError(null);
     try {
-      const b = await fetchBars(target, tf, limit, { signal: ac.signal, extendedHours: extended });
+      const barsTimeout = preview ? 45_000 : undefined;
+      const b = await fetchBars(target, tf, limit, {
+        signal: ac.signal,
+        extendedHours: extended,
+        timeoutMs: barsTimeout,
+      });
       if (ac.signal.aborted || seq !== barsSeqRef.current) return;
       if (b.symbol && b.symbol.toUpperCase() !== target) return;
-      const shown = barsForChart(b.bars, tf, extended);
+      let shown = barsForChart(b.bars, tf, extended);
+      if (shown.length === 0 && b.bars.length > 0 && preview) {
+        shown = barsForChart(b.bars, tf, true);
+      }
       const sessionBars = { ...b, bars: shown, count: shown.length };
       setBars(sessionBars);
       writeBarsCache(target, tf, sessionBars, extended);
@@ -306,9 +323,15 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           if (refineSeq !== barsSeqRef.current) return;
           void (async () => {
             try {
-              const full = await fetchBars(target, tf, fullLimit, { extendedHours: extended });
-              if (refineSeq !== barsSeqRef.current || extendedRef.current !== extended) return;
-              const fullShown = barsForChart(full.bars, tf, extended);
+              const full = await fetchBars(target, tf, fullLimit, {
+                extendedHours: extended,
+                timeoutMs: preview ? 45_000 : undefined,
+              });
+              if (refineSeq !== barsSeqRef.current || sessionAllForChart() !== extended) return;
+              let fullShown = barsForChart(full.bars, tf, extended);
+              if (fullShown.length === 0 && full.bars.length > 0 && preview) {
+                fullShown = barsForChart(full.bars, tf, true);
+              }
               const fullSession = { ...full, bars: fullShown, count: fullShown.length };
               setBars(fullSession);
               writeBarsCache(target, tf, fullSession, extended);
@@ -323,6 +346,27 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       if (ac.signal.aborted) {
         setBarsError("Chart request was interrupted. Tap Retry.");
         return;
+      }
+      if (preview && !extended) {
+        try {
+          const b = await fetchBars(target, tf, limit, {
+            signal: ac.signal,
+            extendedHours: true,
+            timeoutMs: 45_000,
+          });
+          if (ac.signal.aborted || seq !== barsSeqRef.current) return;
+          let shown = barsForChart(b.bars, tf, true);
+          if (shown.length === 0 && b.bars.length > 0) {
+            shown = b.bars.filter((bar) => bar != null && Number.isFinite(bar.close));
+          }
+          const sessionBars = { ...b, bars: shown, count: shown.length };
+          setBars(sessionBars);
+          writeBarsCache(target, tf, sessionBars, true);
+          setBarsError(null);
+          return;
+        } catch {
+          /* fall through */
+        }
       }
       setBarsError(friendlyApiError(err));
       if (!soft && !readBarsCache(target, tf, extended)) setBars(null);
@@ -357,10 +401,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     [setExtendedHours],
   );
 
-  const setMockTradingMode = useCallback((on: boolean) => {
-    setMockTradingModeState(on);
-    writeMockTradingMode(on);
-  }, []);
+  const setMockTradingMode = useCallback(
+    (on: boolean) => {
+      setMockTradingModeState(on);
+      writeMockTradingMode(on);
+      if (on) setExtendedHours(true);
+    },
+    [setExtendedHours],
+  );
 
   const resetMockTrading = useCallback(() => {
     setMockPortfolio(resetMockPortfolio());
@@ -647,6 +695,22 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     if (symbol) void loadBars(symbol, chartTf);
   }, [chartTf, symbol, loadBars]);
 
+  useEffect(() => {
+    if (!symbol || (!labTestDataMode && !mockTradingMode)) return;
+    void loadBars(symbol, chartTf, { soft: false, limit: historyLimit(chartTf) });
+  }, [labTestDataMode, mockTradingMode, symbol, chartTf, loadBars]);
+
+  const reloadChart = useCallback(() => {
+    const sym = symbolRef.current;
+    if (!sym) return;
+    void loadBars(sym, chartTfRef.current, { soft: false, limit: historyLimit(chartTfRef.current) });
+  }, [loadBars]);
+
+  const chartExtendedHours = useMemo(
+    () => chartUsesExtendedSession(extendedHours, labTestDataMode, mockTradingMode),
+    [extendedHours, labTestDataMode, mockTradingMode],
+  );
+
   const displayPrice = useMemo(() => {
     // Header price is the active chart's last candle close, not a quote patched onto the bar.
     if (bars?.symbol?.toUpperCase() === symbol.toUpperCase()) {
@@ -684,6 +748,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setChartTf,
       extendedHours,
       setExtendedHours,
+      chartExtendedHours,
       labTestDataMode,
       setLabTestDataMode,
       mockTradingMode,
@@ -715,6 +780,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       clearAlerts,
       recentScans,
       selectSymbol,
+      reloadChart,
     }),
     [
       symbol,
@@ -728,6 +794,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       chartTf,
       extendedHours,
       setExtendedHours,
+      chartExtendedHours,
       labTestDataMode,
       setLabTestDataMode,
       mockTradingMode,
@@ -757,6 +824,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       clearAlerts,
       recentScans,
       selectSymbol,
+      reloadChart,
     ],
   );
 

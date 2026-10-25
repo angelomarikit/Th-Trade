@@ -20,6 +20,8 @@ export function ScannerPage() {
     setChartTf,
     extendedHours,
     setExtendedHours,
+    chartExtendedHours,
+    reloadChart,
     symbol,
     error,
     inspectorOpen,
@@ -239,8 +241,9 @@ export function ScannerPage() {
             timeframe={chartTf}
             onTimeframe={setChartTf}
             symbol={symbol}
-            extendedHours={extendedHours}
+            extendedHours={chartExtendedHours}
             onExtendedHours={setExtendedHours}
+            chartPreviewMode={labTestDataMode || mockTradingMode}
             labTestDataMode={labTestDataMode}
             labTestDataAvailable={health?.monitor?.wuluLabModeEnabled === true}
             onLabTestDataMode={(on) => {
@@ -250,7 +253,10 @@ export function ScannerPage() {
             mockTradingMode={mockTradingMode}
             onMockTradingMode={setMockTradingMode}
             lastPrice={last}
-            onRetry={() => void scan({ ticker: symbol, fast: true })}
+            onRetry={() => {
+              reloadChart();
+              void scan({ ticker: symbol, fast: true });
+            }}
             chartExtras={{
               rvol: rvol ?? null,
               feedLabel,

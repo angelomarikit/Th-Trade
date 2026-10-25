@@ -34,6 +34,15 @@ export function barsForChart<T extends { time: number; close: number }>(
 }
 
 /** How many regular-session bars to keep on the chart. */
+/** Mock/lab preview always loads extended-hours bars so the chart is not empty off RTH. */
+export function chartUsesExtendedSession(
+  extendedHours: boolean,
+  labTestDataMode: boolean,
+  mockTradingMode: boolean,
+): boolean {
+  return extendedHours || labTestDataMode || mockTradingMode;
+}
+
 export function historyLimit(timeframe: string): number {
   switch (timeframe.toLowerCase()) {
     case "1m":

@@ -85,6 +85,8 @@ export function CandleChart(props: {
   onLabTestDataMode?: (on: boolean) => void;
   mockTradingMode?: boolean;
   onMockTradingMode?: (on: boolean) => void;
+  /** Lab/mock — chart shows last SIP session, not live stream. */
+  chartPreviewMode?: boolean;
   lastPrice?: number | null;
   onRetry?: () => void;
   chartExtras?: {
@@ -842,6 +844,12 @@ export function CandleChart(props: {
           </p>
           {props.chartExtras?.quoteNote ? (
             <p className="chart-settings-meta">{props.chartExtras.quoteNote}</p>
+          ) : null}
+          {props.chartPreviewMode ? (
+            <p className="chart-settings-meta">
+              Preview chart — last available SIP session (mock/lab). Candles update when you rescan or
+              change timeframe.
+            </p>
           ) : null}
         </div>
       ) : null}
