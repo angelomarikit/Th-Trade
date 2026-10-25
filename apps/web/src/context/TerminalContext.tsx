@@ -484,6 +484,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (ac.signal.aborted || symbolRef.current !== t) return;
         setData(next);
         setUpdatedAt(Date.now());
+        setError(null);
         const charged = next.signalRecommendation?.creditsCharged ?? 0;
         const remaining = next.signalRecommendation?.creditsRemaining;
         if (charged > 0 && remaining != null) {
@@ -541,7 +542,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           return nextList;
         });
       } catch (err) {
-        if (!ac.signal.aborted) {
+        if (!ac.signal.aborted && !isPoll) {
           setError(friendlyApiError(err));
         }
       } finally {
@@ -697,7 +698,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       barsError,
       updatedAt,
       health,
-      feedConnected: health?.ok === true && !error,
+      /** Health ping only — background poll timeouts must not show "API down" when /health is OK. */
+      feedConnected: health?.ok === true,
       sidebarCollapsed,
       setSidebarCollapsed,
       inspectorOpen,
