@@ -188,6 +188,15 @@ export function SignalSummaryPanel() {
           Mock ENTER (lab): engine shows ENTER for paper drill — not live RTH permission.
         </p>
       ) : null}
+      {data?.liveCard?.mockRth &&
+      data?.liveCard?.labMockEnterAuthorizedSide &&
+      !data?.liveCard?.mockEnter &&
+      side !== data.liveCard.labMockEnterAuthorizedSide ? (
+        <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          Mock lab: only <strong>{data.liveCard.labMockEnterAuthorizedSide}</strong> can ENTER on this
+          snapshot — {side} blocked (same as live).
+        </p>
+      ) : null}
       {showMockBuyNow && !engineEnter ? (
         <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
           {labTestDataMode

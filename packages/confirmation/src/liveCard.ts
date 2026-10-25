@@ -74,6 +74,8 @@ export interface LiveSetupCard {
   mockRth?: boolean;
   /** Lab sim RTH + mockEnter=1: synthetic ENTRY ACTIVE for paper drill. */
   mockEnter?: boolean;
+  /** When mock enter requested: the only side allowed ENTER on this snapshot. */
+  labMockEnterAuthorizedSide?: TradeSide;
   labDisclaimer?: string;
   setupId: string;
   session: {

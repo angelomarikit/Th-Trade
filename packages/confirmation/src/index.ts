@@ -24,4 +24,5 @@ export * from "./outcomeTracking.js";
 export * from "./tradingAction.js";
 export * from "./labMockEnter.js";
 export * from "./labEnterSnapshot.js";
+export * from "./pickLabMockEnterSide.js";
 export * from "./liveValidationEvidence.js";

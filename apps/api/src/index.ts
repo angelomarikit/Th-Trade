@@ -941,6 +941,7 @@ async function main() {
             labMode: card.labMode ?? false,
             mockRth: card.mockRth ?? false,
             mockEnter: card.mockEnter ?? false,
+            labMockEnterAuthorizedSide: card.labMockEnterAuthorizedSide ?? null,
             labDisclaimer: card.labDisclaimer ?? null,
             marketDataStatus: card.marketDataStatus ?? null,
             evaluatedAt: card.evaluatedAt,

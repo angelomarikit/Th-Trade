@@ -99,6 +99,7 @@ export interface SetupLiveCard {
   labMode?: boolean;
   mockRth?: boolean;
   mockEnter?: boolean;
+  labMockEnterAuthorizedSide?: "LONG" | "SHORT" | null;
   labDisclaimer?: string | null;
   marketDataStatus?: {
     session: string;
@@ -391,6 +392,7 @@ export function fetchSetup(
     lab?: boolean;
     mockRth?: boolean;
   mockEnter?: boolean;
+  labMockEnterAuthorizedSide?: "LONG" | "SHORT" | null;
     accessToken?: string | null;
     timeoutMs?: number;
     signal?: AbortSignal;

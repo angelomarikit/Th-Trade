@@ -22,6 +22,7 @@ import { evaluateRetest, type RetestPhase } from "./retest.js";
 import { setupScoreFromMatrix } from "./scoreFromMatrix.js";
 import { shapeSnapshotForLabEnter } from "./labEnterSnapshot.js";
 import { applyLabMockEnterDrill } from "./labMockEnter.js";
+import { pickLabMockEnterSide } from "./pickLabMockEnterSide.js";
 import { assertEntryNotFromNewsAlone, decideSetupState } from "./stateMachine.js";
 import { buildIndicatorChecklist } from "./indicatorReadouts.js";
 import { describeEntryGeometry } from "./entryGeometry.js";
@@ -79,8 +80,15 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
           "Lab simulated RTH — last SIP snapshot replayed with regular-session rules (not live clock)",
       }
     : realSession;
+  const wantsMockEnter = input.mockEnter === true && simulateRth;
+  const labMockEnterAuthorizedSide = wantsMockEnter
+    ? pickLabMockEnterSide(input.snapshot)
+    : undefined;
+  const mockEnterActive =
+    wantsMockEnter && labMockEnterAuthorizedSide === input.side;
+
   let snapshot = input.snapshot;
-  if (input.mockEnter === true && simulateRth) {
+  if (mockEnterActive) {
     snapshot = shapeSnapshotForLabEnter(snapshot, input.side, now);
   }
   const profile = confirmationProfileForSession(session);
@@ -330,6 +338,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     },
     labMode: labMode && !realSession.isRegularHours ? true : undefined,
     mockRth: simulateRth ? true : undefined,
+    labMockEnterAuthorizedSide: labMockEnterAuthorizedSide,
     labDisclaimer: simulateRth
       ? "SIMULATED RTH (lab) — replays last SIP bars with live RTH rules. Clock is still off-hours; no broker orders."
       : labMode && !realSession.isRegularHours
@@ -337,8 +346,13 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
         : undefined,
   };
 
-  if (input.mockEnter === true && simulateRth) {
+  if (mockEnterActive) {
     card = applyLabMockEnterDrill(card);
+  } else if (wantsMockEnter && labMockEnterAuthorizedSide) {
+    card = {
+      ...card,
+      labDisclaimer: `SIMULATED RTH (lab) — mock ENTER only on ${labMockEnterAuthorizedSide} for this snapshot; ${input.side} stays blocked like live.`,
+    };
   }
   return card;
 }
