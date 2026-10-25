@@ -747,11 +747,13 @@ async function main() {
         let journalEntry: Awaited<ReturnType<typeof scanner.scanWithJournal>>["journalEntry"];
         const rthBarsOnly = !labMode || mockRth;
         if (useFastSnapshot || labMode) {
+          const bars5mLimit = useFastSnapshot ? 45 : labMode ? 120 : 45;
+          const bars1mLimit = useFastSnapshot ? 30 : labMode ? 120 : 30;
           const [bars5m, quote] = await Promise.all([
             marketData.getBars({
               symbol: sym,
               timeframe: "5Min",
-              limit: labMode ? 120 : 45,
+              limit: bars5mLimit,
               regularHoursOnly: rthBarsOnly,
             }),
             marketData.getQuote(sym),
@@ -764,7 +766,7 @@ async function main() {
           const bars1m = await marketData.getBars({
             symbol: sym,
             timeframe: "1Min",
-            limit: labMode ? 120 : 30,
+            limit: bars1mLimit,
             regularHoursOnly: rthBarsOnly,
           });
           const last1m = bars1m.at(-1) ?? lastBar;

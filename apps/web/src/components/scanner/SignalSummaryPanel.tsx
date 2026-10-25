@@ -33,6 +33,7 @@ export function SignalSummaryPanel() {
     setSide,
     scan,
     loading,
+    error,
     toggleWatchlist,
     watchlist,
     displayPrice,
@@ -52,10 +53,29 @@ export function SignalSummaryPanel() {
 
   if (!data?.liveCard) {
     return (
-      <aside className="signal-panel panel">
+      <aside className="signal-panel panel" aria-busy={loading}>
+        {error ? (
+          <p className="banner error" role="alert" style={{ margin: "0 0 0.5rem", fontSize: "0.85rem" }}>
+            {error}
+          </p>
+        ) : null}
         <p className="muted" style={{ margin: 0 }}>
-          {loading ? "Loading setup…" : "Search a symbol to load chart and trading recommendation."}
+          {loading
+            ? `Loading ${symbol} ${side} setup… (market data can take up to a minute when the API is busy).`
+            : error
+              ? "Tap Scan in the top bar or pick a symbol from Recent to retry."
+              : "Search a symbol to load chart and trading recommendation."}
         </p>
+        {!loading && error ? (
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ marginTop: "0.65rem" }}
+            onClick={() => void scan({ fast: true })}
+          >
+            Retry scan
+          </button>
+        ) : null}
       </aside>
     );
   }

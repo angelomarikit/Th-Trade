@@ -617,10 +617,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : historyLimit(chartTfRef.current);
-      // Bars first. A parallel setup call uses the same Alpaca queue and delays the chart.
+      // Start chart fetch immediately; do not block setup on bars (panel paints first).
       if (!isPoll && (symbolChanged || opts?.fast === true)) {
-        await loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });
-        if (ac.signal.aborted || symbolRef.current !== t) return;
+        void loadBars(t, chartTfRef.current, { soft: !symbolChanged, limit: barLimit });
       }
       setupInflightRef.current = true;
       try {
@@ -648,6 +647,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           referencePrice,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
+          timeoutMs: isPoll ? 28_000 : 50_000,
         });
         if (ac.signal.aborted || symbolRef.current !== t) return;
         setData(next);
@@ -719,7 +719,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         }
       } finally {
         setupInflightRef.current = false;
-        if (!ac.signal.aborted) setLoading(false);
+        if (!isPoll) setLoading(false);
       }
     },
     [loadBars, pushAlert, session?.access_token, setCreditsLocal],
@@ -803,6 +803,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const loop = () => {
       if (cancelled) return;
+      if (setupInflightRef.current) {
+        timer = window.setTimeout(loop, 1_500);
+        return;
+      }
       void scan({ brief: false, fast: true, poll: true, refreshBars: true });
       const labOk = healthRef.current?.monitor?.wuluLabModeEnabled === true;
       const labPoll =
@@ -960,6 +964,16 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         });
         if (resyncScanRef.current != null) window.clearTimeout(resyncScanRef.current);
         resyncScanRef.current = window.setTimeout(() => {
+          if (setupInflightRef.current) {
+            resyncScanRef.current = window.setTimeout(() => {
+              void scanRef.current({
+                poll: true,
+                fast: true,
+                referencePrice: nextClose,
+              });
+            }, resyncMs);
+            return;
+          }
           void scanRef.current({
             poll: true,
             fast: true,
