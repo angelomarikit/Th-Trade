@@ -126,23 +126,35 @@ export function ScannerPage() {
           Syncing chart and recommendation — refreshing scan.
         </p>
       )}
-      {labTestDataMode && health?.monitor?.wuluLabModeEnabled && (
-        <p className="banner warn" role="status">
-          {lc?.labDisclaimer ??
-            (lc?.mockEnter
-              ? "Mock ENTER lab — paper drill only."
-              : "Lab test data — off-RTH diagnostic scan only. ENTER is blocked; not a live trade signal.")}
-        </p>
-      )}
-      {mockTradingMode && (
-        <p className="banner warn" role="status">
-          Mock trading ON — practice fills stay on this device. No real orders are sent.
-          {lc?.mockRth ? " Simulated RTH rules active on last SIP snapshot." : ""}
-          {mockLiveRthMode && labTestDataMode
-            ? ` Lab tape: ${mockTapeCadenceLabel(chartTf)} on the forming candle (SIP replay — not live NBBO).`
-            : ""}
-        </p>
-      )}
+      {(() => {
+        const lines: string[] = [];
+        if (labTestDataMode && health?.monitor?.wuluLabModeEnabled) {
+          lines.push(
+            lc?.labDisclaimer ??
+              (lc?.mockEnter
+                ? "Mock ENTER lab — paper drill only."
+                : "Lab test data — off-RTH diagnostic only. ENTER blocked."),
+          );
+        }
+        if (mockTradingMode) {
+          const mockParts = ["Mock trading ON — practice only, no real orders"];
+          if (lc?.mockRth) mockParts.push("sim RTH on SIP snapshot");
+          if (mockLiveRthMode && labTestDataMode) {
+            mockParts.push(`tape ${mockTapeCadenceLabel(chartTf)}`);
+          }
+          lines.push(mockParts.join(" · "));
+        }
+        if (lines.length === 0) return null;
+        return (
+          <div className="banner warn scanner-mode-banner" role="status">
+            {lines.map((line, i) => (
+              <span key={i} className="scanner-mode-banner-line">
+                {line}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
       {/* Weekend / unverified reason lives once in SignalSummaryPanel (avoids triple banners on mobile). */}
 
       {/* Single global search lives in TopBar — no second hero search on Scanner. */}

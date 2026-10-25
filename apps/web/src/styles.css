@@ -981,6 +981,21 @@ a {
   background: rgba(245, 185, 66, 0.08);
 }
 
+/** Lab + mock: one strip (no double banner gap) */
+.scanner-mode-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.32rem 0.55rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+.scanner-mode-banner-line {
+  display: block;
+}
+
 .banner.info {
   color: var(--blue);
   border-color: rgba(96, 165, 250, 0.35);
@@ -3201,8 +3216,22 @@ a {
   .scanner-page-v7 {
     overflow: hidden;
     height: 100%;
-    padding: 0.3rem 0.4rem 0.2rem;
-    gap: 0.3rem;
+    padding: 0.2rem 0.4rem 0.15rem;
+    gap: 0.2rem;
+  }
+
+  .scanner-mode-banner {
+    padding: 0.28rem 0.45rem;
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+
+  .trade-plan-trigger {
+    padding: 0.32rem 0.5rem;
+  }
+
+  .trade-plan-trigger-copy .muted {
+    display: none;
   }
 
   .scanner-layout-v7 {
