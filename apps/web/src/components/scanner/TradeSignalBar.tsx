@@ -36,6 +36,7 @@ function signalDisplay(status: string, dataFresh: boolean): {
 /** Mobile-first trade signal strip — levels mirror setup engine output (display only). */
 export function TradeSignalBar() {
   const { data, side, loading, mockTradingMode, mockPortfolio, symbol } = useTerminal();
+  const mockRth = data?.liveCard?.mockRth === true;
   const lc = data?.liveCard ? viewLiveCard(data.liveCard) : null;
 
   if (!lc) {
@@ -50,7 +51,8 @@ export function TradeSignalBar() {
 
   const fresh = lc.dataFresh !== false;
   const openMock = mockTradingMode && hasOpenMockPosition(mockPortfolio, symbol, side);
-  const mockBuy = mockTradingMode && !openMock && lc.tradingAction !== "ENTER";
+  const mockBuy =
+    mockTradingMode && !openMock && lc.tradingAction !== "ENTER" && !data?.liveCard?.mockRth;
   let { headline, tone, Icon } = signalDisplay(lc.status, fresh);
   if (mockBuy) {
     headline = mockPracticeHeadline(side);

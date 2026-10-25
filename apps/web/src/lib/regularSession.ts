@@ -39,7 +39,11 @@ export function chartUsesExtendedSession(
   extendedHours: boolean,
   labTestDataMode: boolean,
   mockTradingMode: boolean,
+  mockLiveRthMode: boolean,
 ): boolean {
+  if (mockLiveRthMode && (mockTradingMode || labTestDataMode)) {
+    return extendedHours;
+  }
   return extendedHours || labTestDataMode || mockTradingMode;
 }
 

@@ -97,6 +97,7 @@ export interface SetupLiveCard {
   dataFeed?: string | null;
   dataFreshReason?: string | null;
   labMode?: boolean;
+  mockRth?: boolean;
   labDisclaimer?: string | null;
   marketDataStatus?: {
     session: string;
@@ -387,6 +388,7 @@ export function fetchSetup(
     brief?: boolean;
     fast?: boolean;
     lab?: boolean;
+    mockRth?: boolean;
     accessToken?: string | null;
     timeoutMs?: number;
     signal?: AbortSignal;
@@ -399,6 +401,7 @@ export function fetchSetup(
   if (opts?.brief) qs.set("brief", "1");
   if (opts?.fast) qs.set("fast", "1");
   if (opts?.lab) qs.set("lab", "1");
+  if (opts?.mockRth) qs.set("mockRth", "1");
   const headers: Record<string, string> = {};
   if (opts?.accessToken) {
     headers.Authorization = `Bearer ${opts.accessToken}`;

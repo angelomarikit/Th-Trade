@@ -132,6 +132,7 @@ export function ScannerPage() {
       {mockTradingMode && (
         <p className="banner warn" role="status">
           Mock trading ON — practice fills stay on this device. No real orders are sent.
+          {lc?.mockRth ? " Simulated RTH rules active on last SIP snapshot." : ""}
         </p>
       )}
       {/* Weekend / unverified reason lives once in SignalSummaryPanel (avoids triple banners on mobile). */}

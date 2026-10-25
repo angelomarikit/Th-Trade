@@ -41,6 +41,8 @@ export interface ScanSetupRequest {
   previousState?: SetupState;
   /** Preview lab scan (API `lab=1` only). */
   labMode?: boolean;
+  /** Lab + `mockRth=1`: RTH gate profile on SIP replay. */
+  mockRth?: boolean;
 }
 
 export interface ScanSetupResult {
@@ -166,6 +168,7 @@ export class SetupScanner {
       snapshot,
       previousState: request.previousState,
       labMode: request.labMode,
+      mockRth: request.mockRth,
       whyMoving: why,
       marketRegime: {
         status: regimeCtx.marketRegime.status,

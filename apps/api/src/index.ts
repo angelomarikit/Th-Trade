@@ -711,11 +711,15 @@ async function main() {
         const wantLab =
           url.searchParams.get("lab") === "1" || url.searchParams.get("lab") === "true";
         const labMode = wantLab && isWuluLabModeEnabled();
+        const wantMockRth =
+          url.searchParams.get("mockRth") === "1" ||
+          url.searchParams.get("mockRth") === "true";
+        const mockRth = wantMockRth && labMode;
         const useFastSnapshot =
           url.searchParams.get("fast") === "1" || url.searchParams.get("fast") === "true";
         let card: Awaited<ReturnType<typeof scanner.scanWithJournal>>["card"];
         let journalEntry: Awaited<ReturnType<typeof scanner.scanWithJournal>>["journalEntry"];
-        const rthBarsOnly = !labMode;
+        const rthBarsOnly = !labMode || mockRth;
         if (useFastSnapshot || labMode) {
           const [bars5m, quote] = await Promise.all([
             marketData.getBars({
@@ -755,6 +759,7 @@ async function main() {
             preloadedSnapshot: snapshot,
             previousState: interactiveSetupState.get(stateKey),
             labMode,
+            mockRth,
           }));
           interactiveSetupState.set(stateKey, card.state);
         } else {
@@ -763,6 +768,8 @@ async function main() {
             symbol: sym,
             side,
             previousState: interactiveSetupState.get(stateKey),
+            labMode,
+            mockRth,
           }));
           interactiveSetupState.set(stateKey, card.state);
         }
@@ -852,9 +859,15 @@ async function main() {
           rewardToRisk: card.rewardToRisk,
         });
         if (labMode && !classifyUsEquitySession().isRegularHours) {
-          tradingAction = "WAIT";
-          if (!displayStatus.toUpperCase().includes("LAB TEST")) {
-            displayStatus = `LAB TEST · ${displayStatus}`;
+          if (mockRth) {
+            if (!displayStatus.toUpperCase().includes("SIM RTH")) {
+              displayStatus = `SIM RTH · ${displayStatus}`;
+            }
+          } else {
+            tradingAction = "WAIT";
+            if (!displayStatus.toUpperCase().includes("LAB TEST")) {
+              displayStatus = `LAB TEST · ${displayStatus}`;
+            }
           }
         }
         const strategyName =
@@ -918,6 +931,7 @@ async function main() {
             dataFresh: card.dataFresh,
             dataFreshReason: card.dataFreshReason ?? null,
             labMode: card.labMode ?? false,
+            mockRth: card.mockRth ?? false,
             labDisclaimer: card.labDisclaimer ?? null,
             marketDataStatus: card.marketDataStatus ?? null,
             evaluatedAt: card.evaluatedAt,

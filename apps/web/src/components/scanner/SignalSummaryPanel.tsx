@@ -85,7 +85,12 @@ export function SignalSummaryPanel() {
     (lc.lastPrice != null && Number.isFinite(lc.lastPrice) ? lc.lastPrice : lc.alertAt);
   const openMock = hasOpenMockPosition(mockPortfolio, symbol, side);
   const showMockBuyNow =
-    mockTradingMode && planForSymbol && !openMock && entryPxForMock != null && Number.isFinite(entryPxForMock);
+    mockTradingMode &&
+    !data?.liveCard?.mockRth &&
+    planForSymbol &&
+    !openMock &&
+    entryPxForMock != null &&
+    Number.isFinite(entryPxForMock);
   const engineEnter = lc.tradingAction === "ENTER" && lc.dataFresh !== false;
   const briefLines = showMockBuyNow
     ? buildMockBuyNowLines({

@@ -71,6 +71,7 @@ export interface LiveSetupCard {
   evaluatedAt: string;
   /** Preview lab: diagnostic scan outside RTH — not live entry permission. */
   labMode?: boolean;
+  mockRth?: boolean;
   labDisclaimer?: string;
   setupId: string;
   session: {

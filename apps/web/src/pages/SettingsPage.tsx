@@ -14,6 +14,8 @@ export function SettingsPage() {
     setLabTestDataMode,
     mockTradingMode,
     setMockTradingMode,
+    mockLiveRthMode,
+    setMockLiveRthMode,
     resetMockTrading,
     health,
   } = useTerminal();
@@ -109,6 +111,19 @@ export function SettingsPage() {
           <p className="disclaimer">
             Practice entries and exits on this device only. No broker connection — Alpaca stays data-only.
             Use Scanner → Simulate practice entry, then track under Positions and Orders.
+          </p>
+          <label style={{ opacity: mockTradingMode ? 1 : 0.65 }}>
+            <input
+              type="checkbox"
+              checked={mockLiveRthMode}
+              disabled={!mockTradingMode}
+              onChange={(e) => setMockLiveRthMode(e.target.checked)}
+            />{" "}
+            Simulate live RTH (lab replay)
+          </label>
+          <p className="disclaimer">
+            Replays the last SIP session with <strong>RTH rules and chart</strong> (session badge shows RTH).
+            Still not real market time — for mock/paper testing only.
           </p>
           {mockTradingMode ? (
             <button type="button" className="icon-btn" onClick={() => resetMockTrading()}>

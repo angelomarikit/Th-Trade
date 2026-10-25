@@ -55,27 +55,52 @@ export interface EvaluateSetupInput {
   relativeMomentum?: RelativeMomentumCardInfo | null;
   /** Preview-only: relax stale-data limits off RTH so gates can be exercised on latest SIP snapshot. */
   labMode?: boolean;
+  /** Lab-only: apply RTH session + gate profile to off-hours SIP replay (acceptance testing). */
+  mockRth?: boolean;
 }
 
 export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const now = input.now ?? new Date();
   const labMode = input.labMode === true;
-  const session = classifyUsEquitySession(now);
+  const realSession = classifyUsEquitySession(now);
+  const simulateRth = labMode && input.mockRth === true && !realSession.isRegularHours;
+  const session = simulateRth
+    ? {
+        session: "RTH" as const,
+        etLabel: `${realSession.etLabel} · SIMULATED RTH`,
+        isRegularHours: true,
+        tightenConfirmation: true,
+        maxDataAgeMs: 90_000,
+        reason:
+          "Lab simulated RTH — last SIP snapshot replayed with regular-session rules (not live clock)",
+      }
+    : realSession;
   const profile = confirmationProfileForSession(session);
   let freshnessMax = profile.maxDataAgeMs;
-  /** Preview lab: allow last session SIP snapshot through weekend/closed (ENTER still blocked in API). */
+  /** Preview lab: allow last session SIP snapshot through weekend/closed. */
   const LAB_CLOSED_SESSION_MAX_AGE_MS = 96 * 60 * 60 * 1000;
-  if (labMode && !session.isRegularHours) {
-    if (session.maxDataAgeMs === 0) freshnessMax = LAB_CLOSED_SESSION_MAX_AGE_MS;
+  if (labMode && !realSession.isRegularHours) {
+    if (realSession.maxDataAgeMs === 0) freshnessMax = LAB_CLOSED_SESSION_MAX_AGE_MS;
     else freshnessMax = Math.max(freshnessMax, 300_000);
   }
-  let freshness = assessFreshness(input.snapshot, now, freshnessMax, session);
+  let freshness = assessFreshness(input.snapshot, now, freshnessMax, realSession);
+  if (simulateRth && input.snapshot.bars5m.length >= 8) {
+    freshness = {
+      ok: true,
+      ageMs: freshness.ageMs,
+      maxAgeMs: freshness.maxAgeMs,
+      reason: "Simulated RTH — snapshot verified for lab gate drill",
+    };
+  }
   const quoteOk = isQuoteUsableForEntry(input.snapshot, profile.maxSpreadPct);
   const priceSource = resolvePriceSource(input.snapshot);
   const referencePriceOnly = priceSource !== "quote_mid";
   if (
     !quoteOk &&
-    (session.session === "RTH" || session.session === "PREMARKET" || session.session.includes("HOUR"))
+    !simulateRth &&
+    (realSession.session === "RTH" ||
+      realSession.session === "PREMARKET" ||
+      realSession.session.includes("HOUR"))
   ) {
     freshness = {
       ok: false,
@@ -295,9 +320,11 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       referencePriceOnly,
       priceBasis: referencePriceExplanation(priceSource),
     },
-    labMode: labMode && !session.isRegularHours ? true : undefined,
-    labDisclaimer:
-      labMode && !session.isRegularHours
+    labMode: labMode && !realSession.isRegularHours ? true : undefined,
+    mockRth: simulateRth ? true : undefined,
+    labDisclaimer: simulateRth
+      ? "SIMULATED RTH (lab) — replays last SIP bars with live RTH rules. Clock is still off-hours; no broker orders."
+      : labMode && !realSession.isRegularHours
         ? "LAB TEST — not live RTH. Latest SIP snapshot for gate preview only; live ENTRY remains blocked."
         : undefined,
   };
