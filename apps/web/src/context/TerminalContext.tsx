@@ -589,6 +589,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       poll?: boolean;
       /** Lab/mock: chart close for server re-evaluation (referencePrice). */
       referencePrice?: number;
+      /** Internal: one automatic retry after API timeout. */
+      setupRetry?: boolean;
     }) => {
       // Prefer explicit ticker/side; otherwise always read latest via refs so the
       // mount-time poll interval never snaps back to the initial NVDA default.
@@ -655,7 +657,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           referencePrice,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
-          timeoutMs: isPoll ? 28_000 : 50_000,
+          timeoutMs: isPoll ? 28_000 : 90_000,
         });
         if (ac.signal.aborted || symbolRef.current !== t) return;
         setData(next);
@@ -724,7 +726,19 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         });
       } catch (err) {
         if (!ac.signal.aborted) {
-          setError(friendlyApiError(err));
+          const msg = friendlyApiError(err);
+          const cached = readCachedSetup(t, s);
+          if (cached?.liveCard) {
+            setData(cached);
+            setError(`${msg} Showing last saved setup — tap Retry for a fresh scan.`);
+          } else if (!opts?.setupRetry && /too long|busy|timeout|aborted/i.test(msg)) {
+            await new Promise((r) => window.setTimeout(r, 1_200));
+            if (!ac.signal.aborted && symbolRef.current === t) {
+              return scan({ ...opts, setupRetry: true });
+            }
+          } else {
+            setError(msg);
+          }
         }
       } finally {
         setupInflightRef.current = false;

@@ -116,6 +116,10 @@ const barsResponseCache = new Map<string, { at: number; payload: unknown }>();
 const barsInflight = new Map<string, Promise<unknown>>();
 const BARS_CACHE_MS = 15_000;
 const BARS_STALE_MS = 5 * 60_000;
+const setupResponseCache = new Map<string, { at: number; payload: unknown }>();
+const setupInflight = new Map<string, Promise<unknown>>();
+/** Coalesce poll storms — identical setup GETs share one Alpaca scan. */
+const SETUP_CACHE_MS = 12_000;
 /** Per-symbol setup lifecycle for MISSED / INVALIDATED on interactive /v1/setup polls. */
 const interactiveSetupState = new Map<string, SetupState>();
 
@@ -712,8 +716,6 @@ async function main() {
       }
 
       if (url.pathname === "/v1/setup" && req.method === "GET") {
-        await withAlpacaPriority("interactive", async () => {
-        try {
         const ticker = url.searchParams.get("ticker");
         const sideParam = (url.searchParams.get("side") ?? "LONG").toUpperCase();
         if (!ticker) {
@@ -730,6 +732,49 @@ async function main() {
           return json(res, 400, { error: "side must be LONG or SHORT" });
         }
         const side = sideParam as TradeSide;
+        const wantBriefEarly =
+          url.searchParams.get("brief") === "1" || url.searchParams.get("brief") === "true";
+        const wantPlanEarly =
+          url.searchParams.get("plan") === "1" || url.searchParams.get("plan") === "true";
+        const wantLabEarly =
+          url.searchParams.get("lab") === "1" || url.searchParams.get("lab") === "true";
+        const labModeEarly = wantLabEarly && isWuluLabModeEnabled();
+        const mockRthEarly =
+          (url.searchParams.get("mockRth") === "1" ||
+            url.searchParams.get("mockRth") === "true") &&
+          labModeEarly;
+        const mockEnterEarly =
+          (url.searchParams.get("mockEnter") === "1" ||
+            url.searchParams.get("mockEnter") === "true") &&
+          mockRthEarly &&
+          labModeEarly;
+        const useFastEarly =
+          url.searchParams.get("fast") === "1" || url.searchParams.get("fast") === "true";
+        const refEarly = url.searchParams.get("referencePrice") ?? "";
+        const setupCacheKey = `${sym}|${side}|${labModeEarly}|${mockRthEarly}|${mockEnterEarly}|${useFastEarly}|${refEarly}`;
+        if (!wantBriefEarly && !wantPlanEarly) {
+          const hit = setupResponseCache.get(setupCacheKey);
+          if (hit && Date.now() - hit.at < SETUP_CACHE_MS) {
+            return json(res, 200, hit.payload);
+          }
+          const pending = setupInflight.get(setupCacheKey);
+          if (pending) {
+            try {
+              return json(res, 200, await pending);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return json(res, 502, {
+                error:
+                  "Could not complete scan for this symbol. Check the ticker or try again in a moment.",
+                detail: message.slice(0, 240),
+                automaticOrders: false,
+              });
+            }
+          }
+        }
+
+        let setupJob = withAlpacaPriority("interactive", async () => {
+        try {
         const wantLab =
           url.searchParams.get("lab") === "1" || url.searchParams.get("lab") === "true";
         const labMode = wantLab && isWuluLabModeEnabled();
@@ -763,12 +808,15 @@ async function main() {
             quote && quote.bid > 0 && quote.ask > 0
               ? (quote.bid + quote.ask) / 2
               : (lastBar?.close ?? 0);
-          const bars1m = await marketData.getBars({
-            symbol: sym,
-            timeframe: "1Min",
-            limit: bars1mLimit,
-            regularHoursOnly: rthBarsOnly,
-          });
+          const skip1mForFastLive = useFastSnapshot && !labMode && !mockRth;
+          const bars1m = skip1mForFastLive
+            ? bars5m
+            : await marketData.getBars({
+                symbol: sym,
+                timeframe: "1Min",
+                limit: bars1mLimit,
+                regularHoursOnly: rthBarsOnly,
+              });
           const last1m = bars1m.at(-1) ?? lastBar;
           let livePx = lastPrice;
           const refParam = url.searchParams.get("referencePrice");
@@ -951,7 +999,7 @@ async function main() {
             ).tradePlan
           : undefined;
 
-        return json(res, 200, {
+        const setupPayload = {
           liveCard: {
             symbol: card.symbol,
             side: card.side,
@@ -1044,10 +1092,26 @@ async function main() {
             executionPlatform: EXECUTION_POLICY.platform,
             alpacaRole: EXECUTION_POLICY.alpacaRole,
           },
-        });
+        };
+        if (!wantBrief && !wantPlan) {
+          setupResponseCache.set(setupCacheKey, { at: Date.now(), payload: setupPayload });
+        }
+        return setupPayload;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn("[setup] scan failed:", message.slice(0, 200));
+          throw err;
+        }
+        });
+        if (!wantBriefEarly && !wantPlanEarly) {
+          setupInflight.set(setupCacheKey, setupJob);
+          setupJob = setupJob.finally(() => setupInflight.delete(setupCacheKey));
+        }
+        try {
+          const payload = await setupJob;
+          return json(res, 200, payload);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
           return json(res, 502, {
             error:
               "Could not complete scan for this symbol. Check the ticker or try again in a moment.",
@@ -1055,8 +1119,6 @@ async function main() {
             automaticOrders: false,
           });
         }
-        });
-        return;
       }
 
       // ── Phase 2: server-side multi-stock monitor ─────────────────────────
