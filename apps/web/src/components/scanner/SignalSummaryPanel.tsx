@@ -18,6 +18,7 @@ import {
 } from "../../lib/mockBuyNow";
 import { DEFAULT_MOCK_SHARES } from "../../lib/mockTrading";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
+import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { setupCardSide, setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 /**
@@ -97,8 +98,8 @@ export function SignalSummaryPanel() {
     !openMock &&
     entryPxForMock != null &&
     Number.isFinite(entryPxForMock);
-  const engineEnter =
-    sideAligned && lc.tradingAction === "ENTER" && lc.dataFresh !== false;
+  const displayAction = effectiveTradingAction(data.liveCard, side);
+  const engineEnter = displayAction === "ENTER";
   const briefLines = showMockBuyNow
     ? buildMockBuyNowLines({
         symbol,
@@ -110,16 +111,14 @@ export function SignalSummaryPanel() {
     : buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
   const heroActionClass = showMockBuyNow
     ? mockPracticeHeroClass(side)
-    : (lc.tradingAction ?? "WAIT").toLowerCase();
+    : displayAction.toLowerCase();
   const heroActionValue = !sideAligned
     ? loading
       ? "…"
       : "WAIT"
     : showMockBuyNow
       ? mockPracticeHeadline(side)
-      : lc.dataFresh === false
-        ? "WAIT"
-        : (lc.tradingAction ?? "WAIT");
+      : displayAction;
   const heroActionLabel = !sideAligned
     ? loading
       ? `Loading ${side} setup…`
@@ -172,7 +171,7 @@ export function SignalSummaryPanel() {
         <p className="action-value">{heroActionValue}</p>
         <p className="action-label">{heroActionLabel}</p>
       </div>
-      {(lc.tradingAction === "SKIP" || status.includes("NO TRADE")) && (
+      {(displayAction === "SKIP" || status.includes("NO TRADE")) && (
         <p className="disclaimer" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
           {lc.watchingSummary ??
             (rr != null && rr < 2
@@ -253,7 +252,7 @@ export function SignalSummaryPanel() {
           </div>
           <div>
             <dt>Action</dt>
-            <dd>{showMockBuyNow ? `${mockPracticeHeadline(side)} (paper)` : (lc.tradingAction ?? "WAIT")}</dd>
+            <dd>{showMockBuyNow ? `${mockPracticeHeadline(side)} (paper)` : displayAction}</dd>
           </div>
           <div>
             <dt>Current price</dt>

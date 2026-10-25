@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildWatchingSummary, deriveTradingAction } from "../src/tradingAction.js";
+import {
+  buildWatchingSummary,
+  deriveTradingAction,
+  enforceOneSideTradingAction,
+} from "../src/tradingAction.js";
 
 const base = {
   state: "WAITING",
@@ -32,6 +36,27 @@ describe("R:R below 2.0 => SKIP (Blueprint v1.3 Step 5)", () => {
     expect(deriveTradingAction({ ...base, rewardToRisk: 0.14, minRewardToRisk: 0 })).toBe(
       "WAIT",
     );
+  });
+
+  it("enforceOneSideTradingAction blocks ENTER on non-authorized mock side", () => {
+    expect(
+      enforceOneSideTradingAction({
+        selectedSide: "LONG",
+        cardSide: "LONG",
+        tradingAction: "ENTER",
+        labMockEnterAuthorizedSide: "SHORT",
+        mockEnter: false,
+      }),
+    ).toBe("WAIT");
+    expect(
+      enforceOneSideTradingAction({
+        selectedSide: "SHORT",
+        cardSide: "SHORT",
+        tradingAction: "ENTER",
+        labMockEnterAuthorizedSide: "SHORT",
+        mockEnter: true,
+      }),
+    ).toBe("ENTER");
   });
 
   it("summary names the R:R reason", () => {

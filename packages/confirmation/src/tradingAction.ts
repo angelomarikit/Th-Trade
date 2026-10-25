@@ -1,4 +1,4 @@
-import type { SetupState } from "@wulu/domain";
+import type { SetupState, TradeSide } from "@wulu/domain";
 import type { OutcomeDetail } from "./outcomeTracking.js";
 
 export type TradingAction = "WAIT" | "ENTER" | "SKIP" | "INVALIDATED";
@@ -81,6 +81,31 @@ export function deriveTradingAction(input: {
   }
   if (u.includes("ENTRY ACTIVE") && !input.entryExecutable) return "WAIT";
   return "WAIT";
+}
+
+/**
+ * Wulu signal model: one symbol snapshot → at most one side may show ENTER.
+ * Applies to lab mock enter and UI/API alignment (card side vs toggle).
+ */
+export function enforceOneSideTradingAction(input: {
+  selectedSide: TradeSide;
+  cardSide: TradeSide;
+  tradingAction: TradingAction;
+  labMockEnterAuthorizedSide?: TradeSide | null;
+  mockEnter?: boolean;
+}): TradingAction {
+  if (input.cardSide !== input.selectedSide) return "WAIT";
+  if (
+    input.labMockEnterAuthorizedSide &&
+    input.labMockEnterAuthorizedSide !== input.selectedSide
+  ) {
+    return "WAIT";
+  }
+  if (input.labMockEnterAuthorizedSide && input.mockEnter !== true) {
+    return "WAIT";
+  }
+  if (input.tradingAction === "ENTER") return "ENTER";
+  return input.tradingAction;
 }
 
 /** One-line “what we’re watching” for recommendation panels. */

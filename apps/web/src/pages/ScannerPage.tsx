@@ -153,9 +153,14 @@ export function ScannerPage() {
               const staleScan = ageMin >= 3;
               const unverified = r.dataFresh === false;
               return (
-              <li key={`${r.symbol}-${r.at}`}>
-                <button type="button" onClick={() => openSymbol(r.symbol, { brief: false })}>
-                  <strong>{r.symbol}</strong>
+              <li key={`${r.symbol}-${r.side}-${r.at}`}>
+                <button
+                  type="button"
+                  onClick={() => openSymbol(r.symbol, { side: r.side, brief: false })}
+                >
+                  <strong>
+                    {r.symbol} · {r.side}
+                  </strong>
                   <span className={unverified || staleScan ? "recent-stale-label" : "muted"}>
                     {r.status}
                     {staleScan ? ` · scan ${ageMin}m ago` : ""}

@@ -643,18 +643,22 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         if (!next.liveCard.nearActive?.active) triggerAlerted.current = "";
         prevStatus.current = `${statusKey}:${status}`;
         prevFresh.current = fresh;
-        const tradeAction = next.liveCard.tradingAction ?? action ?? "WAIT";
+        const tradeAction =
+          next.liveCard.tradingAction ?? action ?? "WAIT";
         const recent: RecentScan = {
           at: Date.now(),
           symbol: t,
           side: s,
-          status: `${tradeAction} · ${status}`,
+          status: `${s} · ${tradeAction} · ${status}`,
           score: next.liveCard.setupScoreValue ?? next.card.setupScore.total,
           dataFresh: fresh,
           tradingAction: tradeAction,
         };
         setRecentScans((prev) => {
-          const nextList = [recent, ...prev.filter((r) => r.symbol !== t)].slice(0, 20);
+          const nextList = [
+            recent,
+            ...prev.filter((r) => !(r.symbol === t && r.side === s)),
+          ].slice(0, 20);
           writeJson(STORAGE_KEYS.recentScans, nextList);
           return nextList;
         });

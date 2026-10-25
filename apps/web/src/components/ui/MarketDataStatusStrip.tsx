@@ -1,13 +1,14 @@
 import { useTerminal } from "../../context/TerminalContext";
+import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 
 /** Separates API connectivity from quote freshness, indicator verification, and entry permission. */
 export function MarketDataStatusStrip() {
-  const { data, feedConnected, loading } = useTerminal();
+  const { data, feedConnected, loading, side } = useTerminal();
   const lc = data?.liveCard;
   const md = lc?.marketDataStatus;
 
   const indicatorsVerified = lc?.dataFresh === true;
-  const entryPermitted = lc?.tradingAction === "ENTER" && lc?.dataFresh === true;
+  const entryPermitted = effectiveTradingAction(lc, side) === "ENTER";
 
   return (
     <div className="market-data-status" role="status" aria-label="Market data status">

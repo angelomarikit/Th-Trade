@@ -11,6 +11,7 @@ import { viewLiveCard } from "../../lib/scannerLiveCardView";
 import { fmtPrice } from "../../lib/format";
 import { hasOpenMockPosition, mockPracticeHeadline } from "../../lib/mockBuyNow";
 import { normalizeStatus } from "../ui/StatusBadge";
+import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 /** Display labels only. Engine status and gates are unchanged. */
@@ -71,9 +72,13 @@ export function TradeSignalBar() {
 
   const fresh = lc.dataFresh !== false;
   const openMock = mockTradingMode && hasOpenMockPosition(mockPortfolio, symbol, side);
+  const displayAction = effectiveTradingAction(data?.liveCard, side);
   const mockBuy =
-    mockTradingMode && !openMock && lc.tradingAction !== "ENTER" && !data?.liveCard?.mockRth;
-  let { headline, tone, Icon } = signalDisplay(lc.status, fresh, side);
+    mockTradingMode && !openMock && displayAction !== "ENTER" && !data?.liveCard?.mockRth;
+  let { headline, tone, Icon } =
+    displayAction === "ENTER"
+      ? signalDisplay("ENTRY ACTIVE", fresh, side)
+      : signalDisplay(lc.status, fresh, side);
   if (mockBuy) {
     headline = mockPracticeHeadline(side);
     tone = side === "LONG" ? "tone-entry" : "tone-exit";

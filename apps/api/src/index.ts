@@ -10,6 +10,7 @@ import {
   SignalOutcomeTracker,
   buildWatchingSummary,
   deriveTradingAction,
+  enforceOneSideTradingAction,
   outcomeDetailToStatusLabel,
 } from "@wulu/confirmation";
 import {
@@ -865,6 +866,13 @@ async function main() {
           rewardToRisk: card.rewardToRisk,
           /** Lab sim RTH: waive 2R SKIP so drills show WAIT/ENTER from other gates. */
           minRewardToRisk: mockRth ? 0 : undefined,
+        });
+        tradingAction = enforceOneSideTradingAction({
+          selectedSide: side,
+          cardSide: card.side,
+          tradingAction,
+          labMockEnterAuthorizedSide: card.labMockEnterAuthorizedSide ?? null,
+          mockEnter: card.mockEnter === true,
         });
         if (labMode && !classifyUsEquitySession().isRegularHours) {
           if (mockRth) {
