@@ -1,4 +1,5 @@
-import type { SetupLiveCard, TradePlanPayload } from "./api";
+import type { ChartBar, SetupLiveCard, TradePlanPayload } from "./api";
+import { buildClientChartRead } from "./clientChartRead";
 import { effectiveTradingAction } from "./effectiveTradingAction";
 import { buildTradePlaybook } from "./tradePlaybook";
 
@@ -44,6 +45,7 @@ export function fallbackTradePlanFromLiveCard(input: {
   side: "LONG" | "SHORT";
   liveCard: SetupLiveCard;
   displayPrice: number | null;
+  chart?: { timeframe: string; bars: ChartBar[] };
 }): TradePlanPayload {
   const { symbol, side, liveCard, displayPrice } = input;
   const tradingAction = effectiveTradingAction(liveCard, side);
@@ -55,6 +57,22 @@ export function fallbackTradePlanFromLiveCard(input: {
     displayPrice,
   });
   const gatesAndNews = [playbook.newsLine, playbook.chartSessionLine].filter(Boolean).join(" ");
+  const chartRead =
+    input.chart?.bars.length && input.liveCard.alertAt
+      ? buildClientChartRead({
+          timeframe: input.chart.timeframe,
+          bars: input.chart.bars,
+          lastPrice: displayPrice ?? liveCard.lastPrice ?? null,
+          levels: {
+            alertAt: liveCard.alertAt,
+            entryLow: liveCard.entryZone.low,
+            entryHigh: liveCard.entryZone.high,
+            stop: liveCard.stop,
+            t1: liveCard.t1,
+          },
+        })
+      : (playbook.chartSessionLine ??
+        "WULU desk narration needs preview API redeploy — chart summary limited to rules mode.");
   return {
     symbol,
     side,
@@ -64,9 +82,7 @@ export function fallbackTradePlanFromLiveCard(input: {
       whyThisZone: playbook.whyThisZone,
       whatToDoNow: playbook.doNow,
       gatesAndNews: gatesAndNews || "See gate checklist below.",
-      chartRead:
-        playbook.chartSessionLine ??
-        "Chart read requires WULU Plan API — redeploy preview Railway or retry after deploy.",
+      chartRead,
       risks: playbook.gatesBlocking.slice(0, 4).map((g) => `${g.label}: ${g.reason}`),
       outlook: `${liveCard.status} · follow gates before entry.`,
     },
