@@ -8,6 +8,7 @@ import { TradeSignalBar } from "../components/scanner/TradeSignalBar";
 import { useTerminal } from "../context/TerminalContext";
 import { useOpenSymbol } from "../hooks/useOpenSymbol";
 import { fmtCompactVolume, fmtPct, fmtPrice, formatEtTime } from "../lib/format";
+import { mockTapeCadenceLabel } from "../lib/mockLiveTape";
 
 export function ScannerPage() {
   const openSymbol = useOpenSymbol();
@@ -137,7 +138,7 @@ export function ScannerPage() {
           Mock trading ON — practice fills stay on this device. No real orders are sent.
           {lc?.mockRth ? " Simulated RTH rules active on last SIP snapshot." : ""}
           {mockLiveRthMode && labTestDataMode
-            ? " Price ticks every ~2.5s on the last candle (lab tape — not live NBBO)."
+            ? ` Lab tape: ${mockTapeCadenceLabel(chartTf)} on the forming candle (SIP replay — not live NBBO).`
             : ""}
         </p>
       )}

@@ -123,8 +123,8 @@ export function SettingsPage() {
           </label>
           <p className="disclaimer">
             Replays the last SIP session with <strong>RTH rules and chart</strong> (session badge shows RTH).
-            With lab test data on, the <strong>last candle ticks</strong> every ~2.5s so price, chart, and paper
-            P/L move like a drill — still not real exchange data.
+            With lab test data on, the forming candle updates on <strong>RTH bar timing</strong> (1m → about once
+            per minute; 5m → every 5 minutes) — still SIP replay, not a live exchange tape.
           </p>
           {mockTradingMode ? (
             <button type="button" className="icon-btn" onClick={() => resetMockTrading()}>

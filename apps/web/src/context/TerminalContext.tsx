@@ -21,8 +21,8 @@ import {
 } from "../lib/api";
 import { readBarsCache, writeBarsCache } from "../lib/barsCache";
 import {
-  MOCK_TAPE_INTERVAL_MS,
   mockTapeActive,
+  mockTapeIntervalMs,
   tickSimulatedPrice,
 } from "../lib/mockLiveTape";
 import { barsForChart, chartUsesExtendedSession, historyLimit } from "../lib/regularSession";
@@ -826,6 +826,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!liveTapeOn || !symbol) return;
     const sym = symbol.toUpperCase();
+    const tf = chartTfRef.current;
+    const intervalMs = mockTapeIntervalMs(tf);
+    tapeStepRef.current = 0;
     const id = window.setInterval(() => {
       setBars((prev) => {
         if (!prev || prev.symbol.toUpperCase() !== sym || !prev.bars.length) return prev;
@@ -842,14 +845,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           step: tapeStepRef.current,
           prevClose: last.close,
           anchor,
+          moveScale: 1,
         });
-        const volBump = 800 + (tapeStepRef.current % 7) * 400;
         const nextBar = {
           ...last,
           close: nextClose,
           high: Math.max(last.high, nextClose),
           low: Math.min(last.low, nextClose),
-          volume: (last.volume ?? 0) + volBump,
+          volume: last.volume ?? 0,
         };
         const nextBars = [...prev.bars.slice(0, -1), nextBar];
         const extended = sessionAllForChart();
@@ -866,9 +869,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         });
         return sessionBars;
       });
-    }, MOCK_TAPE_INTERVAL_MS);
+    }, intervalMs);
     return () => window.clearInterval(id);
-  }, [liveTapeOn, symbol]);
+  }, [liveTapeOn, symbol, chartTf]);
 
   const displayPrice = useMemo(() => {
     // Header price is the active chart's last candle close, not a quote patched onto the bar.
