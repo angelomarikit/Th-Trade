@@ -19,6 +19,7 @@ import {
 import { DEFAULT_MOCK_SHARES } from "../../lib/mockTrading";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
+import { enrichLiveCardWithChartPrice, liveSignalHeadline } from "../../lib/liveSignalFromPrice";
 import { setupCardSide, setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 /**
@@ -59,15 +60,18 @@ export function SignalSummaryPanel() {
     );
   }
 
-  const lc = viewLiveCard(data.liveCard);
+  const chartClose =
+    bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
+  const lc = enrichLiveCardWithChartPrice(
+    viewLiveCard(data.liveCard),
+    displayPrice ?? chartClose,
+  );
   const sideAligned = setupMatchesSelectedSide(data, side);
   const cardSide = setupCardSide(data);
   const status = normalizeStatus(lc.status);
   const rr = lc.rewardToRisk;
   const score10 = lc.qualityScore10 ?? lc.nearActive?.setupQualityScore ?? null;
   const strat = primaryStrategyName(lc);
-  const chartClose =
-    bars?.symbol?.toUpperCase() === symbol.toUpperCase() ? bars.bars.at(-1)?.close : null;
   const setupSymbol = lc.symbol ?? data?.card.symbol ?? null;
   const setupStale = isSetupChartStale({
     symbol,
@@ -127,7 +131,14 @@ export function SignalSummaryPanel() {
         : status
     : showMockBuyNow
       ? "Paper practice · tap Buy now below"
-      : status;
+      : displayAction === "WAIT" || displayAction === "ENTER"
+        ? liveSignalHeadline({
+            status,
+            tradingAction: displayAction,
+            distanceLabel: lc.nearActive?.distanceLabel,
+            side,
+          })
+        : status;
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
     (lc.matrixChecklist ?? []).map((row) => ({

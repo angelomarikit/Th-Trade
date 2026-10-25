@@ -12,6 +12,7 @@ import { fmtPrice } from "../../lib/format";
 import { hasOpenMockPosition, mockPracticeHeadline } from "../../lib/mockBuyNow";
 import { normalizeStatus } from "../ui/StatusBadge";
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
+import { enrichLiveCardWithChartPrice, liveSignalHeadline } from "../../lib/liveSignalFromPrice";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 /** Display labels only. Engine status and gates are unchanged. */
@@ -45,9 +46,12 @@ function signalDisplay(
 
 /** Mobile-first trade signal strip — levels mirror setup engine output (display only). */
 export function TradeSignalBar() {
-  const { data, side, loading, mockTradingMode, mockPortfolio, symbol } = useTerminal();
+  const { data, side, loading, mockTradingMode, mockPortfolio, symbol, displayPrice } =
+    useTerminal();
   const mockRth = data?.liveCard?.mockRth === true;
-  const lc = data?.liveCard ? viewLiveCard(data.liveCard) : null;
+  const lc = data?.liveCard
+    ? enrichLiveCardWithChartPrice(viewLiveCard(data.liveCard), displayPrice)
+    : null;
   const sideAligned = setupMatchesSelectedSide(data, side);
 
   if (!lc) {
@@ -83,6 +87,13 @@ export function TradeSignalBar() {
     headline = mockPracticeHeadline(side);
     tone = side === "LONG" ? "tone-entry" : "tone-exit";
     Icon = side === "LONG" ? ArrowUp : TrendingDown;
+  } else if (displayAction !== "ENTER" && fresh) {
+    headline = liveSignalHeadline({
+      status: lc.status,
+      tradingAction: displayAction,
+      distanceLabel: lc.nearActive?.distanceLabel,
+      side,
+    });
   }
   const score10 = lc.qualityScore10;
   const scoreLabel =

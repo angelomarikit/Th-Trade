@@ -456,6 +456,8 @@ export function fetchSetup(
     lab?: boolean;
     mockRth?: boolean;
     mockEnter?: boolean;
+    /** Lab/mock: chart last close so setup re-evaluates vs forming candle. */
+    referencePrice?: number | null;
   labMockEnterAuthorizedSide?: "LONG" | "SHORT" | null;
     accessToken?: string | null;
     timeoutMs?: number;
@@ -472,6 +474,9 @@ export function fetchSetup(
   if (opts?.lab) qs.set("lab", "1");
   if (opts?.mockRth) qs.set("mockRth", "1");
   if (opts?.mockEnter) qs.set("mockEnter", "1");
+  if (opts?.referencePrice != null && Number.isFinite(opts.referencePrice) && opts.referencePrice > 0) {
+    qs.set("referencePrice", String(opts.referencePrice));
+  }
   const headers: Record<string, string> = {};
   if (opts?.accessToken) {
     headers.Authorization = `Bearer ${opts.accessToken}`;

@@ -143,7 +143,8 @@ interface TerminalContextValue {
 
 const TerminalContext = createContext<TerminalContextValue | null>(null);
 
-const POLL_MS = 15_000;
+const POLL_MS_RTH = 15_000;
+const POLL_MS_LAB = 5_000;
 
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const { session, setCreditsLocal } = useAuth();
@@ -217,6 +218,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const labTestRef = useRef(false);
   const mockTradingRef = useRef(false);
   const mockLiveRthRef = useRef(true);
+  const barsRef = useRef(bars);
+  const scanRef = useRef<(opts?: Parameters<TerminalContextValue["scan"]>[0]) => Promise<void>>(
+    async () => {},
+  );
+  const resyncScanRef = useRef<number | null>(null);
   const healthRef = useRef<HealthResponse | null>(null);
   symbolRef.current = symbol;
   sideRef.current = side;
@@ -226,6 +232,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   mockTradingRef.current = mockTradingMode;
   mockLiveRthRef.current = mockLiveRthMode;
   healthRef.current = health;
+  barsRef.current = bars;
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
     setSidebarCollapsedState(v);
@@ -541,6 +548,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       refreshBars?: boolean;
       /** Background refresh. Must not cancel an in-flight symbol switch. */
       poll?: boolean;
+      /** Lab/mock: chart close for server re-evaluation (referencePrice). */
+      referencePrice?: number;
     }) => {
       // Prefer explicit ticker/side; otherwise always read latest via refs so the
       // mount-time poll interval never snaps back to the initial NVDA default.
@@ -589,12 +598,22 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
             (mockTradingRef.current && mockLiveRthRef.current));
         const useMockRth = useLab && mockLiveRthRef.current;
         const useMockEnter = useMockRth && mockTradingRef.current;
+        let referencePrice = opts?.referencePrice;
+        if (
+          (referencePrice == null || !Number.isFinite(referencePrice)) &&
+          useLab &&
+          barsRef.current?.symbol?.toUpperCase() === t
+        ) {
+          const close = barsRef.current.bars.at(-1)?.close;
+          if (close != null && Number.isFinite(close)) referencePrice = close;
+        }
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
           fast: useFastPath,
           lab: useLab,
           mockRth: useMockRth,
           mockEnter: useMockEnter,
+          referencePrice: useLab ? referencePrice : undefined,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
         });
@@ -673,6 +692,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     },
     [loadBars, pushAlert, session?.access_token, setCreditsLocal],
   );
+  scanRef.current = scan;
 
   const selectSymbol = useCallback(
     (sym: string, opts?: { brief?: boolean }) => {
@@ -746,17 +766,25 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [session?.access_token, pushAlert]);
 
   useEffect(() => {
-    // Fast first paint: small bar fetch + lighter setup snapshot; brief=1 avoids OpenAI.
     void scan({ brief: false, fast: true });
-    const id = window.setInterval(
-      () => void scan({ brief: false, fast: true, poll: true, refreshBars: true }),
-      POLL_MS,
-    );
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const loop = () => {
+      if (cancelled) return;
+      void scan({ brief: false, fast: true, poll: true, refreshBars: true });
+      const labOk = healthRef.current?.monitor?.wuluLabModeEnabled === true;
+      const labPoll =
+        labOk &&
+        (labTestRef.current || (mockTradingRef.current && mockLiveRthRef.current));
+      const ms = labPoll ? POLL_MS_LAB : POLL_MS_RTH;
+      timer = window.setTimeout(loop, ms);
+    };
+    timer = window.setTimeout(loop, POLL_MS_RTH);
     return () => {
-      window.clearInterval(id);
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
       abortRef.current?.abort();
     };
-    // initial + poll for current symbol/side — intentional
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -867,6 +895,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
             card: { ...scan.card, lastPrice: nextClose },
           };
         });
+        if (resyncScanRef.current != null) window.clearTimeout(resyncScanRef.current);
+        resyncScanRef.current = window.setTimeout(() => {
+          void scanRef.current({
+            poll: true,
+            fast: true,
+            referencePrice: nextClose,
+          });
+        }, 900);
         return sessionBars;
       });
     }, intervalMs);

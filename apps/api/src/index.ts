@@ -768,9 +768,15 @@ async function main() {
             regularHoursOnly: rthBarsOnly,
           });
           const last1m = bars1m.at(-1) ?? lastBar;
+          let livePx = lastPrice;
+          const refParam = url.searchParams.get("referencePrice");
+          const refPx = refParam ? Number(refParam) : NaN;
+          if (labMode && Number.isFinite(refPx) && refPx > 0) {
+            livePx = refPx;
+          }
           const snapshot = {
             symbol: sym,
-            lastPrice,
+            lastPrice: livePx,
             quote,
             bars1m: bars1m.length ? bars1m : bars5m,
             bars5m,
@@ -778,6 +784,13 @@ async function main() {
             marketTimestamp:
               quote?.timestamp ?? (last1m ? barEffectiveEndTime(last1m) : null),
           };
+          if (labMode && Number.isFinite(refPx) && refPx > 0 && snapshot.quote) {
+            snapshot.quote = {
+              ...snapshot.quote,
+              bid: refPx * 0.9995,
+              ask: refPx * 1.0005,
+            };
+          }
           const stateKey = setupStateKey(sym, side);
           ({ card, journalEntry } = await scanner.scanWithJournal({
             symbol: sym,
