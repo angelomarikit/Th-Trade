@@ -9,6 +9,7 @@ import {
 import { useTerminal } from "../../context/TerminalContext";
 import { viewLiveCard } from "../../lib/scannerLiveCardView";
 import { fmtPrice } from "../../lib/format";
+import { hasOpenMockPosition, mockPracticeHeadline } from "../../lib/mockBuyNow";
 import { normalizeStatus } from "../ui/StatusBadge";
 
 /** Display labels only. Engine status and gates are unchanged. */
@@ -34,7 +35,7 @@ function signalDisplay(status: string, dataFresh: boolean): {
 
 /** Mobile-first trade signal strip — levels mirror setup engine output (display only). */
 export function TradeSignalBar() {
-  const { data, side, loading } = useTerminal();
+  const { data, side, loading, mockTradingMode, mockPortfolio, symbol } = useTerminal();
   const lc = data?.liveCard ? viewLiveCard(data.liveCard) : null;
 
   if (!lc) {
@@ -48,7 +49,14 @@ export function TradeSignalBar() {
   }
 
   const fresh = lc.dataFresh !== false;
-  const { headline, tone, Icon } = signalDisplay(lc.status, fresh);
+  const openMock = mockTradingMode && hasOpenMockPosition(mockPortfolio, symbol, side);
+  const mockBuy = mockTradingMode && !openMock && lc.tradingAction !== "ENTER";
+  let { headline, tone, Icon } = signalDisplay(lc.status, fresh);
+  if (mockBuy) {
+    headline = mockPracticeHeadline(side);
+    tone = side === "LONG" ? "tone-entry" : "tone-exit";
+    Icon = side === "LONG" ? ArrowUp : TrendingDown;
+  }
   const score10 = lc.qualityScore10;
   const scoreLabel =
     score10 != null && Number.isFinite(score10)
@@ -97,9 +105,11 @@ export function TradeSignalBar() {
         ) : null}
       </dl>
       <p className="trade-signal-note">
-        {stale && lc.dataFreshReason
-          ? lc.dataFreshReason
-          : `Setup score ${scoreLabel}. Signals only — not an order.`}
+        {mockBuy
+          ? "Paper BUY NOW — tap Buy now in the panel to simulate. Not a live order."
+          : stale && lc.dataFreshReason
+            ? lc.dataFreshReason
+            : `Setup score ${scoreLabel}. Signals only — not an order.`}
       </p>
     </section>
   );

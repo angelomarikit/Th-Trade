@@ -10,6 +10,13 @@ import { fmtPct, fmtPrice, formatEtTime } from "../../lib/format";
 import { SessionPriceBanner } from "../ui/SessionPriceBanner";
 import { MarketDataStatusStrip } from "../ui/MarketDataStatusStrip";
 import { isSetupChartStale } from "../../lib/setupChartSync";
+import {
+  buildMockBuyNowLines,
+  hasOpenMockPosition,
+  mockPracticeHeadline,
+  mockPracticeHeroClass,
+} from "../../lib/mockBuyNow";
+import { DEFAULT_MOCK_SHARES } from "../../lib/mockTrading";
 import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecommendation";
 
 /**
@@ -30,6 +37,7 @@ export function SignalSummaryPanel() {
     mockTradingMode,
     simulateMockEntry,
     mockPortfolio,
+    labTestDataMode,
   } = useTerminal();
   const [mockMsg, setMockMsg] = useState<string | null>(null);
   const { session, configured } = useAuth();
@@ -71,7 +79,34 @@ export function SignalSummaryPanel() {
     lc.entryZone != null
       ? (lc.entryZone.low + lc.entryZone.high) / 2
       : null;
-  const briefLines = buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
+  const entryPxForMock =
+    displayPrice ??
+    entryMid ??
+    (lc.lastPrice != null && Number.isFinite(lc.lastPrice) ? lc.lastPrice : lc.alertAt);
+  const openMock = hasOpenMockPosition(mockPortfolio, symbol, side);
+  const showMockBuyNow =
+    mockTradingMode && planForSymbol && !openMock && entryPxForMock != null && Number.isFinite(entryPxForMock);
+  const engineEnter = lc.tradingAction === "ENTER" && lc.dataFresh !== false;
+  const briefLines = showMockBuyNow
+    ? buildMockBuyNowLines({
+        symbol,
+        side,
+        entryPrice: entryPxForMock,
+        stop: lc.stop,
+        t1: lc.t1,
+      })
+    : buildTradingBrief({ symbol, side, liveCard: lc, displayPrice });
+  const heroActionClass = showMockBuyNow
+    ? mockPracticeHeroClass(side)
+    : (lc.tradingAction ?? "WAIT").toLowerCase();
+  const heroActionValue = showMockBuyNow
+    ? mockPracticeHeadline(side)
+    : lc.dataFresh === false
+      ? "WAIT"
+      : (lc.tradingAction ?? "WAIT");
+  const heroActionLabel = showMockBuyNow
+    ? "Paper practice · tap Buy now below"
+    : status;
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
     (lc.matrixChecklist ?? []).map((row) => ({
@@ -111,10 +146,17 @@ export function SignalSummaryPanel() {
         <StatusBadge status={status} className="signal-status" />
       </div>
 
-      <div className={`signal-action-hero signal-panel-hero-dup ${(lc.tradingAction ?? "WAIT").toLowerCase()}`}>
-        <p className="action-value">{lc.dataFresh === false ? "WAIT" : (lc.tradingAction ?? "WAIT")}</p>
-        <p className="action-label">{status}</p>
+      <div className={`signal-action-hero signal-panel-hero-dup ${heroActionClass}`}>
+        <p className="action-value">{heroActionValue}</p>
+        <p className="action-label">{heroActionLabel}</p>
       </div>
+      {showMockBuyNow && !engineEnter ? (
+        <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          {labTestDataMode
+            ? "Lab + mock: BUY NOW is for paper fills only — live ENTER stays blocked off RTH."
+            : "Mock BUY NOW is practice data on this device — not live permission to enter."}
+        </p>
+      ) : null}
       {lc.dataFresh === false && lc.dataFreshReason ? (
         <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
           <strong>Not verified:</strong> {lc.dataFreshReason}
@@ -164,7 +206,7 @@ export function SignalSummaryPanel() {
           </div>
           <div>
             <dt>Action</dt>
-            <dd>{lc.tradingAction ?? "WAIT"}</dd>
+            <dd>{showMockBuyNow ? `${mockPracticeHeadline(side)} (paper)` : (lc.tradingAction ?? "WAIT")}</dd>
           </div>
           <div>
             <dt>Current price</dt>
@@ -229,20 +271,25 @@ export function SignalSummaryPanel() {
 
       {mockTradingMode ? (
         <>
-          <p className="disclaimer" style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
-            Mock trading does not need ENTER or verified live data — use the button below to paper-fill at
-            current chart levels.
-          </p>
-          <button
-            type="button"
-            className="scan-btn"
-            onClick={() => {
-              const res = simulateMockEntry();
-              setMockMsg(res.message);
-            }}
-          >
-            Simulate practice entry
-          </button>
+          {!openMock ? (
+            <button
+              type="button"
+              className="scan-btn"
+              style={{ marginTop: "0.65rem", fontWeight: 700 }}
+              onClick={() => {
+                const res = simulateMockEntry();
+                setMockMsg(res.message);
+              }}
+            >
+              {side === "LONG"
+                ? `Buy now · ${DEFAULT_MOCK_SHARES} shares (paper)`
+                : `Sell now · ${DEFAULT_MOCK_SHARES} shares (paper)`}
+            </button>
+          ) : (
+            <p className="banner warn" role="status" style={{ marginTop: "0.65rem" }}>
+              In paper position — close from Positions to buy again.
+            </p>
+          )}
           {mockPortfolio.positions.some(
             (p) => p.symbol === symbol.toUpperCase() && p.side === side,
           ) ? (
