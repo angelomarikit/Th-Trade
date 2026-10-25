@@ -42,8 +42,17 @@ export function assessFreshness(
   session?: SessionSnapshot,
 ): FreshnessResult {
   const sess = session ?? classifyUsEquitySession(now);
+  /** Lab preview passes multi-hour maxAgeMs on weekend/closed; ignore small accidental overrides. */
+  const closedSessionLabOverride =
+    sess.maxDataAgeMs === 0 && maxAgeMs >= 60 * 60 * 1000;
   const limit =
-    sess.maxDataAgeMs === 0 ? 0 : maxAgeMs !== DEFAULT_MAX_DATA_AGE_MS ? maxAgeMs : sess.maxDataAgeMs;
+    sess.maxDataAgeMs === 0
+      ? closedSessionLabOverride
+        ? maxAgeMs
+        : 0
+      : maxAgeMs !== DEFAULT_MAX_DATA_AGE_MS
+        ? maxAgeMs
+        : sess.maxDataAgeMs;
 
   const marketTs = resolveMarketDataTimestamp(snapshot);
   if (!marketTs) {

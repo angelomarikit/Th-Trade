@@ -36,4 +36,35 @@ describe("assessFreshness bar timing", () => {
     const fresh = assessFreshness(snap, now, 90_000, session);
     expect(fresh.ok).toBe(true);
   });
+
+  it("honors explicit maxAgeMs on weekend when lab preview override is passed", () => {
+    const now = new Date("2026-10-25T12:00:00Z"); // Sun ~08:00 ET
+    const session = classifyUsEquitySession(now);
+    expect(session.session).toBe("WEEKEND");
+    const friClose = new Date("2026-10-24T20:00:00Z"); // Fri 16:00 ET bar end approx
+    const bar: Bar = {
+      symbol: "NVDA",
+      timeframe: "5Min",
+      timestamp: new Date(friClose.getTime() - 300_000),
+      open: 1,
+      high: 1,
+      low: 1,
+      close: 1,
+      volume: 1,
+      completed: true,
+    };
+    const snap: MarketSnapshot = {
+      symbol: "NVDA",
+      lastPrice: 211,
+      quote: null,
+      bars1m: [],
+      bars5m: [bar],
+      receivedAt: now,
+      marketTimestamp: friClose,
+    };
+    expect(assessFreshness(snap, now, 90_000, session).ok).toBe(false);
+    const lab = assessFreshness(snap, now, 96 * 60 * 60 * 1000, session);
+    expect(lab.ok).toBe(true);
+    expect(lab.maxAgeMs).toBe(96 * 60 * 60 * 1000);
+  });
 });

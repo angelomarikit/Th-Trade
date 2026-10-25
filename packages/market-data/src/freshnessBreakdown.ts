@@ -24,9 +24,14 @@ export function buildMarketDataFreshnessBreakdown(
   verifyReason: string,
   now: Date = new Date(),
   session?: SessionSnapshot,
+  /** When lab mode relaxes freshness off RTH, match assessFreshness limit for UI chips. */
+  freshnessLimitMs?: number,
 ): MarketDataFreshnessBreakdown {
   const sess = session ?? classifyUsEquitySession(now);
-  const limit = sess.maxDataAgeMs;
+  const limit =
+    freshnessLimitMs != null && freshnessLimitMs > 0
+      ? freshnessLimitMs
+      : sess.maxDataAgeMs;
   const last1m = snapshot.bars1m.at(-1);
   const barEnd = last1m ? barEffectiveEndTime(last1m) : null;
   const barsAgeMs = barEnd ? Math.max(0, now.getTime() - barEnd.getTime()) : null;

@@ -229,10 +229,13 @@ export function SignalSummaryPanel() {
 
       {mockTradingMode ? (
         <>
+          <p className="disclaimer" style={{ marginTop: "0.5rem", marginBottom: "0.35rem" }}>
+            Mock trading does not need ENTER or verified live data — use the button below to paper-fill at
+            current chart levels.
+          </p>
           <button
             type="button"
             className="scan-btn"
-            style={{ marginTop: "0.5rem" }}
             onClick={() => {
               const res = simulateMockEntry();
               setMockMsg(res.message);

@@ -63,8 +63,10 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const session = classifyUsEquitySession(now);
   const profile = confirmationProfileForSession(session);
   let freshnessMax = profile.maxDataAgeMs;
+  /** Preview lab: allow last session SIP snapshot through weekend/closed (ENTER still blocked in API). */
+  const LAB_CLOSED_SESSION_MAX_AGE_MS = 96 * 60 * 60 * 1000;
   if (labMode && !session.isRegularHours) {
-    if (session.maxDataAgeMs === 0) freshnessMax = 600_000;
+    if (session.maxDataAgeMs === 0) freshnessMax = LAB_CLOSED_SESSION_MAX_AGE_MS;
     else freshnessMax = Math.max(freshnessMax, 300_000);
   }
   let freshness = assessFreshness(input.snapshot, now, freshnessMax, session);
@@ -257,6 +259,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
         freshness.reason,
         now,
         session,
+        freshness.maxAgeMs,
       );
       return freshness.ok ? freshness.reason : breakdown.summary;
     })(),
@@ -266,6 +269,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       freshness.reason,
       now,
       session,
+      freshness.maxAgeMs,
     ),
     evaluatedAt,
     setupId,
