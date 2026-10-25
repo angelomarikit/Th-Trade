@@ -45,6 +45,7 @@ import {
   DEFAULT_MOCK_SHARES,
   type MockPortfolio,
 } from "../lib/mockTrading";
+import { readCachedSetup, writeCachedSetup } from "../lib/setupCache";
 import { readJson, STORAGE_KEYS, writeJson } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 
@@ -165,7 +166,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [symbol, setSymbol] = useState("NVDA");
   const [symbolDraft, setSymbolDraft] = useState("NVDA");
   const [side, setSide] = useState<"LONG" | "SHORT">("LONG");
-  const [data, setData] = useState<SetupResponse | null>(null);
+  const [data, setData] = useState<SetupResponse | null>(() =>
+    readCachedSetup("NVDA", "LONG"),
+  );
   const [bars, setBars] = useState<BarsResponse | null>(null);
   const [chartTf, setChartTf] = useState("5m");
   const [extendedHours, setExtendedHoursState] = useState(() => {
@@ -244,6 +247,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   );
   const resyncScanRef = useRef<number | null>(null);
   const healthRef = useRef<HealthResponse | null>(null);
+  const dataRef = useRef(data);
   symbolRef.current = symbol;
   sideRef.current = side;
   chartTfRef.current = chartTf;
@@ -255,6 +259,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   mockTapeDemoIntervalRef.current = mockTapeDemoIntervalMs;
   healthRef.current = health;
   barsRef.current = bars;
+  dataRef.current = data;
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
     setSidebarCollapsedState(v);
@@ -604,16 +609,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       const ac = new AbortController();
       abortRef.current = ac;
-      if (symbolChanged || (sideChanged && !isPoll)) setLoading(true);
+      const needsSetup = !dataRef.current?.liveCard;
+      if (symbolChanged || (sideChanged && !isPoll) || needsSetup) setLoading(true);
       if (!isPoll) setError(null);
       setSymbol(t);
       setSymbolDraft(t);
       setSide(s);
       if (symbolChanged) {
-        setData(null);
+        setData(readCachedSetup(t, s));
         setBars(null);
       } else if (sideChanged && !isPoll) {
-        setData(null);
+        setData(readCachedSetup(t, s));
       }
       const useFastPath = symbolChanged || opts?.fast === true;
       const barLimit = useFastPath ? FAST_BAR_LIMIT : historyLimit(chartTfRef.current);
@@ -651,6 +657,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         });
         if (ac.signal.aborted || symbolRef.current !== t) return;
         setData(next);
+        writeCachedSetup(t, s, next);
         setUpdatedAt(Date.now());
         setError(null);
         const charged = next.signalRecommendation?.creditsCharged ?? 0;

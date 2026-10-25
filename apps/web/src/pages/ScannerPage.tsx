@@ -121,9 +121,14 @@ export function ScannerPage() {
           backend (check /health for supportsFastSetup).
         </p>
       )}
-      {setupStale && (
+      {lc && setupStale && (
         <p className="banner warn" role="status">
           Syncing chart and recommendation — refreshing scan.
+        </p>
+      )}
+      {!lc && (loading || barsLoading) && (
+        <p className="banner warn" role="status">
+          Loading {symbol} {side} recommendation…
         </p>
       )}
       {(() => {

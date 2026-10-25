@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { canShowSetupChartLevels, isSetupChartStale } from "../src/lib/setupChartSync";
 
 describe("setupChartSync", () => {
+  it("does not treat missing setup as stale (avoids resync storm)", () => {
+    expect(
+      isSetupChartStale({
+        symbol: "NVDA",
+        barsSymbol: "NVDA",
+        setupSymbol: null,
+        setupEvaluatedAt: null,
+      }),
+    ).toBe(false);
+  });
+
   it("hides levels when setup symbol or bars do not match active ticker", () => {
     expect(
       isSetupChartStale({

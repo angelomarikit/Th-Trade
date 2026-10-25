@@ -15,6 +15,8 @@ export function isSetupChartStale(params: {
 
   if (!barsSym || barsSym !== sym) return true;
   if (setupSym && setupSym !== sym) return true;
+  // No setup loaded yet — not a stale sync; initial scan still pending.
+  if (!setupSym && !params.setupEvaluatedAt) return false;
 
   const ageMs = params.setupEvaluatedAt
     ? Date.now() - Date.parse(params.setupEvaluatedAt)
