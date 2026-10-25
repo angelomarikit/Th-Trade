@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTerminal } from "../../context/TerminalContext";
 import { fetchSetup, type TradePlanPayload } from "../../lib/api";
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
+import { fallbackTradePlanFromLiveCard } from "../../lib/fallbackTradePlan";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
 
 export function TradePlanModalTrigger() {
@@ -59,7 +60,7 @@ function planSourceLabel(briefSource: TradePlanPayload["briefSource"]): string {
 
 function TradePlanModal(props: { onClose: () => void; sessionToken: string | null }) {
   const titleId = useId();
-  const { symbol, side, health, labTestDataMode, mockTradingMode, mockLiveRthMode } =
+  const { symbol, side, health, labTestDataMode, mockTradingMode, mockLiveRthMode, displayPrice } =
     useTerminal();
   const [plan, setPlan] = useState<TradePlanPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,10 +85,22 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
         accessToken: props.sessionToken,
         timeoutMs: 90_000,
       });
-      if (!res.tradePlan) {
-        throw new Error("No WULU Plan returned from API.");
+      if (res.tradePlan) {
+        setPlan(res.tradePlan);
+      } else if (res.liveCard) {
+        setPlan(
+          fallbackTradePlanFromLiveCard({
+            symbol,
+            side,
+            liveCard: res.liveCard,
+            displayPrice,
+          }),
+        );
+      } else {
+        throw new Error(
+          "WULU Plan unavailable — setup did not return card data. Redeploy preview API (needs commit 84cd395+).",
+        );
       }
-      setPlan(res.tradePlan);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load WULU Plan.");
     } finally {
@@ -98,6 +111,7 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
     labTestDataMode,
     mockLiveRthMode,
     mockTradingMode,
+    displayPrice,
     props.sessionToken,
     side,
     symbol,
