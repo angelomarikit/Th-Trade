@@ -10,7 +10,7 @@ const API = (process.env.WULU_PREVIEW_API ?? "https://th-trade-preview.up.railwa
   /\/+$/,
   "",
 );
-const EXPECT = (process.env.EXPECT_GIT_SHA ?? "66ed273").slice(0, 7);
+const EXPECT = (process.env.EXPECT_GIT_SHA ?? "a2d59d1").slice(0, 7);
 const TICKER = (process.env.WULU_TICKER ?? "NVDA").toUpperCase();
 const SIDE = (process.env.WULU_SIDE ?? "LONG").toUpperCase();
 

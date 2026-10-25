@@ -87,7 +87,7 @@ export function TradeSignalBar() {
     headline = mockPracticeHeadline(side);
     tone = side === "LONG" ? "tone-entry" : "tone-exit";
     Icon = side === "LONG" ? ArrowUp : TrendingDown;
-  } else if (displayAction !== "ENTER" && fresh) {
+  } else if (fresh) {
     headline = liveSignalHeadline({
       status: lc.status,
       tradingAction: displayAction,
@@ -111,9 +111,7 @@ export function TradeSignalBar() {
       aria-label="Trade signal"
     >
       <div className="trade-signal-bar-top">
-        <span className="trade-signal-headline">
-          {headline} · {side}
-        </span>
+        <span className="trade-signal-headline">{headline}</span>
         <span className="trade-signal-icon" aria-hidden="true">
           <Icon size={18} strokeWidth={2.4} />
         </span>

@@ -1,6 +1,12 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTerminal } from "../context/TerminalContext";
+import {
+  MOCK_TAPE_DEMO_INTERVAL_MAX_MS,
+  MOCK_TAPE_DEMO_INTERVAL_MIN_MS,
+  MOCK_TAPE_FAST_INTERVAL_MS,
+  mockTapeCadenceLabel,
+} from "../lib/mockLiveTape";
 
 export function SettingsPage() {
   const {
@@ -16,9 +22,20 @@ export function SettingsPage() {
     setMockTradingMode,
     mockLiveRthMode,
     setMockLiveRthMode,
+    mockTapeFastMode,
+    setMockTapeFastMode,
+    mockTapeDemoIntervalMs,
+    setMockTapeDemoIntervalMs,
+    chartTf,
     resetMockTrading,
     health,
   } = useTerminal();
+  const labTapeControlsOn = mockTradingMode && mockLiveRthMode;
+  const tapePreview = mockTapeCadenceLabel(
+    chartTf,
+    mockTapeFastMode,
+    mockTapeDemoIntervalMs,
+  );
   const labServerOn = health?.monitor?.wuluLabModeEnabled === true;
   const { configured, profile, plan, user, signOut } = useAuth();
 
@@ -121,11 +138,94 @@ export function SettingsPage() {
             />{" "}
             Simulate live RTH (lab replay)
           </label>
-          <p className="disclaimer">
-            Replays the last SIP session with <strong>RTH rules and chart</strong> (session badge shows RTH).
-            With lab test data on, the forming candle updates on <strong>RTH bar timing</strong> (1m → about once
-            per minute; 5m → every 5 minutes) — still SIP replay, not a live exchange tape.
-          </p>
+          <fieldset
+            className="lab-sim-fieldset"
+            disabled={!labTapeControlsOn}
+            style={{
+              margin: 0,
+              padding: "0.65rem 0.75rem",
+              border: "1px solid var(--border, rgba(255,255,255,0.12))",
+              borderRadius: 8,
+              opacity: labTapeControlsOn ? 1 : 0.55,
+            }}
+          >
+            <legend style={{ padding: "0 0.35rem", fontWeight: 600 }}>Lab simulation speed</legend>
+            <p className="disclaimer" style={{ margin: "0 0 0.5rem" }}>
+              Controls how often the Scanner chart nudges and WAIT/ENTER distance updates. Requires{" "}
+              <strong>Lab test data</strong> on (below).
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+              <label>
+                <input
+                  type="radio"
+                  name="mock-tape-cadence"
+                  checked={!mockTapeFastMode}
+                  onChange={() => setMockTapeFastMode(false)}
+                />{" "}
+                Real RTH bar timing (1m ≈ 1 min, 5m ≈ 5 min)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="mock-tape-cadence"
+                  checked={mockTapeFastMode}
+                  onChange={() => setMockTapeFastMode(true)}
+                />{" "}
+                Fast demo (adjustable tick speed)
+              </label>
+            </div>
+            <label
+              style={{
+                display: "block",
+                marginTop: "0.65rem",
+                opacity: mockTapeFastMode ? 1 : 0.45,
+              }}
+            >
+              <span style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                <span>Tick every</span>
+                <strong>{(mockTapeDemoIntervalMs / 1000).toFixed(1)}s</strong>
+              </span>
+              <input
+                type="range"
+                min={MOCK_TAPE_DEMO_INTERVAL_MIN_MS}
+                max={MOCK_TAPE_DEMO_INTERVAL_MAX_MS}
+                step={100}
+                value={mockTapeDemoIntervalMs}
+                disabled={!mockTapeFastMode}
+                onChange={(e) => setMockTapeDemoIntervalMs(Number(e.target.value))}
+                style={{ width: "100%", marginTop: "0.35rem" }}
+              />
+            </label>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.35rem",
+                marginTop: "0.45rem",
+                opacity: mockTapeFastMode ? 1 : 0.45,
+              }}
+            >
+              {[
+                { label: "0.5s", ms: 500 },
+                { label: "0.8s", ms: MOCK_TAPE_FAST_INTERVAL_MS },
+                { label: "1.5s", ms: 1500 },
+                { label: "3s", ms: 3000 },
+              ].map((p) => (
+                <button
+                  key={p.ms}
+                  type="button"
+                  className="icon-btn"
+                  disabled={!mockTapeFastMode}
+                  onClick={() => setMockTapeDemoIntervalMs(p.ms)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="disclaimer" style={{ margin: "0.55rem 0 0", fontSize: "0.85rem" }}>
+              On Scanner ({chartTf} chart): <strong>{tapePreview}</strong>
+            </p>
+          </fieldset>
           {mockTradingMode ? (
             <button type="button" className="icon-btn" onClick={() => resetMockTrading()}>
               Reset paper account

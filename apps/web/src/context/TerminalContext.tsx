@@ -23,8 +23,15 @@ import { readBarsCache, writeBarsCache } from "../lib/barsCache";
 import {
   mockTapeActive,
   mockTapeIntervalMs,
+  mockTapeMoveScale,
+  mockTapeResyncDelayMs,
+  readMockTapeDemoIntervalMs,
+  readMockTapeFastMode,
   tickSimulatedPrice,
+  writeMockTapeDemoIntervalMs,
+  writeMockTapeFastMode,
 } from "../lib/mockLiveTape";
+import { chartDistanceToTrigger } from "../lib/liveSignalFromPrice";
 import { barsForChart, chartUsesExtendedSession, historyLimit } from "../lib/regularSession";
 import { isUserVisibleMonitorTransition } from "../lib/monitorDisplay";
 import {
@@ -109,6 +116,12 @@ interface TerminalContextValue {
   /** Lab: replay last SIP snapshot with RTH rules (requires lab on API). */
   mockLiveRthMode: boolean;
   setMockLiveRthMode: (on: boolean) => void;
+  /** Faster lab tape ticks + setup resync (demo WAIT/ENTER). */
+  mockTapeFastMode: boolean;
+  setMockTapeFastMode: (on: boolean) => void;
+  /** Fast-demo tick interval (ms) — Settings slider. */
+  mockTapeDemoIntervalMs: number;
+  setMockTapeDemoIntervalMs: (ms: number) => void;
   mockPortfolio: MockPortfolio;
   simulateMockEntry: () => { ok: boolean; message: string };
   closeMockPositionById: (positionId: string, exitPrice: number, reason?: string) => {
@@ -145,6 +158,7 @@ const TerminalContext = createContext<TerminalContextValue | null>(null);
 
 const POLL_MS_RTH = 15_000;
 const POLL_MS_LAB = 5_000;
+const POLL_MS_LAB_FAST = 2_000;
 
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const { session, setCreditsLocal } = useAuth();
@@ -177,6 +191,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       return true;
     }
   });
+  const [mockTapeFastMode, setMockTapeFastModeState] = useState(() => readMockTapeFastMode());
+  const [mockTapeDemoIntervalMs, setMockTapeDemoIntervalMsState] = useState(() =>
+    readMockTapeDemoIntervalMs(),
+  );
   const [mockPortfolio, setMockPortfolio] = useState<MockPortfolio>(() => readMockPortfolio());
   const [loading, setLoading] = useState(false);
   const [barsLoading, setBarsLoading] = useState(false);
@@ -218,6 +236,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const labTestRef = useRef(false);
   const mockTradingRef = useRef(false);
   const mockLiveRthRef = useRef(true);
+  const mockTapeFastRef = useRef(true);
+  const mockTapeDemoIntervalRef = useRef(800);
   const barsRef = useRef(bars);
   const scanRef = useRef<(opts?: Parameters<TerminalContextValue["scan"]>[0]) => Promise<void>>(
     async () => {},
@@ -231,6 +251,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   labTestRef.current = labTestDataMode;
   mockTradingRef.current = mockTradingMode;
   mockLiveRthRef.current = mockLiveRthMode;
+  mockTapeFastRef.current = mockTapeFastMode;
+  mockTapeDemoIntervalRef.current = mockTapeDemoIntervalMs;
   healthRef.current = health;
   barsRef.current = bars;
 
@@ -435,6 +457,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     [setExtendedHours],
   );
 
+  const setMockTapeFastMode = useCallback((on: boolean) => {
+    setMockTapeFastModeState(on);
+    writeMockTapeFastMode(on);
+  }, []);
+
+  const setMockTapeDemoIntervalMs = useCallback((ms: number) => {
+    writeMockTapeDemoIntervalMs(ms);
+    const next = readMockTapeDemoIntervalMs();
+    setMockTapeDemoIntervalMsState(next);
+  }, []);
+
   const setMockLiveRthMode = useCallback(
     (on: boolean) => {
       setMockLiveRthModeState(on);
@@ -601,7 +634,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         let referencePrice = opts?.referencePrice;
         if (
           (referencePrice == null || !Number.isFinite(referencePrice)) &&
-          useLab &&
           barsRef.current?.symbol?.toUpperCase() === t
         ) {
           const close = barsRef.current.bars.at(-1)?.close;
@@ -613,7 +645,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           lab: useLab,
           mockRth: useMockRth,
           mockEnter: useMockEnter,
-          referencePrice: useLab ? referencePrice : undefined,
+          referencePrice,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
         });
@@ -776,7 +808,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const labPoll =
         labOk &&
         (labTestRef.current || (mockTradingRef.current && mockLiveRthRef.current));
-      const ms = labPoll ? POLL_MS_LAB : POLL_MS_RTH;
+      const ms = labPoll
+        ? mockTapeFastRef.current
+          ? POLL_MS_LAB_FAST
+          : POLL_MS_LAB
+        : POLL_MS_RTH;
       timer = window.setTimeout(loop, ms);
     };
     timer = window.setTimeout(loop, POLL_MS_RTH);
@@ -855,7 +891,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     if (!liveTapeOn || !symbol) return;
     const sym = symbol.toUpperCase();
     const tf = chartTfRef.current;
-    const intervalMs = mockTapeIntervalMs(tf);
+    const intervalMs = mockTapeIntervalMs(tf, mockTapeFastMode, mockTapeDemoIntervalMs);
+    const moveScale = mockTapeMoveScale(mockTapeFastMode, mockTapeDemoIntervalMs);
+    const resyncMs = mockTapeResyncDelayMs(mockTapeFastMode, mockTapeDemoIntervalMs);
     tapeStepRef.current = 0;
     const id = window.setInterval(() => {
       setBars((prev) => {
@@ -873,7 +911,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           step: tapeStepRef.current,
           prevClose: last.close,
           anchor,
-          moveScale: 1,
+          moveScale,
         });
         const nextBar = {
           ...last,
@@ -889,9 +927,34 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setMockPortfolio(updateMockMarks(sym, nextClose));
         setData((scan) => {
           if (!scan?.liveCard || scan.liveCard.symbol?.toUpperCase() !== sym) return scan;
+          const trigger = scan.liveCard.alertAt;
+          let nearActive = scan.liveCard.nearActive;
+          if (Number.isFinite(trigger) && trigger > 0) {
+            const { pct, label, abs } = chartDistanceToTrigger(trigger, nextClose);
+            nearActive = nearActive
+              ? {
+                  ...nearActive,
+                  distanceToTriggerAbs: abs,
+                  distanceToTriggerPct: pct,
+                  distanceLabel: label,
+                }
+              : {
+                  active: false,
+                  distanceToTriggerAbs: abs,
+                  distanceToTriggerPct: pct,
+                  distanceLabel: label,
+                  stillWaitingFor: scan.liveCard.waitingFor ?? [],
+                  conditionsPassed: scan.liveCard.conditionsPassed ?? 0,
+                  conditionsTotal: scan.liveCard.conditionsTotal ?? 0,
+                  confirmationRequirement: "",
+                  permissionToEnter: false,
+                  dataTimestamp: scan.liveCard.evaluatedAt ?? null,
+                  setupQualityScore: scan.liveCard.qualityScore10 ?? scan.liveCard.setupScoreValue ?? null,
+                };
+          }
           return {
             ...scan,
-            liveCard: { ...scan.liveCard, lastPrice: nextClose },
+            liveCard: { ...scan.liveCard, lastPrice: nextClose, nearActive },
             card: { ...scan.card, lastPrice: nextClose },
           };
         });
@@ -902,12 +965,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
             fast: true,
             referencePrice: nextClose,
           });
-        }, 900);
+        }, resyncMs);
         return sessionBars;
       });
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [liveTapeOn, symbol, chartTf]);
+  }, [liveTapeOn, symbol, chartTf, mockTapeFastMode, mockTapeDemoIntervalMs]);
 
   const displayPrice = useMemo(() => {
     // Header price is the active chart's last candle close, not a quote patched onto the bar.
@@ -953,6 +1016,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setMockTradingMode,
       mockLiveRthMode,
       setMockLiveRthMode,
+      mockTapeFastMode,
+      setMockTapeFastMode,
+      mockTapeDemoIntervalMs,
+      setMockTapeDemoIntervalMs,
       mockPortfolio,
       simulateMockEntry,
       closeMockPositionById,
@@ -1001,6 +1068,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       setMockTradingMode,
       mockLiveRthMode,
       setMockLiveRthMode,
+      mockTapeFastMode,
+      setMockTapeFastMode,
+      mockTapeDemoIntervalMs,
+      setMockTapeDemoIntervalMs,
       mockPortfolio,
       simulateMockEntry,
       closeMockPositionById,

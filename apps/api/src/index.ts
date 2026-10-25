@@ -771,7 +771,7 @@ async function main() {
           let livePx = lastPrice;
           const refParam = url.searchParams.get("referencePrice");
           const refPx = refParam ? Number(refParam) : NaN;
-          if (labMode && Number.isFinite(refPx) && refPx > 0) {
+          if (Number.isFinite(refPx) && refPx > 0) {
             livePx = refPx;
           }
           const snapshot = {

@@ -5,6 +5,62 @@ import type { ChartTimeframeId } from "./chartTimeframes";
 /** Real-time RTH: one lab tick per chart bar period (1m → ~60s between updates). */
 export const MOCK_TAPE_RTH_REALTIME = true;
 
+const FAST_TAPE_KEY = "wulu:mock-tape-fast";
+const DEMO_INTERVAL_KEY = "wulu:mock-tape-interval-ms";
+
+/** Default fast-demo tick (Settings → Lab simulation). */
+export const MOCK_TAPE_FAST_INTERVAL_MS = 800;
+export const MOCK_TAPE_DEMO_INTERVAL_MIN_MS = 300;
+export const MOCK_TAPE_DEMO_INTERVAL_MAX_MS = 5_000;
+
+export function readMockTapeFastMode(): boolean {
+  try {
+    const v = localStorage.getItem(FAST_TAPE_KEY);
+    return v == null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function writeMockTapeFastMode(on: boolean): void {
+  try {
+    localStorage.setItem(FAST_TAPE_KEY, on ? "1" : "0");
+  } catch {
+    /* private mode */
+  }
+}
+
+export function readMockTapeDemoIntervalMs(): number {
+  try {
+    const raw = localStorage.getItem(DEMO_INTERVAL_KEY);
+    if (raw == null || raw.trim() === "") return MOCK_TAPE_FAST_INTERVAL_MS;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return MOCK_TAPE_FAST_INTERVAL_MS;
+    return Math.min(
+      MOCK_TAPE_DEMO_INTERVAL_MAX_MS,
+      Math.max(MOCK_TAPE_DEMO_INTERVAL_MIN_MS, Math.round(n)),
+    );
+  } catch {
+    return MOCK_TAPE_FAST_INTERVAL_MS;
+  }
+}
+
+export function writeMockTapeDemoIntervalMs(ms: number): void {
+  const clamped = Math.min(
+    MOCK_TAPE_DEMO_INTERVAL_MAX_MS,
+    Math.max(MOCK_TAPE_DEMO_INTERVAL_MIN_MS, Math.round(ms)),
+  );
+  try {
+    localStorage.setItem(DEMO_INTERVAL_KEY, String(clamped));
+  } catch {
+    /* private mode */
+  }
+}
+
+function demoIntervalMs(): number {
+  return readMockTapeDemoIntervalMs();
+}
+
 const PERIOD_MS: Record<ChartTimeframeId, number> = {
   "1m": 60_000,
   "5m": 300_000,
@@ -22,11 +78,37 @@ export function barPeriodMs(chartTf: string): number {
  * How often the lab tape may nudge the forming candle — matches RTH bar cadence.
  * 1h/1D charts: at most once per real minute (SIP replay has no live hourly stream).
  */
-export function mockTapeIntervalMs(chartTf: string): number {
+export function mockTapeIntervalMs(
+  chartTf: string,
+  fastDemo = readMockTapeFastMode(),
+  demoInterval = demoIntervalMs(),
+): number {
+  if (fastDemo) {
+    const period = barPeriodMs(chartTf);
+    if (period >= 3_600_000) return Math.max(demoInterval, 5_000);
+    return demoInterval;
+  }
   const period = barPeriodMs(chartTf);
   if (period >= 3_600_000) return 60_000;
   if (MOCK_TAPE_RTH_REALTIME) return period;
   return Math.max(period, 15_000);
+}
+
+export function mockTapeMoveScale(
+  fastDemo = readMockTapeFastMode(),
+  demoInterval = demoIntervalMs(),
+): number {
+  if (!fastDemo) return 1;
+  const base = MOCK_TAPE_FAST_INTERVAL_MS;
+  return Math.min(20, Math.max(4, Math.round((10 * base) / demoInterval)));
+}
+
+export function mockTapeResyncDelayMs(
+  fastDemo = readMockTapeFastMode(),
+  demoInterval = demoIntervalMs(),
+): number {
+  if (!fastDemo) return 450;
+  return Math.min(600, Math.max(120, Math.round(demoInterval * 0.25)));
 }
 
 function hashSymbol(symbol: string): number {
@@ -76,8 +158,15 @@ export function mockTapeActive(
 }
 
 /** Human label for settings / banner. */
-export function mockTapeCadenceLabel(chartTf: string): string {
-  const ms = mockTapeIntervalMs(chartTf);
+export function mockTapeCadenceLabel(
+  chartTf: string,
+  fastDemo = readMockTapeFastMode(),
+  demoInterval = demoIntervalMs(),
+): string {
+  const ms = mockTapeIntervalMs(chartTf, fastDemo, demoInterval);
+  if (fastDemo && ms < 60_000) {
+    return `~${(ms / 1000).toFixed(1)}s per tick (fast demo)`;
+  }
   if (ms >= 60_000) {
     const min = Math.round(ms / 60_000);
     return min === 1 ? "~1 min per update (RTH 1m bar)" : `~${min} min per update (RTH ${chartTf} bar)`;

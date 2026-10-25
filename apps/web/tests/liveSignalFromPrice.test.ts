@@ -38,6 +38,12 @@ describe("liveSignalFromPrice", () => {
     expect(next.lastPrice).toBe(100);
   });
 
+  it("creates distance when nearActive was missing", () => {
+    const { nearActive, ...noNear } = base;
+    const next = enrichLiveCardWithChartPrice(noNear as SetupLiveCard, 101);
+    expect(next.nearActive?.distanceLabel).toContain("ABOVE TRIGGER");
+  });
+
   it("headline includes live distance", () => {
     expect(
       liveSignalHeadline({

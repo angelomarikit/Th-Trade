@@ -13,6 +13,14 @@ function distanceLabel(trigger: number, lastPrice: number): { pct: number; label
   return { pct: distancePct, label };
 }
 
+export function chartDistanceToTrigger(
+  trigger: number,
+  chartPrice: number,
+): { pct: number; label: string; abs: number } {
+  const { pct, label } = distanceLabel(trigger, chartPrice);
+  return { pct, label, abs: chartPrice - trigger };
+}
+
 /** Keep WAIT/ENTER from engine; refresh distance + last price from the chart every tick. */
 export function enrichLiveCardWithChartPrice(
   lc: SetupLiveCard,
@@ -22,15 +30,27 @@ export function enrichLiveCardWithChartPrice(
   const trigger = lc.alertAt;
   if (!Number.isFinite(trigger) || trigger <= 0) return { ...lc, lastPrice: chartPrice };
 
-  const { pct, label } = distanceLabel(trigger, chartPrice);
+  const { pct, label, abs } = chartDistanceToTrigger(trigger, chartPrice);
   const near = lc.nearActive
     ? {
         ...lc.nearActive,
-        distanceToTriggerAbs: chartPrice - trigger,
+        distanceToTriggerAbs: abs,
         distanceToTriggerPct: pct,
         distanceLabel: label,
       }
-    : lc.nearActive;
+    : {
+        active: false,
+        distanceToTriggerAbs: abs,
+        distanceToTriggerPct: pct,
+        distanceLabel: label,
+        stillWaitingFor: lc.waitingFor ?? [],
+        conditionsPassed: lc.conditionsPassed ?? 0,
+        conditionsTotal: lc.conditionsTotal ?? 0,
+        confirmationRequirement: "",
+        permissionToEnter: false,
+        dataTimestamp: lc.evaluatedAt ?? null,
+        setupQualityScore: lc.qualityScore10 ?? lc.setupScoreValue ?? null,
+      };
 
   return {
     ...lc,

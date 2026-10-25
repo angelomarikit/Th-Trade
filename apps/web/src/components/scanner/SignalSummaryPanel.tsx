@@ -116,13 +116,22 @@ export function SignalSummaryPanel() {
   const heroActionClass = showMockBuyNow
     ? mockPracticeHeroClass(side)
     : displayAction.toLowerCase();
+  const liveHeadline =
+    sideAligned && !showMockBuyNow && (displayAction === "WAIT" || displayAction === "ENTER")
+      ? liveSignalHeadline({
+          status,
+          tradingAction: displayAction,
+          distanceLabel: lc.nearActive?.distanceLabel,
+          side,
+        })
+      : null;
   const heroActionValue = !sideAligned
     ? loading
       ? "…"
       : "WAIT"
     : showMockBuyNow
       ? mockPracticeHeadline(side)
-      : displayAction;
+      : liveHeadline ?? displayAction;
   const heroActionLabel = !sideAligned
     ? loading
       ? `Loading ${side} setup…`
@@ -131,14 +140,11 @@ export function SignalSummaryPanel() {
         : status
     : showMockBuyNow
       ? "Paper practice · tap Buy now below"
-      : displayAction === "WAIT" || displayAction === "ENTER"
-        ? liveSignalHeadline({
-            status,
-            tradingAction: displayAction,
-            distanceLabel: lc.nearActive?.distanceLabel,
-            side,
-          })
-        : status;
+      : liveHeadline
+        ? lc.watchingSummary ?? status
+        : displayAction === "SKIP" || displayAction === "INVALIDATED"
+          ? status
+          : lc.watchingSummary ?? status;
   const indicatorRows =
     (lc.indicatorChecklist?.length ? lc.indicatorChecklist : null) ??
     (lc.matrixChecklist ?? []).map((row) => ({
