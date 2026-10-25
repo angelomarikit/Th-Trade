@@ -585,11 +585,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           (labTestRef.current ||
             (mockTradingRef.current && mockLiveRthRef.current));
         const useMockRth = useLab && mockLiveRthRef.current;
+        const useMockEnter = useMockRth && mockTradingRef.current;
         const next = await fetchSetup(t, s, {
           brief: wantBrief,
           fast: useFastPath,
           lab: useLab,
           mockRth: useMockRth,
+          mockEnter: useMockEnter,
           accessToken: session?.access_token ?? null,
           signal: ac.signal,
         });
@@ -788,6 +790,31 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     tapeAnchorRef.current = null;
     tapeBarTimeRef.current = null;
   }, [symbol]);
+
+  /** Align chart + tape with lab enter-in-zone price from the API. */
+  useEffect(() => {
+    const lc = data?.liveCard;
+    if (!lc?.mockEnter || lc.entryZone == null || !symbol) return;
+    const sym = symbol.toUpperCase();
+    const mid = (lc.entryZone.low + lc.entryZone.high) / 2;
+    if (!Number.isFinite(mid)) return;
+    tapeAnchorRef.current = mid;
+    tapeStepRef.current = 0;
+    setBars((prev) => {
+      if (!prev || prev.symbol.toUpperCase() !== sym || !prev.bars.length) return prev;
+      const last = prev.bars[prev.bars.length - 1]!;
+      const nextBar = {
+        ...last,
+        close: mid,
+        high: Math.max(last.high, mid),
+        low: Math.min(last.low, mid),
+      };
+      const nextBars = [...prev.bars.slice(0, -1), nextBar];
+      const sessionBars = { ...prev, bars: nextBars, count: nextBars.length };
+      writeBarsCache(sym, chartTfRef.current, sessionBars, sessionAllForChart());
+      return sessionBars;
+    });
+  }, [data?.liveCard?.mockEnter, data?.liveCard?.evaluatedAt, data?.liveCard?.entryZone, symbol]);
 
   useEffect(() => {
     if (!liveTapeOn || !symbol) return;

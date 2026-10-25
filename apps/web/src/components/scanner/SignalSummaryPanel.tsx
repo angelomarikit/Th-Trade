@@ -166,6 +166,11 @@ export function SignalSummaryPanel() {
             : null}
         </p>
       )}
+      {data?.liveCard?.mockEnter ? (
+        <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          Mock ENTER (lab): engine shows ENTER for paper drill — not live RTH permission.
+        </p>
+      ) : null}
       {showMockBuyNow && !engineEnter ? (
         <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
           {labTestDataMode

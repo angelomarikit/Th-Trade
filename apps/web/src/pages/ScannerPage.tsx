@@ -127,7 +127,9 @@ export function ScannerPage() {
       {labTestDataMode && health?.monitor?.wuluLabModeEnabled && (
         <p className="banner warn" role="status">
           {lc?.labDisclaimer ??
-            "Lab test data — off-RTH diagnostic scan only. ENTER is blocked; not a live trade signal."}
+            (lc?.mockEnter
+              ? "Mock ENTER lab — paper drill only."
+              : "Lab test data — off-RTH diagnostic scan only. ENTER is blocked; not a live trade signal.")}
         </p>
       )}
       {mockTradingMode && (

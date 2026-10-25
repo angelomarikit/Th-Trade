@@ -20,6 +20,8 @@ import { buildNearActiveView } from "./nearActive.js";
 import { scoreSetupQuality10 } from "./qualityScore10.js";
 import { evaluateRetest, type RetestPhase } from "./retest.js";
 import { setupScoreFromMatrix } from "./scoreFromMatrix.js";
+import { shapeSnapshotForLabEnter } from "./labEnterSnapshot.js";
+import { applyLabMockEnterDrill } from "./labMockEnter.js";
 import { assertEntryNotFromNewsAlone, decideSetupState } from "./stateMachine.js";
 import { buildIndicatorChecklist } from "./indicatorReadouts.js";
 import { describeEntryGeometry } from "./entryGeometry.js";
@@ -57,6 +59,8 @@ export interface EvaluateSetupInput {
   labMode?: boolean;
   /** Lab-only: apply RTH session + gate profile to off-hours SIP replay (acceptance testing). */
   mockRth?: boolean;
+  /** Lab + sim RTH: force ENTRY ACTIVE for mock paper trading (API `mockEnter=1`). */
+  mockEnter?: boolean;
 }
 
 export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
@@ -75,6 +79,10 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
           "Lab simulated RTH — last SIP snapshot replayed with regular-session rules (not live clock)",
       }
     : realSession;
+  let snapshot = input.snapshot;
+  if (input.mockEnter === true && simulateRth) {
+    snapshot = shapeSnapshotForLabEnter(snapshot, input.side, now);
+  }
   const profile = confirmationProfileForSession(session);
   let freshnessMax = profile.maxDataAgeMs;
   /** Preview lab: allow last session SIP snapshot through weekend/closed. */
@@ -83,8 +91,8 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     if (realSession.maxDataAgeMs === 0) freshnessMax = LAB_CLOSED_SESSION_MAX_AGE_MS;
     else freshnessMax = Math.max(freshnessMax, 300_000);
   }
-  let freshness = assessFreshness(input.snapshot, now, freshnessMax, realSession);
-  if (simulateRth && input.snapshot.bars5m.length >= 8) {
+  let freshness = assessFreshness(snapshot, now, freshnessMax, realSession);
+  if (simulateRth && snapshot.bars5m.length >= 8) {
     freshness = {
       ok: true,
       ageMs: freshness.ageMs,
@@ -92,8 +100,8 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       reason: "Simulated RTH — snapshot verified for lab gate drill",
     };
   }
-  const quoteOk = isQuoteUsableForEntry(input.snapshot, profile.maxSpreadPct);
-  const priceSource = resolvePriceSource(input.snapshot);
+  const quoteOk = isQuoteUsableForEntry(snapshot, profile.maxSpreadPct);
+  const priceSource = resolvePriceSource(snapshot);
   const referencePriceOnly = priceSource !== "quote_mid";
   if (
     !quoteOk &&
@@ -107,22 +115,22 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       ageMs: freshness.ageMs,
       maxAgeMs: freshness.maxAgeMs,
       reason: `${
-        describeQuoteBlock(input.snapshot, profile.maxSpreadPct) ??
+        describeQuoteBlock(snapshot, profile.maxSpreadPct) ??
         "Live bid/ask not trustworthy for entry"
       } — ENTER blocked; levels use last RTH bar as reference only.`,
     };
   }
-  const levels = deriveLevels(input.snapshot.bars5m, input.side, input.snapshot.lastPrice);
+  const levels = deriveLevels(snapshot.bars5m, input.side, snapshot.lastPrice);
 
   const breakout = analyzeBreakout({
     side: input.side,
-    bars5m: input.snapshot.bars5m,
+    bars5m: snapshot.bars5m,
     trigger: levels.trigger,
   });
 
   const retest = evaluateRetest({
     side: input.side,
-    bars5m: input.snapshot.bars5m,
+    bars5m: snapshot.bars5m,
     level: levels.trigger,
     previousPhase: input.previousRetestPhase,
     preferRetestModel: input.preferRetestModel ?? false,
@@ -130,7 +138,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
   const fakeWarnings = detectFakeBreakoutRisk({
     side: input.side,
-    bars5m: input.snapshot.bars5m,
+    bars5m: snapshot.bars5m,
     trigger: levels.trigger,
     rvol: input.relativeMomentum?.rvol ?? null,
     minRvol: profile.minRelativeVolume,
@@ -140,7 +148,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
 
   const built = buildSetupConditionMatrix({
     side: input.side,
-    snapshot: input.snapshot,
+    snapshot: snapshot,
     freshness,
     levels,
     whyMoving: input.whyMoving,
@@ -161,8 +169,8 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const structureInvalidated = wasNearOrActive && structureRow?.status === "FAIL";
   const stopBreached =
     input.side === "LONG"
-      ? input.snapshot.lastPrice < levels.stop
-      : input.snapshot.lastPrice > levels.stop;
+      ? snapshot.lastPrice < levels.stop
+      : snapshot.lastPrice > levels.stop;
   const fakeBreakoutInvalidated =
     wasNearOrActive &&
     fakeWarnings.some(
@@ -207,7 +215,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     state,
     matrix: built.matrix,
     levels,
-    lastPrice: input.snapshot.lastPrice,
+    lastPrice: snapshot.lastPrice,
     dataTimestamp: evaluatedAt,
     setupQualityScore: setupScore.total,
   });
@@ -216,24 +224,24 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const setupId = `${input.symbol.toUpperCase()}:${input.side}:${levels.trigger.toFixed(4)}`;
   const indicatorChecklist = buildIndicatorChecklist({
     side: input.side,
-    snapshot: input.snapshot,
+    snapshot: snapshot,
     levels,
     dataFresh: freshness.ok,
     minRvol: profile.minRelativeVolume,
   });
 
-  const liquidityMeta = evaluateLiquidity(input.snapshot.quote, profile.maxSpreadPct, {
+  const liquidityMeta = evaluateLiquidity(snapshot.quote, profile.maxSpreadPct, {
     maxQuoteAgeMs: profile.maxDataAgeMs,
     now,
   });
   const entryGeometry = describeEntryGeometry(
     input.side,
     levels,
-    input.snapshot.lastPrice,
+    snapshot.lastPrice,
     near.statusLabel,
   );
 
-  return {
+  let card: LiveSetupCard = {
     symbol: input.symbol.toUpperCase(),
     side: input.side,
     state,
@@ -264,9 +272,9 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       actionHint,
       entryModel: retest.model === "NONE" ? (breakout.mode === "CONFIRMED_CLOSE" ? "CONFIRMED_BREAKOUT" : "NONE") : retest.model,
     },
-    lastPrice: input.snapshot.lastPrice,
+    lastPrice: snapshot.lastPrice,
     lastCompletedBar: (() => {
-      const b = lastCompletedBar(input.snapshot.bars5m);
+      const b = lastCompletedBar(snapshot.bars5m);
       if (!b) return null;
       return {
         high: b.high,
@@ -279,7 +287,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     dataFresh: freshness.ok,
     dataFreshReason: (() => {
       const breakdown = buildMarketDataFreshnessBreakdown(
-        input.snapshot,
+        snapshot,
         freshness.ok,
         freshness.reason,
         now,
@@ -289,7 +297,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       return freshness.ok ? freshness.reason : breakdown.summary;
     })(),
     marketDataStatus: buildMarketDataFreshnessBreakdown(
-      input.snapshot,
+      snapshot,
       freshness.ok,
       freshness.reason,
       now,
@@ -328,6 +336,11 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
         ? "LAB TEST — not live RTH. Latest SIP snapshot for gate preview only; live ENTRY remains blocked."
         : undefined,
   };
+
+  if (input.mockEnter === true && simulateRth) {
+    card = applyLabMockEnterDrill(card);
+  }
+  return card;
 }
 
 function actionHintFor(

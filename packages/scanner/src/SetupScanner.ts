@@ -43,6 +43,8 @@ export interface ScanSetupRequest {
   labMode?: boolean;
   /** Lab + `mockRth=1`: RTH gate profile on SIP replay. */
   mockRth?: boolean;
+  /** Lab paper drill: synthetic ENTRY ACTIVE (`mockEnter=1` + sim RTH). */
+  mockEnter?: boolean;
 }
 
 export interface ScanSetupResult {
@@ -169,6 +171,7 @@ export class SetupScanner {
       previousState: request.previousState,
       labMode: request.labMode,
       mockRth: request.mockRth,
+      mockEnter: request.mockEnter,
       whyMoving: why,
       marketRegime: {
         status: regimeCtx.marketRegime.status,

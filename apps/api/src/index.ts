@@ -715,6 +715,10 @@ async function main() {
           url.searchParams.get("mockRth") === "1" ||
           url.searchParams.get("mockRth") === "true";
         const mockRth = wantMockRth && labMode;
+        const wantMockEnter =
+          url.searchParams.get("mockEnter") === "1" ||
+          url.searchParams.get("mockEnter") === "true";
+        const mockEnter = wantMockEnter && mockRth && labMode;
         const useFastSnapshot =
           url.searchParams.get("fast") === "1" || url.searchParams.get("fast") === "true";
         let card: Awaited<ReturnType<typeof scanner.scanWithJournal>>["card"];
@@ -760,6 +764,7 @@ async function main() {
             previousState: interactiveSetupState.get(stateKey),
             labMode,
             mockRth,
+            mockEnter,
           }));
           interactiveSetupState.set(stateKey, card.state);
         } else {
@@ -770,6 +775,7 @@ async function main() {
             previousState: interactiveSetupState.get(stateKey),
             labMode,
             mockRth,
+            mockEnter,
           }));
           interactiveSetupState.set(stateKey, card.state);
         }
@@ -934,6 +940,7 @@ async function main() {
             dataFreshReason: card.dataFreshReason ?? null,
             labMode: card.labMode ?? false,
             mockRth: card.mockRth ?? false,
+            mockEnter: card.mockEnter ?? false,
             labDisclaimer: card.labDisclaimer ?? null,
             marketDataStatus: card.marketDataStatus ?? null,
             evaluatedAt: card.evaluatedAt,

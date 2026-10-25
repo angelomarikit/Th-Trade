@@ -72,6 +72,8 @@ export interface LiveSetupCard {
   /** Preview lab: diagnostic scan outside RTH — not live entry permission. */
   labMode?: boolean;
   mockRth?: boolean;
+  /** Lab sim RTH + mockEnter=1: synthetic ENTRY ACTIVE for paper drill. */
+  mockEnter?: boolean;
   labDisclaimer?: string;
   setupId: string;
   session: {
