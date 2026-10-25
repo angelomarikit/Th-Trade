@@ -857,6 +857,8 @@ async function main() {
           entryExecutable: card.entryZone.executable,
           outcomeDetail: resolvedDetail,
           rewardToRisk: card.rewardToRisk,
+          /** Lab sim RTH: waive 2R SKIP so drills show WAIT/ENTER from other gates. */
+          minRewardToRisk: mockRth ? 0 : undefined,
         });
         if (labMode && !classifyUsEquitySession().isRegularHours) {
           if (mockRth) {

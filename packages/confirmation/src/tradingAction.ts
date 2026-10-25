@@ -60,6 +60,7 @@ export function deriveTradingAction(input: {
   if (!input.dataFresh || u.includes("DATA NOT VERIFIED")) return "WAIT";
   const minRr = input.minRewardToRisk ?? 2;
   if (
+    minRr > 0 &&
     input.rewardToRisk != null &&
     Number.isFinite(input.rewardToRisk) &&
     input.rewardToRisk > 0 &&

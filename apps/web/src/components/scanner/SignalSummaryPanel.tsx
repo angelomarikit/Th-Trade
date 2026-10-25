@@ -155,6 +155,17 @@ export function SignalSummaryPanel() {
         <p className="action-value">{heroActionValue}</p>
         <p className="action-label">{heroActionLabel}</p>
       </div>
+      {(lc.tradingAction === "SKIP" || status.includes("NO TRADE")) && (
+        <p className="disclaimer" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          {lc.watchingSummary ??
+            (rr != null && rr < 2
+              ? `SKIP: reward/risk to T1 is ${rr.toFixed(2)}R — Wulu requires ~2R minimum for live setups.`
+              : "Setup failed one or more gates (regime, volume, structure, etc.). Expand checklist below.")}
+          {data?.liveCard?.mockRth && rr != null && rr < 2
+            ? " Sim RTH lab waived the 2R auto-SKIP — action reflects other gates only."
+            : null}
+        </p>
+      )}
       {showMockBuyNow && !engineEnter ? (
         <p className="banner warn" role="status" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
           {labTestDataMode

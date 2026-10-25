@@ -28,6 +28,12 @@ describe("R:R below 2.0 => SKIP (Blueprint v1.3 Step 5)", () => {
     expect(deriveTradingAction({ ...base, rewardToRisk: 0 })).toBe("WAIT");
   });
 
+  it("minRewardToRisk 0 disables R:R SKIP (lab sim RTH)", () => {
+    expect(deriveTradingAction({ ...base, rewardToRisk: 0.14, minRewardToRisk: 0 })).toBe(
+      "WAIT",
+    );
+  });
+
   it("summary names the R:R reason", () => {
     const s = buildWatchingSummary({
       symbol: "NVDA",
