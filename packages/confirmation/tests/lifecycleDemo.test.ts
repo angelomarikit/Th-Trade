@@ -57,6 +57,7 @@ function tslaCard(partial: Partial<LiveSetupCard> & Pick<LiveSetupCard, "state">
     regime: null,
     historicalEdge: null,
     matchedStrategies: [{ strategyId: "ORB", strategyName: "Opening Range Breakout", family: "BREAKOUT", reason: "demo" }],
+    activeTechnique: null,
     options: null,
     relativeMomentum: null,
     indicatorChecklist: [],

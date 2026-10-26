@@ -52,7 +52,8 @@ describe("evaluateSetup", () => {
     expect(card.setupScore.disclaimer).toMatch(/NOT WIN PROBABILITY/);
     expect(card.regime).toBeNull();
     expect(card.historicalEdge).toBeNull();
-    expect(card.matchedStrategies).toEqual([]);
+    expect(card.matchedStrategies.length).toBeGreaterThan(0);
+    expect(card.activeTechnique?.strategyName).toBeTruthy();
     expect(card.options).toBeNull();
     expect(card.relativeMomentum).toBeNull();
   });

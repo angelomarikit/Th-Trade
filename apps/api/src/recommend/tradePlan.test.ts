@@ -76,6 +76,7 @@ function minimalCard(overrides: Partial<LiveSetupCard> = {}): LiveSetupCard {
       collapsedSummary: "58% over 12 samples",
     },
     matchedStrategies: [],
+    activeTechnique: null,
     options: null,
     relativeMomentum: null,
     indicatorChecklist: [],

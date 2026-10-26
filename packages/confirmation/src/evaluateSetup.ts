@@ -1,4 +1,6 @@
 import type { SetupState, TradeSide } from "@wulu/domain";
+import { loadConfirmationConfig } from "@wulu/domain";
+import { selectPrimaryTechnique } from "@wulu/strategies";
 import {
   assessFreshness,
   buildMarketDataFreshnessBreakdown,
@@ -13,8 +15,8 @@ import {
 } from "@wulu/market-data";
 import type { WhyMovingBlock } from "@wulu/news";
 import { analyzeBreakout } from "./breakoutAnalysis.js";
-import { buildSetupConditionMatrix, type AlignmentInput } from "./buildMatrix.js";
-import { deriveLevels } from "./deriveLevels.js";
+import { type AlignmentInput } from "./buildMatrix.js";
+import { buildTechniqueConditionMatrix } from "./buildTechniqueMatrix.js";
 import { detectFakeBreakoutRisk, worstFakeBreakoutSeverity } from "./fakeBreakout.js";
 import { buildNearActiveView } from "./nearActive.js";
 import { scoreSetupQuality10 } from "./qualityScore10.js";
@@ -91,7 +93,14 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   if (mockEnterActive) {
     snapshot = shapeSnapshotForLabEnter(snapshot, input.side, now);
   }
-  const profile = confirmationProfileForSession(session);
+  let profile = confirmationProfileForSession(session);
+  const confirmationConfig = loadConfirmationConfig();
+  profile = {
+    ...profile,
+    minRelativeVolume: confirmationConfig.minRelativeVolume,
+    minRewardToRisk: confirmationConfig.minRewardToRisk,
+    maxSpreadPct: confirmationConfig.maxSpreadPct,
+  };
   let freshnessMax = profile.maxDataAgeMs;
   /** Preview lab: allow last session SIP snapshot through weekend/closed. */
   const LAB_CLOSED_SESSION_MAX_AGE_MS = 96 * 60 * 60 * 1000;
@@ -128,7 +137,16 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       } — ENTER blocked; levels use last RTH bar as reference only.`,
     };
   }
-  const levels = deriveLevels(snapshot.bars5m, input.side, snapshot.lastPrice);
+  const technique = selectPrimaryTechnique({
+    symbol: input.symbol,
+    side: input.side,
+    snapshot,
+    now,
+    enabledFamilies: input.regimeInfo?.strategyGates ?? {},
+    regimePrimary: input.regimeInfo?.primary,
+    config: confirmationConfig,
+  });
+  const levels = technique.levels;
 
   const breakout = analyzeBreakout({
     side: input.side,
@@ -136,12 +154,15 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     trigger: levels.trigger,
   });
 
+  const preferRetest =
+    input.preferRetestModel ??
+    (technique.family === "breakoutRetest" || technique.strategyId.includes("BREAKOUT"));
   const retest = evaluateRetest({
     side: input.side,
     bars5m: snapshot.bars5m,
     level: levels.trigger,
     previousPhase: input.previousRetestPhase,
-    preferRetestModel: input.preferRetestModel ?? false,
+    preferRetestModel: preferRetest,
   });
 
   const fakeWarnings = detectFakeBreakoutRisk({
@@ -154,17 +175,24 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   });
   const falseBreakoutRisk = worstFakeBreakoutSeverity(fakeWarnings);
 
-  const built = buildSetupConditionMatrix({
-    side: input.side,
-    snapshot: snapshot,
-    freshness,
+  const built = buildTechniqueConditionMatrix({
+    technique,
     levels,
+    snapshot,
+    freshness,
     whyMoving: input.whyMoving,
-    marketRegime: input.marketRegime,
-    sectorAlignment: input.sectorAlignment,
     profile,
     evaluatedAt: now,
   });
+
+  const matchedFromTechnique: MatchedStrategyInfo[] = [
+    {
+      strategyId: technique.strategyId,
+      strategyName: technique.strategyName,
+      family: technique.family,
+      reason: technique.statusReason,
+    },
+  ];
 
   const prev = input.previousState;
   const wasNearOrActive =
@@ -323,7 +351,26 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
     },
     regime: input.regimeInfo ?? null,
     historicalEdge: input.historicalEdge ?? null,
-    matchedStrategies: input.matchedStrategies ?? [],
+    matchedStrategies: matchedFromTechnique,
+    activeTechnique: {
+      strategyId: technique.strategyId,
+      strategyName: technique.strategyName,
+      family: technique.family,
+      phase: technique.phase,
+      trendContext: technique.trendContext,
+      entryTriggerDescription: technique.entryTriggerDescription,
+      statusReason: technique.statusReason,
+      invalidationRules: technique.invalidationRules,
+      htfTrend: technique.htfTrend,
+      relevanceScore: technique.relevanceScore,
+      confirmations: built.matrix.rows.map((r) => ({
+        id: r.id,
+        label: r.label,
+        status: r.status,
+        reason: r.reason,
+        required: r.requiredForEntry,
+      })),
+    },
     options: input.options ?? null,
     indicatorChecklist,
     entryGeometry,

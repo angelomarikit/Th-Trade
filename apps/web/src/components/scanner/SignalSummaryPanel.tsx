@@ -204,6 +204,24 @@ export function SignalSummaryPanel() {
         <StatusBadge status={status} className="signal-status" />
       </div>
 
+      {lc.activeTechnique ? (
+        <div className="signal-technique panel-inset" style={{ marginTop: "0.65rem", fontSize: "0.88rem" }}>
+          <p style={{ margin: "0 0 0.25rem" }}>
+            <strong>{lc.activeTechnique.strategyName}</strong> · {lc.activeTechnique.phase}
+          </p>
+          <p className="muted" style={{ margin: 0 }}>
+            {lc.activeTechnique.entryTriggerDescription}
+          </p>
+          <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+            {lc.activeTechnique.trendContext}
+          </p>
+        </div>
+      ) : strat ? (
+        <p style={{ margin: "0.65rem 0 0", fontSize: "0.88rem" }}>
+          Strategy: <strong>{strat}</strong>
+        </p>
+      ) : null}
+
       <div className={`signal-action-hero signal-panel-hero-dup ${heroActionClass}`}>
         <p className="action-value">{heroActionValue}</p>
         <p className="action-label">{heroActionLabel}</p>
@@ -213,7 +231,7 @@ export function SignalSummaryPanel() {
           {lc.watchingSummary ??
             (rr != null && rr < 2
               ? `SKIP: reward/risk to T1 is ${rr.toFixed(2)}R — Wulu requires ~2R minimum for live setups.`
-              : "Setup failed one or more gates (regime, volume, structure, etc.). Expand checklist below.")}
+              : "Setup failed one or more technique confirmations. Expand checklist below.")}
           {data?.liveCard?.mockRth && rr != null && rr < 2
             ? " Sim RTH lab waived the 2R auto-SKIP — action reflects other gates only."
             : null}

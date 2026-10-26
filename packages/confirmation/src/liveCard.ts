@@ -88,6 +88,8 @@ export interface LiveSetupCard {
   /** Phase D — collapsed historical edge; never win probability */
   historicalEdge: HistoricalEdgeCardInfo | null;
   matchedStrategies: MatchedStrategyInfo[];
+  /** Strategy-first evaluation (levels + confirmations). */
+  activeTechnique: ActiveTechniqueView | null;
   /** Phase F — only populated when FEATURE_OPTIONS_ENGINE=true and ENTRY ACTIVE */
   options: OptionsCardInfo | null;
   /** Relative strength / momentum vs SPY, QQQ, sector — context only, not entry permission */
@@ -174,6 +176,28 @@ export interface MatchedStrategyInfo {
   strategyName: string;
   family: string;
   reason: string;
+}
+
+/** Primary technique driving levels, confirmations, and status copy. */
+export interface ActiveTechniqueView {
+  strategyId: string;
+  strategyName: string;
+  family: string;
+  phase: string;
+  trendContext: string;
+  entryTriggerDescription: string;
+  statusReason: string;
+  invalidationRules: string[];
+  htfTrend: string;
+  relevanceScore: number;
+  /** Technique-specific confirmation lines (mirror of matrix rows). */
+  confirmations: Array<{
+    id: string;
+    label: string;
+    status: string;
+    reason: string;
+    required: boolean;
+  }>;
 }
 
 export interface SignalIntelligenceInfo {

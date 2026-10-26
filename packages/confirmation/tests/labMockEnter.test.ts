@@ -74,6 +74,7 @@ function minimalWaitCard(): LiveSetupCard {
     regime: null,
     historicalEdge: null,
     matchedStrategies: [],
+    activeTechnique: null,
     options: null,
     relativeMomentum: null,
     indicatorChecklist: [],

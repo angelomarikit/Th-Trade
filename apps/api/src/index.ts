@@ -1059,6 +1059,7 @@ async function main() {
             marketRegime: card.regime?.primary ?? null,
             session: card.session,
             matchedStrategies: card.matchedStrategies,
+            activeTechnique: card.activeTechnique,
             historicalEdge: card.historicalEdge,
             options: card.options,
             nearActive: {

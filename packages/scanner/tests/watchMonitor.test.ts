@@ -98,6 +98,7 @@ function fakeCard(
     regime: null,
     historicalEdge: null,
     matchedStrategies: [],
+    activeTechnique: null,
     indicatorChecklist: [],
     options: null,
     relativeMomentum: {

@@ -3,8 +3,12 @@ import { fmtPrice } from "./format";
 import { normalizeStatus } from "../components/ui/StatusBadge";
 
 export function primaryStrategyName(lc: SetupLiveCard): string | null {
-  const m = lc.matchedStrategies?.[0];
-  return m?.strategyName ?? m?.strategyId ?? null;
+  return (
+    lc.activeTechnique?.strategyName ??
+    lc.matchedStrategies?.[0]?.strategyName ??
+    lc.matchedStrategies?.[0]?.strategyId ??
+    null
+  );
 }
 
 /** Plain-English assistant copy from the same setup card the chart uses. */
@@ -56,6 +60,14 @@ export function buildTradingBrief(input: {
 
   const strat = primaryStrategyName(lc);
   if (strat) lines.push(`Strategy: ${strat}.`);
+  if (lc.activeTechnique) {
+    lines.push(`Phase: ${lc.activeTechnique.phase} — ${lc.activeTechnique.statusReason}`);
+    lines.push(`Trigger: ${lc.activeTechnique.entryTriggerDescription}`);
+    lines.push(`Context: ${lc.activeTechnique.trendContext}`);
+    if (lc.activeTechnique.invalidationRules.length) {
+      lines.push(`Invalidation: ${lc.activeTechnique.invalidationRules[0]}`);
+    }
+  }
 
   if (status.includes("WAIT") && lc.nearActive?.distanceLabel) {
     lines.push(`Status: ${status} — ${lc.nearActive.distanceLabel.toLowerCase()}.`);

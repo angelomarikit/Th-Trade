@@ -3,3 +3,4 @@ export * from "./helpers.js";
 export * from "./definitions.js";
 export * from "./registry.js";
 export * from "./matchLive.js";
+export * from "./techniques/index.js";

@@ -5,6 +5,7 @@ export * from "./vwap.js";
 export * from "./liquidity.js";
 export * from "./deriveLevels.js";
 export * from "./buildMatrix.js";
+export * from "./buildTechniqueMatrix.js";
 export * from "./stateMachine.js";
 export * from "./nearActive.js";
 export * from "./scoreFromMatrix.js";

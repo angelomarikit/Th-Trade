@@ -168,6 +168,25 @@ export interface SetupLiveCard {
     family: string;
     reason: string;
   }>;
+  activeTechnique?: {
+    strategyId: string;
+    strategyName: string;
+    family: string;
+    phase: string;
+    trendContext: string;
+    entryTriggerDescription: string;
+    statusReason: string;
+    invalidationRules: string[];
+    htfTrend: string;
+    relevanceScore: number;
+    confirmations: Array<{
+      id: string;
+      label: string;
+      status: string;
+      reason: string;
+      required: boolean;
+    }>;
+  } | null;
   historicalEdge: SetupHistoricalEdge | null;
   options: {
     enabled: boolean;
