@@ -1,4 +1,6 @@
-import type { Bar } from "@wulu/market-data";
+import type { Bar, MarketSnapshot } from "@wulu/market-data";
+
+export type HtfBias = "BULLISH" | "BEARISH" | "RANGE" | "UNKNOWN";
 
 export function atrPct(bars5m: Bar[], period = 14): number | null {
   const c = bars5m.filter((b) => b.completed);
@@ -37,7 +39,24 @@ export function aggregateCloses(bars5m: Bar[], groupSize: number): number[] {
   return out;
 }
 
-export function htfTrend(bars5m: Bar[]): "BULLISH" | "BEARISH" | "RANGE" | "UNKNOWN" {
+export function trendFromCompletedBars(
+  bars: Bar[],
+  minCompleted = 4,
+  slopeThreshold = 0.003,
+): HtfBias {
+  const c = bars.filter((b) => b.completed);
+  if (c.length < minCompleted) return "UNKNOWN";
+  const first = c[0]!.close;
+  const last = c.at(-1)!.close;
+  if (!(first > 0)) return "UNKNOWN";
+  const slope = (last - first) / first;
+  if (slope > slopeThreshold) return "BULLISH";
+  if (slope < -slopeThreshold) return "BEARISH";
+  return "RANGE";
+}
+
+/** Legacy proxy: aggregate 5m when native HTF bars missing. */
+export function htfTrendFromAggregated5m(bars5m: Bar[]): HtfBias {
   const h1 = aggregateCloses(bars5m, 12);
   const m15 = aggregateCloses(bars5m, 3);
   const series = h1.length >= 4 ? h1 : m15.length >= 4 ? m15 : [];
@@ -48,6 +67,44 @@ export function htfTrend(bars5m: Bar[]): "BULLISH" | "BEARISH" | "RANGE" | "UNKN
   if (slope > 0.004) return "BULLISH";
   if (slope < -0.004) return "BEARISH";
   return "RANGE";
+}
+
+export function htfTrend(bars5m: Bar[]): HtfBias {
+  return htfTrendFromAggregated5m(bars5m);
+}
+
+export interface ResolvedHtf {
+  htf1h: HtfBias;
+  htf15m: HtfBias;
+  /** Best available primary trend (prefers native 1h). */
+  primary: HtfBias;
+  native1h: boolean;
+  native15m: boolean;
+}
+
+export function resolveHtfFromSnapshot(
+  snapshot: Pick<MarketSnapshot, "bars5m"> & {
+    bars15m?: Bar[];
+    bars1h?: Bar[];
+  },
+): ResolvedHtf {
+  const bars15m = snapshot.bars15m ?? [];
+  const bars1h = snapshot.bars1h ?? [];
+  const native1h = bars1h.length > 0;
+  const native15m = bars15m.length > 0;
+  const htf1h = native1h
+    ? trendFromCompletedBars(bars1h, 3, 0.004)
+    : htfTrendFromAggregated5m(snapshot.bars5m);
+  const htf15m = native15m
+    ? trendFromCompletedBars(bars15m, 4, 0.003)
+    : trendFromCompletedBars(snapshot.bars5m, 12, 0.002);
+  const primary =
+    native1h && htf1h !== "UNKNOWN"
+      ? htf1h
+      : native15m && htf15m !== "UNKNOWN"
+        ? htf15m
+        : htfTrendFromAggregated5m(snapshot.bars5m);
+  return { htf1h, htf15m, primary, native1h, native15m };
 }
 
 export function swingResistance(bars5m: Bar[]): number | null {

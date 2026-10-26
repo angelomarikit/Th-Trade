@@ -152,6 +152,27 @@ export class WatchMonitor {
     return SETUP_STATES.includes(raw as SetupState) ? (raw as SetupState) : undefined;
   }
 
+  previousRetestPhase(symbol: string): import("@wulu/confirmation").RetestPhase | undefined {
+    const phase = this.states.get(symbol.toUpperCase())?.retestPhase;
+    if (!phase || phase === "NONE") return undefined;
+    const allowed = [
+      "BROKE",
+      "WAITING_RETEST",
+      "RETESTING",
+      "RETEST_HELD",
+      "RETEST_FAILED",
+      "CONTINUATION_CONFIRMED",
+    ] as const;
+    return (allowed as readonly string[]).includes(phase)
+      ? (phase as import("@wulu/confirmation").RetestPhase)
+      : undefined;
+  }
+
+  previousRetestLevel(symbol: string): number | undefined {
+    const at = this.states.get(symbol.toUpperCase())?.alertAt;
+    return at != null && Number.isFinite(at) ? at : undefined;
+  }
+
   setWatchlist(items: MonitorSymbolConfig[]): MonitorSymbolConfig[] {
     const cleaned = normalizeConfigs(items).slice(0, this.maxSymbols);
     this.configs.clear();
@@ -695,13 +716,16 @@ export class MonitorHub {
 
           for (const { cfg, monitors } of pairMap.values()) {
           try {
-            const previousState = monitors[0]?.previousSetupState(cfg.symbol);
+            const lead = monitors[0];
+            const previousState = lead?.previousSetupState(cfg.symbol);
             const card = await this.scanner.scan({
               symbol: cfg.symbol,
               side: cfg.side,
-              recordJournal: false,
+              recordJournal: true,
               preloadedSnapshot: snapBySymbol.get(cfg.symbol.toUpperCase()),
               previousState,
+              previousRetestPhase: lead?.previousRetestPhase(cfg.symbol),
+              previousRetestLevel: lead?.previousRetestLevel(cfg.symbol),
             });
             for (const mon of monitors) {
               const evt = mon.applyCard(cfg, card, this.feed);

@@ -246,9 +246,12 @@ function TradePlanModal(props: { onClose: () => void; sessionToken: string | nul
                 <div>
                   <label>Win rate</label>
                   <strong>
-                    {plan.successRate.winRatePct != null
+                    {plan.successRate.showWinRatePct !== false &&
+                    plan.successRate.winRatePct != null
                       ? `${plan.successRate.winRatePct.toFixed(0)}%`
-                      : "—"}
+                      : plan.successRate.sampleSize > 0
+                        ? "Insufficient n"
+                        : "—"}
                   </strong>
                 </div>
                 <div>

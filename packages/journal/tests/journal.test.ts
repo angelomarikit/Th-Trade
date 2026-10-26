@@ -58,7 +58,8 @@ describe("Phase E signal journal", () => {
     expect(a.state).toBe("NEAR_ACTIVE");
     expect(b.state).toBe("DATA_NOT_VERIFIED");
     expect(journal.count()).toBe(2);
-    expect(a.features.schemaVersion).toBe(FEATURE_SCHEMA_VERSION);
+    expect(a!.features.schemaVersion).toBe(FEATURE_SCHEMA_VERSION);
+    expect(a!.calibration.evaluationId).toContain("TEST");
     expect(a.features.decisionAt).toBe(near.evaluatedAt);
     expect(a.outcome.status).toBe("NOT_APPLICABLE");
   });

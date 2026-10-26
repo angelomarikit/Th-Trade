@@ -9,6 +9,8 @@ function emptyMarketSnapshot(symbol: string): MarketSnapshot {
     quote: null,
     bars1m: [],
     bars5m: [],
+    bars15m: [],
+    bars1h: [],
     receivedAt: new Date(),
     marketTimestamp: null,
     priceSource: "unknown",

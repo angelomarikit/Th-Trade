@@ -1,17 +1,8 @@
 import { conservativeEntryPriceForRisk } from "@wulu/domain";
 import { longLevels, shortLevels } from "../helpers.js";
-import { htfTrend, openingRangeEt } from "./bars.js";
-import {
-  checkExtension,
-  checkFiveMinClose,
-  checkHtfRegime,
-  checkRiskReward,
-  checkRsi,
-  checkVolume,
-  checkVwapSide,
-  closesFromSnapshot,
-  mergeRrChecks,
-} from "./sharedChecks.js";
+import { openingRangeEt } from "./bars.js";
+import { htfForConfirmations } from "./htfForConfirmations.js";
+import { buildOrbConfirmations } from "./confirmations/orbConfirmations.js";
 import type { TechniqueContext, TechniqueEvaluation } from "./types.js";
 import { lastCompleted, toTradeLevels } from "./types.js";
 
@@ -31,8 +22,8 @@ export function evaluateOrb(ctx: TechniqueContext): TechniqueEvaluation | null {
   const last = lastCompleted(bars5m);
   if (!last) return null;
 
-  const htf = htfTrend(bars5m);
-  const closes = closesFromSnapshot(ctx.snapshot);
+  const htfPack = htfForConfirmations(ctx.snapshot);
+  const htf = htfPack.primary;
 
   const broke =
     ctx.side === "LONG" ? last.close > or.high : last.close < or.low;
@@ -55,27 +46,34 @@ export function evaluateOrb(ctx: TechniqueContext): TechniqueEvaluation | null {
   const levels = toTradeLevels(ctx.side, trigger, lv.stop, lv.target1, lv.target2);
   const entryForRr = conservativeEntryPriceForRisk(levels, ctx.snapshot.lastPrice);
 
-  const checks = [
-    checkHtfRegime(htf, ctx.side),
-    checkFiveMinClose(bars5m, ctx.side, trigger, ctx.config),
-    checkVolume(bars5m, ctx.config),
-    checkRsi(closes, ctx.side, ctx.config),
-    checkVwapSide(bars1m, bars5m, ctx.snapshot.lastPrice, ctx.side),
-    {
-      id: "STRUCTURE" as const,
-      status: broke ? ("PASS" as const) : ("WAITING" as const),
-      reason: broke
-        ? `ORB ${ctx.side === "LONG" ? "high" : "low"} ${trigger.toFixed(2)} broken on 5m close`
-        : `Approaching ORB ${ctx.side === "LONG" ? "high" : "low"} ${trigger.toFixed(2)}`,
-      requiredForEntry: true,
-    },
-    mergeRrChecks(
-      checkExtension(ctx.snapshot.lastPrice, trigger, bars5m, ctx.side, ctx.config),
-      checkRiskReward(entryForRr, levels.stop, levels.target1, ctx.config),
-    ),
-  ];
+  const structure = {
+    id: "STRUCTURE" as const,
+    status: broke ? ("PASS" as const) : ("WAITING" as const),
+    reason: broke
+      ? `ORB ${ctx.side === "LONG" ? "high" : "low"} ${trigger.toFixed(2)} broken on 5m close`
+      : `Approaching ORB ${ctx.side === "LONG" ? "high" : "low"} ${trigger.toFixed(2)}`,
+    requiredForEntry: true,
+  };
 
-  let score = broke ? 70 : 45;
+  const checks = buildOrbConfirmations({
+    side: ctx.side,
+    bars5m,
+    bars1m,
+    lastPrice: ctx.snapshot.lastPrice,
+    trigger,
+    orbMinutes: ctx.config.orbMinutes,
+    config: ctx.config,
+    htf1h: htfPack.htf1h,
+    htf15m: htfPack.htf15m,
+    native1h: htfPack.native1h,
+    native15m: htfPack.native15m,
+    entryForRr,
+    stop: levels.stop,
+    target1: levels.target1,
+    structure,
+  });
+
+  const score = broke ? 70 : 45;
 
   return {
     strategyId: ctx.side === "LONG" ? "ORB_LONG" : "ORB_SHORT",
@@ -92,7 +90,7 @@ export function evaluateOrb(ctx: TechniqueContext): TechniqueEvaluation | null {
         : `Close back inside opening range above ${or.low.toFixed(2)}`,
       `Stop ${levels.stop.toFixed(2)}`,
     ],
-    trendContext: `HTF: ${htf} · OR ${or.low.toFixed(2)}–${or.high.toFixed(2)} (${ctx.config.orbMinutes}m ET)`,
+    trendContext: `${htfPack.trendContextSuffix} · OR ${or.low.toFixed(2)}–${or.high.toFixed(2)} (${ctx.config.orbMinutes}m ET)`,
     entryTriggerDescription: `Break ${ctx.config.orbMinutes}m opening range ${ctx.side === "LONG" ? "high" : "low"} with 5m close`,
     statusReason: broke ? "ORB break — confirm volume and R:R" : "Near opening range — wait for 5m break close",
     htfTrend: htf,

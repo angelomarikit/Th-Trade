@@ -1,4 +1,5 @@
 import type { LiveSetupCard } from "@wulu/confirmation";
+import { deriveTradingAction } from "@wulu/confirmation";
 import {
   FEATURE_SCHEMA_VERSION,
   STRATEGY_DEFINITIONS_VERSION,
@@ -37,6 +38,13 @@ export interface FeatureSnapshotV1 {
   historicalEdgeExpectancyR: number | null;
   historicalEdgeSampleSize: number | null;
   historicalEdgeWinRatePct: number | null;
+  setupId: string;
+  tradingAction: string;
+  activeTechniqueStrategyName: string | null;
+  activeTechniquePhase: string | null;
+  retestPhase: string | null;
+  htf1hStatus: string | null;
+  htf15mStatus: string | null;
 }
 
 export function buildFeatureSnapshotV1(card: LiveSetupCard): FeatureSnapshotV1 {
@@ -74,6 +82,20 @@ export function buildFeatureSnapshotV1(card: LiveSetupCard): FeatureSnapshotV1 {
     historicalEdgeExpectancyR: card.historicalEdge?.expectancyR ?? null,
     historicalEdgeSampleSize: card.historicalEdge?.sampleSize ?? null,
     historicalEdgeWinRatePct: card.historicalEdge?.winRatePct ?? null,
+    setupId: card.setupId,
+    tradingAction: deriveTradingAction({
+      state: card.state,
+      statusLabel: card.statusLabel,
+      userStatus: card.statusLabel,
+      dataFresh: card.dataFresh,
+      entryExecutable: card.entryZone.executable,
+      rewardToRisk: card.rewardToRisk,
+    }),
+    activeTechniqueStrategyName: card.activeTechnique?.strategyName ?? null,
+    activeTechniquePhase: card.activeTechnique?.phase ?? null,
+    retestPhase: card.signalIntelligence?.retest.phase ?? null,
+    htf1hStatus: card.matrix.rows.find((r) => r.id === "HTF_1H")?.status ?? null,
+    htf15mStatus: card.matrix.rows.find((r) => r.id === "HTF_15M")?.status ?? null,
   };
 }
 

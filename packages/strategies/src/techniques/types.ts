@@ -1,6 +1,7 @@
 import type { ConditionId, ConditionStatus, TradeSide, TradeLevels } from "@wulu/domain";
 import type { ConfirmationConfig } from "@wulu/domain";
 import type { Bar, MarketSnapshot } from "@wulu/market-data";
+import type { HtfBias } from "./bars.js";
 
 export interface TechniqueCheck {
   id: ConditionId;
@@ -23,7 +24,7 @@ export interface TechniqueEvaluation {
   trendContext: string;
   entryTriggerDescription: string;
   statusReason: string;
-  htfTrend: "BULLISH" | "BEARISH" | "RANGE" | "UNKNOWN";
+  htfTrend: HtfBias;
 }
 
 export interface TechniqueContext {

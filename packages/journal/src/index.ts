@@ -6,3 +6,6 @@ export * from "./outcomeTracker.js";
 export * from "./SignalJournal.js";
 export * from "./analytics.js";
 export * from "./createJournal.js";
+export * from "./evaluationSnapshot.js";
+export * from "./evaluationPersistGate.js";
+export * from "./calibrationExport.js";

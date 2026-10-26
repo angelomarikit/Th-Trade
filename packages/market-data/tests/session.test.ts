@@ -39,6 +39,8 @@ describe("US equity session + RTH tightening", () => {
       },
       bars1m: [],
       bars5m: [],
+      bars15m: [],
+      bars1h: [],
       receivedAt: now,
       marketTimestamp: now,
     };

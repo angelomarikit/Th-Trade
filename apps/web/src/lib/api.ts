@@ -61,6 +61,7 @@ export interface TradePlanPayload {
     qualityScore10: number | null;
     qualityDisclaimer: string;
     headline: string;
+    showWinRatePct?: boolean;
   };
   briefSource: "rules" | "model";
   gatesPassed: Array<{ label: string; reason: string }>;

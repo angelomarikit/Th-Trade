@@ -5,6 +5,7 @@ import { barEffectiveEndTime, type MarketDataProvider, withAlpacaPriority } from
 import { normalizeTicker, type SetupScanner } from "@wulu/scanner";
 import { isWuluLabModeEnabled } from "../monitor/planCap.js";
 import type { PlanChartBar } from "../recommend/chartContextForPlan.js";
+import { writeSetupSessionMemory, type SetupSessionMemory } from "../setupSessionMemory.js";
 import { buildWuluPlanForCard } from "./buildWuluPlan.js";
 
 export async function handleWuluPlanPost(input: {
@@ -19,7 +20,7 @@ export async function handleWuluPlanPost(input: {
   scanner: SetupScanner;
   marketData: MarketDataProvider;
   outcomeTracker: SignalOutcomeTracker;
-  interactiveSetupState: Map<string, import("@wulu/domain").SetupState>;
+  interactiveSetupMemory: Map<string, SetupSessionMemory>;
   setupStateKey: (symbol: string, side: TradeSide) => string;
   json: (res: ServerResponse, code: number, payload: unknown) => void;
   res: ServerResponse;
@@ -37,7 +38,7 @@ export async function handleWuluPlanPost(input: {
   const rthBarsOnly = !labMode || mockRth;
 
   await withAlpacaPriority("interactive", async () => {
-    const [bars5m, quote] = await Promise.all([
+    const [bars5m, quote, bars15m, bars1h] = await Promise.all([
       input.marketData.getBars({
         symbol: sym,
         timeframe: "5Min",
@@ -45,6 +46,18 @@ export async function handleWuluPlanPost(input: {
         regularHoursOnly: rthBarsOnly,
       }),
       input.marketData.getQuote(sym),
+      input.marketData.getBars({
+        symbol: sym,
+        timeframe: "15Min",
+        limit: 32,
+        regularHoursOnly: rthBarsOnly,
+      }),
+      input.marketData.getBars({
+        symbol: sym,
+        timeframe: "1Hour",
+        limit: 24,
+        regularHoursOnly: rthBarsOnly,
+      }),
     ]);
     const lastBar = bars5m.at(-1);
     const lastPrice =
@@ -64,20 +77,25 @@ export async function handleWuluPlanPost(input: {
       quote,
       bars1m: bars1m.length ? bars1m : bars5m,
       bars5m,
+      bars15m,
+      bars1h,
       receivedAt: new Date(),
       marketTimestamp: quote?.timestamp ?? (last1m ? barEffectiveEndTime(last1m) : null),
     };
     const stateKey = input.setupStateKey(sym, side);
+    const mem = input.interactiveSetupMemory.get(stateKey);
     const { card } = await input.scanner.scanWithJournal({
       symbol: sym,
       side,
       preloadedSnapshot: snapshot,
-      previousState: input.interactiveSetupState.get(stateKey),
+      previousState: mem?.state,
+      previousRetestPhase: mem?.retestPhase,
+      previousRetestLevel: mem?.retestLevel,
       labMode,
       mockRth,
       mockEnter,
     });
-    input.interactiveSetupState.set(stateKey, card.state);
+    writeSetupSessionMemory(input.interactiveSetupMemory, stateKey, card);
 
     const clientBars = input.body.chart?.bars?.filter((b) => Number.isFinite(b.close)) ?? [];
     const chart =

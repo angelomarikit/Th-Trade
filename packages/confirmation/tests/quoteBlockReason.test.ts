@@ -8,6 +8,8 @@ function snap(bid: number, ask: number): MarketSnapshot {
     quote: { symbol: "MU", bid, ask, timestamp: new Date() },
     bars1m: [],
     bars5m: [],
+    bars15m: [],
+    bars1h: [],
     receivedAt: new Date(),
     marketTimestamp: new Date(),
   } as MarketSnapshot;

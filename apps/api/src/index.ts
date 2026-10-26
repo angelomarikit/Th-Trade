@@ -86,6 +86,7 @@ import { buildAutomaticSignal, buildSetupSnapshot } from "./recommend/fromCard.j
 import { openAiConfigured } from "./recommend/openaiEnv.js";
 import { buildWuluPlanForCard } from "./wuluPlan/buildWuluPlan.js";
 import { handleWuluPlanPost } from "./wuluPlan/handleWuluPlanRequest.js";
+import { writeSetupSessionMemory, type SetupSessionMemory } from "./setupSessionMemory.js";
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -120,8 +121,8 @@ const setupResponseCache = new Map<string, { at: number; payload: unknown }>();
 const setupInflight = new Map<string, Promise<unknown>>();
 /** Coalesce poll storms — identical setup GETs share one Alpaca scan. */
 const SETUP_CACHE_MS = 12_000;
-/** Per-symbol setup lifecycle for MISSED / INVALIDATED on interactive /v1/setup polls. */
-const interactiveSetupState = new Map<string, SetupState>();
+/** Per-symbol setup lifecycle + retest phase on interactive /v1/setup polls. */
+const interactiveSetupMemory = new Map<string, SetupSessionMemory>();
 
 function setupStateKey(symbol: string, side: TradeSide): string {
   return `${symbol.toUpperCase()}:${side}`;
@@ -704,7 +705,7 @@ async function main() {
             scanner,
             marketData,
             outcomeTracker,
-            interactiveSetupState,
+            interactiveSetupMemory,
             setupStateKey,
             json,
             res,
@@ -794,7 +795,7 @@ async function main() {
         if (useFastSnapshot || labMode) {
           const bars5mLimit = useFastSnapshot ? 45 : labMode ? 120 : 45;
           const bars1mLimit = useFastSnapshot ? 30 : labMode ? 120 : 30;
-          const [bars5m, quote] = await Promise.all([
+          const [bars5m, quote, bars15m, bars1h] = await Promise.all([
             marketData.getBars({
               symbol: sym,
               timeframe: "5Min",
@@ -802,6 +803,18 @@ async function main() {
               regularHoursOnly: rthBarsOnly,
             }),
             marketData.getQuote(sym),
+            marketData.getBars({
+              symbol: sym,
+              timeframe: "15Min",
+              limit: useFastSnapshot ? 24 : 32,
+              regularHoursOnly: rthBarsOnly,
+            }),
+            marketData.getBars({
+              symbol: sym,
+              timeframe: "1Hour",
+              limit: 24,
+              regularHoursOnly: rthBarsOnly,
+            }),
           ]);
           const lastBar = bars5m.at(-1);
           const lastPrice =
@@ -830,6 +843,8 @@ async function main() {
             quote,
             bars1m: bars1m.length ? bars1m : bars5m,
             bars5m,
+            bars15m,
+            bars1h,
             receivedAt: new Date(),
             marketTimestamp:
               quote?.timestamp ?? (last1m ? barEffectiveEndTime(last1m) : null),
@@ -842,27 +857,33 @@ async function main() {
             };
           }
           const stateKey = setupStateKey(sym, side);
+          const mem = interactiveSetupMemory.get(stateKey);
           ({ card, journalEntry } = await scanner.scanWithJournal({
             symbol: sym,
             side,
             preloadedSnapshot: snapshot,
-            previousState: interactiveSetupState.get(stateKey),
+            previousState: mem?.state,
+            previousRetestPhase: mem?.retestPhase,
+            previousRetestLevel: mem?.retestLevel,
             labMode,
             mockRth,
             mockEnter,
           }));
-          interactiveSetupState.set(stateKey, card.state);
+          writeSetupSessionMemory(interactiveSetupMemory, stateKey, card);
         } else {
           const stateKey = setupStateKey(sym, side);
+          const mem = interactiveSetupMemory.get(stateKey);
           ({ card, journalEntry } = await scanner.scanWithJournal({
             symbol: sym,
             side,
-            previousState: interactiveSetupState.get(stateKey),
+            previousState: mem?.state,
+            previousRetestPhase: mem?.retestPhase,
+            previousRetestLevel: mem?.retestLevel,
             labMode,
             mockRth,
             mockEnter,
           }));
-          interactiveSetupState.set(stateKey, card.state);
+          writeSetupSessionMemory(interactiveSetupMemory, stateKey, card);
         }
 
         const verifiedRaw = process.env.VERIFIED_ACCOUNT_VALUE;
@@ -1843,17 +1864,57 @@ async function main() {
           analytics: summarizeJournal(entries),
           entries: entries.map((e) => ({
             id: e.id,
+            evaluationId: e.calibration?.evaluationId ?? null,
             decisionAt: e.decisionAt,
             symbol: e.symbol,
             side: e.side,
             state: e.state,
             strategyId: e.strategyId,
+            strategyName: e.calibration?.activeTechnique?.strategyName ?? e.strategyName,
+            tradingAction: e.calibration?.tradingAction ?? null,
+            retestPhase: e.calibration?.retest?.phase ?? null,
             setupScore: e.setupScore,
             marketRegime: e.marketRegime,
             hasCatalyst: e.hasCatalyst,
             outcome: e.outcome,
             featureSchemaVersion: e.featureSchemaVersion,
+            calibrationSchemaVersion: e.calibration?.schemaVersion ?? null,
           })),
+        });
+      }
+
+      if (url.pathname === "/v1/journal/calibration/export" && req.method === "GET") {
+        if (!journal) {
+          return json(res, 503, { error: "journal not enabled" });
+        }
+        const symbol = url.searchParams.get("symbol") ?? undefined;
+        const from = url.searchParams.get("from") ?? undefined;
+        const to = url.searchParams.get("to") ?? undefined;
+        const limit = Number(url.searchParams.get("limit") ?? 5000);
+        const formatParam = (url.searchParams.get("format") ?? "json").toLowerCase();
+        const format = formatParam === "csv" ? "csv" : "json";
+        const entries = journal.list({
+          symbol,
+          from,
+          to,
+          limit: Number.isFinite(limit) ? limit : 5000,
+        });
+        const body = journal.exportCalibration(
+          { symbol, from, to, limit: Number.isFinite(limit) ? limit : 5000 },
+          format,
+        );
+        if (format === "csv") {
+          res.writeHead(200, {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": `attachment; filename="wulu-calibration-${new Date().toISOString().slice(0, 10)}.csv"`,
+            "Access-Control-Allow-Origin": corsOrigin === "*" ? "*" : corsOrigin,
+          });
+          res.end(body);
+          return;
+        }
+        return json(res, 200, {
+          count: entries.length,
+          rows: journal.exportCalibrationRows({ symbol, from, to, limit: Number.isFinite(limit) ? limit : 5000 }),
         });
       }
 

@@ -35,6 +35,10 @@ export interface MarketSnapshot {
   quote: Quote | null;
   bars1m: Bar[];
   bars5m: Bar[];
+  /** Native 15-minute RTH bars when provider fetched them. */
+  bars15m: Bar[];
+  /** Native 1-hour RTH bars when provider fetched them. */
+  bars1h: Bar[];
   /** When this snapshot was assembled locally */
   receivedAt: Date;
   /** Latest upstream market timestamp observed */

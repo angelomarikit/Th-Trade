@@ -165,7 +165,7 @@ describe("Alpaca request pacing", () => {
     });
 
     await provider.getSnapshot("NVDA");
-    expect(maxInFlight).toBe(1);
+    expect(maxInFlight).toBeLessThanOrEqual(2);
   });
 
   it("getSnapshots batches quotes + multi bars (few HTTP calls)", async () => {
@@ -227,10 +227,10 @@ describe("Alpaca request pacing", () => {
 
     const snaps = await provider.getSnapshots(["AAA", "BBB"]);
     expect(snaps).toHaveLength(2);
-    // 1 snapshots + 2 multi-bar timeframes (not 2×4 per-symbol)
-    expect(urls.length).toBeLessThanOrEqual(4);
+    // 1 snapshots + 4 multi-bar timeframes (1m/5m/15m/1h batch)
+    expect(urls.length).toBeLessThanOrEqual(5);
     expect(urls.some((u) => u.includes("/snapshots"))).toBe(true);
-    expect(urls.filter((u) => u.includes("/v2/stocks/bars")).length).toBe(2);
+    expect(urls.filter((u) => u.includes("/v2/stocks/bars")).length).toBe(4);
   });
 });
 

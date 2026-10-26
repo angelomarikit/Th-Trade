@@ -1,6 +1,6 @@
 import type { SetupState, TradeSide } from "@wulu/domain";
 import { loadConfirmationConfig } from "@wulu/domain";
-import { selectPrimaryTechnique } from "@wulu/strategies";
+import { selectPrimaryTechnique, syncBreakoutRetestTechnique } from "@wulu/strategies";
 import {
   assessFreshness,
   buildMarketDataFreshnessBreakdown,
@@ -45,6 +45,8 @@ export interface EvaluateSetupInput {
   whyMoving: WhyMovingBlock;
   previousState?: SetupState;
   previousRetestPhase?: RetestPhase;
+  /** Prior trigger level — retest memory clears when trigger drifts >0.5%. */
+  previousRetestLevel?: number;
   preferRetestModel?: boolean;
   now?: Date;
   marketRegime?: AlignmentInput;
@@ -137,7 +139,7 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
       } — ENTER blocked; levels use last RTH bar as reference only.`,
     };
   }
-  const technique = selectPrimaryTechnique({
+  let technique = selectPrimaryTechnique({
     symbol: input.symbol,
     side: input.side,
     snapshot,
@@ -157,13 +159,25 @@ export function evaluateSetup(input: EvaluateSetupInput): LiveSetupCard {
   const preferRetest =
     input.preferRetestModel ??
     (technique.family === "breakoutRetest" || technique.strategyId.includes("BREAKOUT"));
+
+  let previousRetestPhase = input.previousRetestPhase;
+  if (
+    input.previousRetestLevel != null &&
+    levels.trigger > 0 &&
+    Math.abs(levels.trigger - input.previousRetestLevel) / input.previousRetestLevel > 0.005
+  ) {
+    previousRetestPhase = undefined;
+  }
+
   const retest = evaluateRetest({
     side: input.side,
     bars5m: snapshot.bars5m,
     level: levels.trigger,
-    previousPhase: input.previousRetestPhase,
+    previousPhase: previousRetestPhase,
     preferRetestModel: preferRetest,
   });
+
+  technique = syncBreakoutRetestTechnique(technique, retest);
 
   const fakeWarnings = detectFakeBreakoutRisk({
     side: input.side,

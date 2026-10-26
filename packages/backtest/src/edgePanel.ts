@@ -4,6 +4,9 @@ import type { WalkForwardReport } from "./walkForward.js";
 export const HISTORICAL_EDGE_DISCLAIMER =
   "Historical win rate is NOT the probability that the current trade will win. Past setups ≠ future outcome.";
 
+/** Align with WULU Plan — do not quote win % below this sample size. */
+export const MIN_HISTORICAL_WIN_RATE_SAMPLE = 5;
+
 export interface HistoricalEdgePanel {
   strategyId: string;
   strategyName: string;
@@ -94,7 +97,13 @@ function pickBestRegime(m: EdgeMetrics): string | null {
 }
 
 function formatCollapsed(p: HistoricalEdgePanel): string {
-  const wr = p.winRatePct != null ? `${p.winRatePct.toFixed(1)}%` : "—";
+  const showWr =
+    p.sampleSize >= MIN_HISTORICAL_WIN_RATE_SAMPLE && p.winRatePct != null;
+  const wr = showWr
+    ? `${p.winRatePct!.toFixed(1)}%`
+    : p.sampleSize > 0
+      ? "WR withheld (low n)"
+      : "—";
   const exp = p.expectancyR != null ? `${p.expectancyR >= 0 ? "+" : ""}${p.expectancyR.toFixed(2)}R` : "—";
   return `${p.strategyName} | n=${p.sampleSize} | WR ${wr} | Exp ${exp}`;
 }
@@ -104,7 +113,13 @@ export function formatHistoricalEdgeText(panel: HistoricalEdgePanel): string {
     "HISTORICAL EDGE",
     `Strategy: ${panel.strategyName}`,
     `Historical sample: ${panel.sampleSize} setups`,
-    `Win rate: ${panel.winRatePct != null ? panel.winRatePct.toFixed(1) + "%" : "—"}`,
+    `Win rate: ${
+      panel.sampleSize >= MIN_HISTORICAL_WIN_RATE_SAMPLE && panel.winRatePct != null
+        ? panel.winRatePct.toFixed(1) + "%"
+        : panel.sampleSize > 0
+          ? "withheld (insufficient sample)"
+          : "—"
+    }`,
     `Average winner: ${fmtR(panel.averageWinnerR)}`,
     `Average loser: ${fmtR(panel.averageLoserR)}`,
     `Expectancy: ${fmtR(panel.expectancyR)}`,

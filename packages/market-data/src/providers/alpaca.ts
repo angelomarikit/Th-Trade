@@ -168,6 +168,10 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         : await this.getLatestTrade(sym);
     const bars1m = await this.getBars({ symbol: sym, timeframe: "1Min", limit: 120, regularHoursOnly: true });
     const bars5m = await this.getBars({ symbol: sym, timeframe: "5Min", limit: 78, regularHoursOnly: true });
+    const [bars15m, bars1h] = await Promise.all([
+      this.getBars({ symbol: sym, timeframe: "15Min", limit: 32, regularHoursOnly: true }),
+      this.getBars({ symbol: sym, timeframe: "1Hour", limit: 24, regularHoursOnly: true }),
+    ]);
 
     const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
     const completed5 = bars5m.filter((b) => b.completed).at(-1) ?? lastBar;
@@ -202,6 +206,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       quote,
       bars1m,
       bars5m,
+      bars15m,
+      bars1h,
       receivedAt: new Date(),
       marketTimestamp,
       priceSource,
@@ -269,12 +275,18 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
     const bars1mBy = await this.getMultiBars(unique, "1Min", 120, true);
     const bars5mBy = await this.getMultiBars(unique, "5Min", 78, true);
+    const [bars15mBy, bars1hBy] = await Promise.all([
+      this.getMultiBars(unique, "15Min", 32, true),
+      this.getMultiBars(unique, "1Hour", 24, true),
+    ]);
 
     const out: MarketSnapshot[] = [];
     for (const sym of unique) {
       const meta = quoteBySymbol.get(sym);
       const bars1m = bars1mBy.get(sym) ?? [];
       const bars5m = bars5mBy.get(sym) ?? [];
+      const bars15m = bars15mBy.get(sym) ?? [];
+      const bars1h = bars1hBy.get(sym) ?? [];
       const lastBar = bars1m.at(-1) ?? bars5m.at(-1);
       const lastPrice = meta?.lastPrice ?? lastBar?.close ?? 0;
       if (!(lastPrice > 0)) continue;
@@ -284,6 +296,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
         quote: meta?.quote ?? null,
         bars1m,
         bars5m,
+        bars15m,
+        bars1h,
         receivedAt: now,
         marketTimestamp:
           meta?.quote?.timestamp ??

@@ -168,7 +168,10 @@ export function BelowChartTabs() {
               <div className="metric-grid">
                 <div>
                   <label>Strategy</label>
-                  <strong>{lc.historicalEdge.strategyName}</strong>
+                  <strong>
+                    {lc.activeTechnique?.strategyName ??
+                      lc.historicalEdge.strategyName}
+                  </strong>
                 </div>
                 <div>
                   <label>Sample</label>
@@ -181,9 +184,12 @@ export function BelowChartTabs() {
                 <div>
                   <label>Win %</label>
                   <strong>
-                    {lc.historicalEdge.winRatePct != null
+                    {lc.historicalEdge.sampleSize >= 5 &&
+                    lc.historicalEdge.winRatePct != null
                       ? `${lc.historicalEdge.winRatePct.toFixed(0)}%`
-                      : "—"}
+                      : lc.historicalEdge.sampleSize > 0
+                        ? "Insufficient n"
+                        : "—"}
                   </strong>
                 </div>
                 <div>

@@ -3,31 +3,36 @@ import { buildClientChartRead } from "./clientChartRead";
 import { effectiveTradingAction } from "./effectiveTradingAction";
 import { buildTradePlaybook } from "./tradePlaybook";
 
+const MIN_HISTORICAL_WIN_RATE_SAMPLE = 5;
+
 function successRateFromLiveCard(lc: SetupLiveCard): TradePlanPayload["successRate"] {
   const edge = lc.historicalEdge;
   const sample = edge?.sampleSize ?? 0;
-  const win =
+  const rawWin =
     sample > 0 && edge?.winRatePct != null && Number.isFinite(edge.winRatePct)
       ? edge.winRatePct
       : null;
+  const showWinRatePct = sample >= MIN_HISTORICAL_WIN_RATE_SAMPLE && rawWin != null;
+  const winRatePct = showWinRatePct ? rawWin : null;
   let headline: string;
-  if (win != null && sample >= 5) {
-    headline = `Historical win rate ${win.toFixed(0)}% (${sample} similar setups)`;
-  } else if (win != null && sample > 0) {
-    headline = `Early sample: ${win.toFixed(0)}% win (${sample} setups — low confidence)`;
+  if (showWinRatePct && rawWin != null) {
+    headline = `Historical win rate ${rawWin.toFixed(0)}% (${sample} similar setups)`;
+  } else if (sample > 0 && sample < MIN_HISTORICAL_WIN_RATE_SAMPLE) {
+    headline = `Insufficient historical sample (n=${sample}) — win rate not shown until n≥${MIN_HISTORICAL_WIN_RATE_SAMPLE}`;
   } else {
     headline = "No matched historical sample for this pattern yet";
   }
   return {
-    winRatePct: win,
+    winRatePct,
     sampleSize: sample,
-    strategyName: edge?.strategyName ?? null,
+    strategyName: lc.activeTechnique?.strategyName ?? edge?.strategyName ?? null,
     expectancyR: edge?.expectancyR ?? null,
     qualityScore10: lc.qualityScore10 ?? null,
     qualityDisclaimer:
       lc.qualityScore10Disclaimer ??
-      "Quality score is setup strength (1–10), not win probability. Gates still decide ENTER.",
+      "Quality score is setup strength (1–10), not win probability. Confirmations still decide ENTER.",
     headline,
+    showWinRatePct,
   };
 }
 

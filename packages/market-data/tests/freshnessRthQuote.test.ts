@@ -12,6 +12,8 @@ function snap(partial: Partial<MarketSnapshot>): MarketSnapshot {
     quote: null,
     bars1m: [],
     bars5m: [],
+    bars15m: [],
+    bars1h: [],
     receivedAt: RTH,
     marketTimestamp: RTH,
     ...partial,

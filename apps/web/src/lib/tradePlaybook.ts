@@ -38,8 +38,11 @@ export function buildTradePlaybook(input: {
       ? `${fmtPrice(lc.entryZone.low)}–${fmtPrice(lc.entryZone.high)}`
       : "—";
 
-  let whyThisZone = geo ?? "";
-  if (!whyThisZone && dist) {
+  const tech = lc.activeTechnique;
+  let whyThisZone = tech
+    ? `${tech.strategyName} (${tech.phase}): ${tech.entryTriggerDescription} ${tech.statusReason}`
+    : geo ?? "";
+  if (!tech && !whyThisZone && dist) {
     whyThisZone = `${side} thesis at trigger ${fmtPrice(lc.alertAt)} — price is ${dist.toLowerCase()}.`;
   }
   if (!whyThisZone) {
@@ -65,11 +68,12 @@ export function buildTradePlaybook(input: {
       doNow = "Stand aside — stop/structure invalidation. Do not re-enter this setup without a fresh scan.";
       break;
     default:
-      doNow =
-        blocking[0]?.reason ??
-        lc.waitingFor?.[0] ??
-        lc.watchingSummary ??
-        `Wait — required gates not all PASS (${passed.length}/${rows.length || "—"}).`;
+      doNow = tech
+        ? `WAIT — ${tech.strategyName} (${tech.phase}). ${tech.statusReason} ${blocking[0]?.reason ?? lc.waitingFor?.[0] ?? ""}`.trim()
+        : blocking[0]?.reason ??
+          lc.waitingFor?.[0] ??
+          lc.watchingSummary ??
+          `Wait — required gates not all PASS (${passed.length}/${rows.length || "—"}).`;
   }
 
   if (lc.labMockEnterAuthorizedSide && lc.labMockEnterAuthorizedSide !== side) {

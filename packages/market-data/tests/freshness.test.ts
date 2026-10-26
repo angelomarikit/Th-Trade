@@ -27,6 +27,8 @@ describe("assessFreshness bar timing", () => {
       quote: null,
       bars1m: [bar],
       bars5m: [],
+      bars15m: [],
+      bars1h: [],
       receivedAt: now,
       marketTimestamp: barOpen,
     };

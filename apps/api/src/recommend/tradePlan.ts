@@ -1,5 +1,5 @@
 import type { LiveSetupCard } from "@wulu/confirmation";
-import type { TradeSide } from "@wulu/domain";
+import { buildTradePlanSuccessRate, type TradeSide } from "@wulu/domain";
 import { readOpenAiApiKey, readOpenAiModel } from "./openaiEnv.js";
 import { openAiConfigured } from "./openaiEnv.js";
 import { signalFromCard } from "./fromCard.js";
@@ -13,6 +13,7 @@ export interface TradePlanSuccessRate {
   qualityScore10: number | null;
   qualityDisclaimer: string;
   headline: string;
+  showWinRatePct: boolean;
 }
 
 export interface TradePlanSections {
@@ -38,30 +39,30 @@ export interface TradePlanPayload {
 
 function successRateFromCard(card: LiveSetupCard): TradePlanSuccessRate {
   const edge = card.historicalEdge;
-  const q = card.qualityScore10;
-  const sample = edge?.sampleSize ?? 0;
-  const win =
-    sample > 0 && edge?.winRatePct != null && Number.isFinite(edge.winRatePct)
-      ? edge.winRatePct
-      : null;
-  let headline: string;
-  if (win != null && sample >= 5) {
-    headline = `Historical win rate ${win.toFixed(0)}% (${sample} similar setups)`;
-  } else if (win != null && sample > 0) {
-    headline = `Early sample: ${win.toFixed(0)}% win (${sample} setups — low confidence)`;
-  } else {
-    headline = "No matched historical sample for this pattern yet";
-  }
-  return {
-    winRatePct: win,
-    sampleSize: sample,
-    strategyName: edge?.strategyName ?? null,
+  return buildTradePlanSuccessRate({
+    sampleSize: edge?.sampleSize ?? 0,
+    winRatePct: edge?.winRatePct,
     expectancyR: edge?.expectancyR ?? null,
-    qualityScore10: q?.score ?? null,
-    qualityDisclaimer:
-      q?.disclaimer ??
-      "Quality score is setup strength (1–10), not win probability. Gates still decide ENTER.",
-    headline,
+    edgeStrategyName: edge?.strategyName ?? null,
+    activeStrategyName: card.activeTechnique?.strategyName ?? null,
+    qualityScore10: card.qualityScore10?.score ?? null,
+    qualityDisclaimer: card.qualityScore10?.disclaimer ?? null,
+  });
+}
+
+function activeTechniqueForPlan(card: LiveSetupCard): Record<string, unknown> | null {
+  const t = card.activeTechnique;
+  if (!t) return null;
+  return {
+    strategyId: t.strategyId,
+    strategyName: t.strategyName,
+    family: t.family,
+    phase: t.phase,
+    trendContext: t.trendContext,
+    entryTriggerDescription: t.entryTriggerDescription,
+    statusReason: t.statusReason,
+    invalidationRules: t.invalidationRules,
+    requiredConfirmations: t.confirmations.filter((c) => c.required),
   };
 }
 
@@ -88,23 +89,39 @@ function buildFallbackSections(input: {
   const { card, side, action, tradingAction } = input;
   const zone = `${card.entryZone.low.toFixed(2)}–${card.entryZone.high.toFixed(2)}`;
   const geo = card.entryGeometry?.summary;
-  const whyThisZone =
-    geo ??
-    `${side} setup at trigger ${card.alertAt.toFixed(2)}; entry zone ${zone}. Last ${card.lastPrice.toFixed(2)}.`;
+  const tech = card.activeTechnique;
+  const whyThisZone = tech
+    ? `${tech.strategyName} (${tech.phase}): ${tech.entryTriggerDescription} Trigger ${card.alertAt.toFixed(2)}; zone ${zone}. ${tech.statusReason}`
+    : geo ??
+      `${side} setup at trigger ${card.alertAt.toFixed(2)}; entry zone ${zone}. Last ${card.lastPrice.toFixed(2)}.`;
+
+  const { blocking } = gateRows(card);
+  const blockText =
+    blocking.length > 0
+      ? blocking.map((b) => `${b.label}: ${b.reason}`).join("; ")
+      : "All required confirmations PASS";
 
   let whatToDoNow: string;
   switch (tradingAction) {
     case "ENTER":
-      whatToDoNow = `Engine: ENTER ${side}. Plan entry ${zone}, stop ${card.stop.toFixed(2)}, T1 ${card.target1.toFixed(2)}. Signal recommendation: ${action}. Size manually — no auto orders.`;
+      whatToDoNow = tech
+        ? `Engine: ENTER ${side} on ${tech.strategyName} — all required confirmations passed. Entry ${zone}, stop ${card.stop.toFixed(2)}, T1 ${card.target1.toFixed(2)}. Signal: ${action}. No auto orders.`
+        : `Engine: ENTER ${side}. Plan entry ${zone}, stop ${card.stop.toFixed(2)}, T1 ${card.target1.toFixed(2)}. Signal recommendation: ${action}. Size manually — no auto orders.`;
       break;
     case "SKIP":
-      whatToDoNow = "Do not chase — skip this signal and wait for a fresh evaluation.";
+      whatToDoNow = tech
+        ? `SKIP — ${tech.strategyName}: ${tech.statusReason} Blocking: ${blockText}`
+        : "Do not chase — skip this signal and wait for a fresh evaluation.";
       break;
     case "INVALIDATED":
-      whatToDoNow = "Stand aside — structure or stop logic invalidated this setup.";
+      whatToDoNow = tech
+        ? `INVALIDATED — ${tech.strategyName}. ${tech.invalidationRules[0] ?? tech.statusReason}`
+        : "Stand aside — structure or stop logic invalidated this setup.";
       break;
     default:
-      whatToDoNow = `Wait — ${card.nearActive.stillWaitingFor.slice(0, 3).join("; ") || "required gates not all PASS"}. Signal: ${action}.`;
+      whatToDoNow = tech
+        ? `WAIT — ${tech.strategyName} (${tech.phase}). ${tech.statusReason} Still need: ${blockText}. Signal: ${action}.`
+        : `Wait — ${card.nearActive.stillWaitingFor.slice(0, 3).join("; ") || blockText}. Signal: ${action}.`;
   }
 
   const catalyst = card.whyMoving.catalystLabel?.trim();
@@ -114,8 +131,7 @@ function buildFallbackSections(input: {
       ? `${catalyst ?? ""}${why && why !== catalyst ? (catalyst ? " — " : "") + why : ""}. News is context only — never authorizes entry alone.`
       : "No fresh catalyst in the news payload.";
 
-  const { blocking } = gateRows(card);
-  const gatesAndNews = `${blocking.length ? `Blocking: ${blocking.map((b) => b.label).join(", ")}.` : "All required gates PASS."} ${newsBit}`;
+  const gatesAndNews = `${blocking.length ? `Blocking: ${blocking.map((b) => b.label).join(", ")}.` : "All required confirmations PASS."} ${newsBit}`;
 
   const risks = [
     card.dataFresh ? "Data verified for this evaluation." : "Data not verified — fail closed.",
@@ -131,7 +147,9 @@ function buildFallbackSections(input: {
     gatesAndNews,
     chartRead: "Chart context not available in rules mode.",
     risks,
-    outlook: `${card.statusLabel} · ${action} bias · ${card.session?.session ?? "session unknown"}. Follow gates, not narrative alone.`,
+    outlook: tech
+      ? `${card.statusLabel} · ${tech.strategyName} · ${action} · ${card.session?.session ?? "session unknown"}. Follow engine confirmations, not narrative alone.`
+      : `${card.statusLabel} · ${action} bias · ${card.session?.session ?? "session unknown"}. Follow gates, not narrative alone.`,
   };
 }
 
@@ -175,6 +193,10 @@ export async function buildTradePlan(input: {
       successRateHeadline: successRate.headline,
       winRatePct: successRate.winRatePct,
       sampleSize: successRate.sampleSize,
+      showWinRatePct: successRate.showWinRatePct,
+      activeTechnique: activeTechniqueForPlan(card),
+      gatesPassed: gates.passed,
+      gatesBlocking: gates.blocking,
       chartContext: chartContext ?? null,
       relativeMomentum: card.relativeMomentum,
       indicatorChecklist: card.indicatorChecklist?.map((r) => ({
@@ -223,9 +245,12 @@ async function narrateTradePlanSections(input: {
 
   const system = `You are WULU desk — explain trade plans from scanner + chart context JSON.
 Rules:
+- activeTechnique (when present) is the authoritative strategy: use its strategyName, phase, statusReason, entryTriggerDescription, and requiredConfirmations. Do NOT invent a different strategy or entry thesis.
 - Use ONLY fields in scannerSetup (including chartContext when present). Do not invent prices, news, or win-rate percentages.
-- winRatePct and successRateHeadline are authoritative; do not change numbers.
+- If showWinRatePct is false, do not quote a win-rate percentage; use successRateHeadline verbatim.
+- winRatePct and successRateHeadline are authoritative when showWinRatePct is true; do not change numbers.
 - tradingAction and action are fixed — never upgrade WAIT to ENTER.
+- whatToDoNow must match tradingAction and cite the same blocking confirmations as gatesBlocking in scannerSetup when WAIT/SKIP.
 - News never alone justifies entry.
 - chartRead must describe structure from chartContext (trend, VWAP side, zone vs price, recent bars). If chartContext.barCount is 0, say chart data was not attached.
 - Respond with one JSON object (no markdown):

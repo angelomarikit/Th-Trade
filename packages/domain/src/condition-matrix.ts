@@ -1,6 +1,8 @@
 export const CONDITION_IDS = [
   "MARKET_REGIME",
   "SECTOR_ALIGNMENT",
+  "HTF_1H",
+  "HTF_15M",
   "RELATIVE_VOLUME",
   "VWAP",
   "STRUCTURE",
@@ -37,6 +39,8 @@ export interface ConditionMatrix {
 export const CONDITION_LABELS: Record<ConditionId, string> = {
   MARKET_REGIME: "MARKET REGIME",
   SECTOR_ALIGNMENT: "SECTOR ALIGNMENT",
+  HTF_1H: "1H TREND",
+  HTF_15M: "15M TREND",
   RELATIVE_VOLUME: "RELATIVE VOLUME",
   VWAP: "VWAP",
   STRUCTURE: "STRUCTURE",

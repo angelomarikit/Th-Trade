@@ -24,6 +24,8 @@ function snapshot(bars5m: Bar[], lastPrice: number): MarketSnapshot {
     quote: { symbol: "TSLA", bid: lastPrice - 0.05, ask: lastPrice + 0.05, timestamp: new Date() },
     bars1m: [],
     bars5m,
+    bars15m: [],
+    bars1h: [],
     receivedAt: new Date("2026-10-26T14:45:00.000Z"),
     marketTimestamp: bars5m.at(-1)?.timestamp ?? null,
     priceSource: "quote_mid",

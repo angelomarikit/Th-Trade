@@ -93,8 +93,49 @@ describe("buildTradePlan", () => {
       withModel: false,
     });
     expect(plan.successRate.winRatePct).toBe(58);
+    expect(plan.successRate.showWinRatePct).toBe(true);
     expect(plan.successRate.sampleSize).toBe(12);
     expect(plan.sections.whatToDoNow).toMatch(/WAIT/i);
     expect(plan.gatesBlocking.some((g) => g.label === "RVOL")).toBe(true);
+  });
+
+  it("suppresses win rate when historical sample is below minimum", async () => {
+    const plan = await buildTradePlan({
+      card: minimalCard({
+        historicalEdge: {
+          strategyId: "x",
+          strategyName: "Breakout retest",
+          sampleSize: 1,
+          winRatePct: 100,
+          averageWinnerR: 2,
+          averageLoserR: -1,
+          expectancyR: 2,
+          profitFactor: null,
+          maxDrawdownR: null,
+          bestRegime: null,
+          disclaimer: "Historical context only.",
+          collapsedSummary: "n=1",
+        },
+        activeTechnique: {
+          strategyId: "breakout_retest",
+          strategyName: "Breakout + Retest",
+          family: "breakout",
+          phase: "RETEST",
+          trendContext: "bull",
+          entryTriggerDescription: "5m close above breakout level",
+          statusReason: "Wick touched trigger; close did not confirm.",
+          invalidationRules: ["Close below level"],
+          confirmations: [],
+        },
+      }),
+      side: "LONG",
+      tradingAction: "WAIT",
+      withModel: false,
+    });
+    expect(plan.successRate.winRatePct).toBeNull();
+    expect(plan.successRate.showWinRatePct).toBe(false);
+    expect(plan.successRate.headline).toMatch(/Insufficient historical sample/i);
+    expect(plan.successRate.strategyName).toBe("Breakout + Retest");
+    expect(plan.sections.whyThisZone).toMatch(/Breakout \+ Retest/i);
   });
 });

@@ -1,4 +1,9 @@
-import { evaluateSetup, type LiveSetupCard, type OptionsCardInfo } from "@wulu/confirmation";
+import {
+  evaluateSetup,
+  type LiveSetupCard,
+  type OptionsCardInfo,
+  type RetestPhase,
+} from "@wulu/confirmation";
 import type { SetupState, TradeSide } from "@wulu/domain";
 import type { MarketDataProvider, MarketSnapshot } from "@wulu/market-data";
 import {
@@ -39,6 +44,8 @@ export interface ScanSetupRequest {
   skipOptions?: boolean;
   /** Prior lifecycle state — enables MISSED / INVALIDATED transitions on monitor ticks. */
   previousState?: SetupState;
+  previousRetestPhase?: RetestPhase;
+  previousRetestLevel?: number;
   /** Preview lab scan (API `lab=1` only). */
   labMode?: boolean;
   /** Lab + `mockRth=1`: RTH gate profile on SIP replay. */
@@ -169,6 +176,8 @@ export class SetupScanner {
       side: request.side,
       snapshot,
       previousState: request.previousState,
+      previousRetestPhase: request.previousRetestPhase,
+      previousRetestLevel: request.previousRetestLevel,
       labMode: request.labMode,
       mockRth: request.mockRth,
       mockEnter: request.mockEnter,

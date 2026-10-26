@@ -2,21 +2,14 @@ import { conservativeEntryPriceForRisk } from "@wulu/domain";
 import { longLevels, shortLevels } from "../helpers.js";
 import {
   breakBarVolumeRatio,
-  htfTrend,
   swingResistance,
   swingSupport,
 } from "./bars.js";
+import { htfForConfirmations } from "./htfForConfirmations.js";
 import {
-  checkExtension,
-  checkFiveMinClose,
-  checkHtfRegime,
-  checkRiskReward,
-  checkRsi,
-  checkVolume,
-  checkVwapSide,
-  closesFromSnapshot,
-  mergeRrChecks,
-} from "./sharedChecks.js";
+  buildBreakoutRetestConfirmations,
+  closesFrom5m,
+} from "./confirmations/breakoutRetestConfirmations.js";
 import type { TechniqueContext, TechniqueEvaluation } from "./types.js";
 import { lastCompleted, toTradeLevels } from "./types.js";
 
@@ -30,8 +23,9 @@ export function evaluateBreakoutRetest(ctx: TechniqueContext): TechniqueEvaluati
   const last = lastCompleted(bars5m);
   if (!last) return null;
 
-  const htf = htfTrend(bars5m);
-  const closes = closesFromSnapshot(ctx.snapshot);
+  const htfPack = htfForConfirmations(ctx.snapshot);
+  const htf = htfPack.primary;
+  const closes = closesFrom5m(ctx.snapshot);
   const breakVol = breakBarVolumeRatio(bars5m, level, ctx.side);
 
   let phase = "WATCHING";
@@ -62,32 +56,40 @@ export function evaluateBreakoutRetest(ctx: TechniqueContext): TechniqueEvaluati
 
   const entryForRr = conservativeEntryPriceForRisk(levels, ctx.snapshot.lastPrice);
 
-  const checks = [
-    checkHtfRegime(htf, ctx.side),
-    checkFiveMinClose(bars5m, ctx.side, level, ctx.config),
-    checkVolume(bars5m, ctx.config, breakVol),
-    checkRsi(closes, ctx.side, ctx.config),
-    {
-      id: "STRUCTURE" as const,
-      status:
-        failedHold
-          ? ("FAIL" as const)
-          : broke
-            ? ("PASS" as const)
-            : ("WAITING" as const),
-      reason: failedHold
-        ? `Failed hold: wick beyond ${level.toFixed(2)} but close ${last.close.toFixed(2)} back inside`
+  const structure = {
+    id: "STRUCTURE" as const,
+    status:
+      failedHold
+        ? ("FAIL" as const)
         : broke
-          ? `Structure: ${ctx.side === "LONG" ? "break" : "breakdown"} vs ${level.toFixed(2)} observed`
-          : `Waiting for ${ctx.side === "LONG" ? "break above" : "break below"} ${level.toFixed(2)}`,
-      requiredForEntry: true,
-    },
-    checkVwapSide(ctx.snapshot.bars1m, bars5m, ctx.snapshot.lastPrice, ctx.side),
-    mergeRrChecks(
-      checkExtension(ctx.snapshot.lastPrice, level, bars5m, ctx.side, ctx.config),
-      checkRiskReward(entryForRr, levels.stop, levels.target1, ctx.config),
-    ),
-  ];
+          ? ("PASS" as const)
+          : ("WAITING" as const),
+    reason: failedHold
+      ? `Failed hold: wick beyond ${level.toFixed(2)} but close ${last.close.toFixed(2)} back inside`
+      : broke
+        ? `Structure: ${ctx.side === "LONG" ? "break" : "breakdown"} vs ${level.toFixed(2)} observed`
+        : `Waiting for ${ctx.side === "LONG" ? "break above" : "break below"} ${level.toFixed(2)}`,
+    requiredForEntry: true,
+  };
+
+  const checks = buildBreakoutRetestConfirmations({
+    side: ctx.side,
+    bars5m,
+    bars1m: ctx.snapshot.bars1m,
+    lastPrice: ctx.snapshot.lastPrice,
+    level,
+    config: ctx.config,
+    htf1h: htfPack.htf1h,
+    htf15m: htfPack.htf15m,
+    native1h: htfPack.native1h,
+    native15m: htfPack.native15m,
+    closes,
+    breakVol,
+    entryForRr,
+    stop: levels.stop,
+    target1: levels.target1,
+    structure,
+  });
 
   let score = 35;
   if (phase === "NEAR_LEVEL" || phase === "RETESTING") score += 25;
@@ -117,7 +119,7 @@ export function evaluateBreakoutRetest(ctx: TechniqueContext): TechniqueEvaluati
         : `5m close back above ${level.toFixed(2)} after breakdown`,
       `Stop below ${levels.stop.toFixed(2)} (structural)`,
     ],
-    trendContext: `HTF (aggregated 5m): ${htf}`,
+    trendContext: htfPack.trendContextSuffix,
     entryTriggerDescription: `Trigger ${level.toFixed(2)} — completed 5m close + retest hold when Model B active`,
     statusReason,
     htfTrend: htf,

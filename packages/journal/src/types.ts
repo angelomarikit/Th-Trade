@@ -1,5 +1,6 @@
 import type { SetupState, TradeSide } from "@wulu/domain";
 import type { FeatureSnapshotV1 } from "./featureSnapshot.js";
+import type { EvaluationCalibrationV1 } from "./evaluationSnapshot.js";
 
 export interface SignalOutcome {
   status: "OPEN" | "CLOSED" | "EXPIRED" | "NOT_APPLICABLE";
@@ -43,6 +44,8 @@ export interface JournalEntry {
   payload: unknown;
   /** Leakage-safe features for future ML research */
   features: FeatureSnapshotV1;
+  /** Strategy-first calibration row for RTH replay / stakeholder export */
+  calibration: EvaluationCalibrationV1;
   outcome: SignalOutcome;
 }
 

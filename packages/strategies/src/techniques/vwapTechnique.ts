@@ -1,17 +1,7 @@
 import { conservativeEntryPriceForRisk } from "@wulu/domain";
 import { vwap, longLevels, shortLevels } from "../helpers.js";
-import { htfTrend } from "./bars.js";
-import {
-  checkExtension,
-  checkFiveMinClose,
-  checkHtfRegime,
-  checkRiskReward,
-  checkRsi,
-  checkVolume,
-  checkVwapSide,
-  closesFromSnapshot,
-  mergeRrChecks,
-} from "./sharedChecks.js";
+import { htfForConfirmations } from "./htfForConfirmations.js";
+import { buildVwapConfirmations } from "./confirmations/vwapConfirmations.js";
 import type { TechniqueContext, TechniqueEvaluation } from "./types.js";
 import { lastCompleted, toTradeLevels } from "./types.js";
 
@@ -29,8 +19,8 @@ export function evaluateVwapReclaimRejection(ctx: TechniqueContext): TechniqueEv
 
   const prev = completed.at(-2)!;
   const last = lastCompleted(bars5m) ?? completed.at(-1)!;
-  const htf = htfTrend(bars5m);
-  const closes = closesFromSnapshot(ctx.snapshot);
+  const htfPack = htfForConfirmations(ctx.snapshot);
+  const htf = htfPack.primary;
 
   const reclaim =
     ctx.side === "LONG" && prev.close < v && last.close > v;
@@ -59,28 +49,43 @@ export function evaluateVwapReclaimRejection(ctx: TechniqueContext): TechniqueEv
 
   const entryForRr = conservativeEntryPriceForRisk(levels, ctx.snapshot.lastPrice);
 
-  const checks = [
-    checkHtfRegime(htf, ctx.side),
-    checkFiveMinClose(bars5m, ctx.side, v, ctx.config),
-    checkVolume(bars5m, ctx.config),
-    checkRsi(closes, ctx.side, ctx.config),
-    checkVwapSide(bars1m, bars5m, ctx.snapshot.lastPrice, ctx.side),
-    {
-      id: "STRUCTURE" as const,
-      status: reclaim || rejection ? ("PASS" as const) : holding ? ("WAITING" as const) : ("WAITING" as const),
-      reason:
-        reclaim
-          ? `VWAP reclaim: prior close below, last close above ${v.toFixed(2)}`
-          : rejection
-            ? `VWAP rejection: prior close above, last close below ${v.toFixed(2)}`
-            : `Waiting for VWAP ${ctx.side === "LONG" ? "reclaim" : "rejection"} cross on 5m`,
-      requiredForEntry: true,
-    },
-    mergeRrChecks(
-      checkExtension(ctx.snapshot.lastPrice, v, bars5m, ctx.side, ctx.config),
-      checkRiskReward(entryForRr, levels.stop, levels.target1, ctx.config),
-    ),
-  ];
+  const structure = {
+    id: "STRUCTURE" as const,
+    status: reclaim || rejection ? ("PASS" as const) : ("WAITING" as const),
+    reason:
+      reclaim
+        ? `VWAP reclaim: prior close below, last close above ${v.toFixed(2)}`
+        : rejection
+          ? `VWAP rejection: prior close above, last close below ${v.toFixed(2)}`
+          : `Waiting for VWAP ${ctx.side === "LONG" ? "reclaim" : "rejection"} cross on 5m`,
+    requiredForEntry: true,
+  };
+
+  const vwapHold = {
+    id: "VWAP" as const,
+    status: holding ? ("PASS" as const) : ("WAITING" as const),
+    reason: holding
+      ? `Price holding ${ctx.side === "LONG" ? "above" : "below"} session VWAP ${v.toFixed(2)}`
+      : `Need ${ctx.side === "LONG" ? "hold above" : "hold below"} VWAP ${v.toFixed(2)}`,
+    requiredForEntry: true,
+  };
+
+  const checks = buildVwapConfirmations({
+    side: ctx.side,
+    bars5m,
+    lastPrice: ctx.snapshot.lastPrice,
+    vwap: v,
+    config: ctx.config,
+    htf1h: htfPack.htf1h,
+    htf15m: htfPack.htf15m,
+    native1h: htfPack.native1h,
+    native15m: htfPack.native15m,
+    entryForRr,
+    stop: levels.stop,
+    target1: levels.target1,
+    structure,
+    vwapHold,
+  });
 
   let score = 30;
   if (reclaim || rejection) score += 35;
@@ -102,7 +107,7 @@ export function evaluateVwapReclaimRejection(ctx: TechniqueContext): TechniqueEv
         : `Close back above VWAP ${v.toFixed(2)}`,
       `Structural stop ${levels.stop.toFixed(2)}`,
     ],
-    trendContext: `HTF: ${htf} · VWAP ${v.toFixed(2)}`,
+    trendContext: `${htfPack.trendContextSuffix} · VWAP ${v.toFixed(2)}`,
     entryTriggerDescription: `${ctx.side === "LONG" ? "Reclaim" : "Reject"} VWAP with completed 5m close`,
     statusReason:
       reclaim || rejection

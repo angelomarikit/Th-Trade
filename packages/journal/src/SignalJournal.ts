@@ -5,6 +5,13 @@ import {
   assertNoFeatureLeakage,
   buildFeatureSnapshotV1,
 } from "./featureSnapshot.js";
+import { buildEvaluationCalibrationV1 } from "./evaluationSnapshot.js";
+import { EvaluationPersistGate } from "./evaluationPersistGate.js";
+import {
+  calibrationRowsFromEntries,
+  calibrationToCsv,
+  calibrationToJson,
+} from "./calibrationExport.js";
 import { trackOutcomeFromBars } from "./outcomeTracker.js";
 import type { JournalEntry, JournalQuery, JournalStore, SignalOutcome } from "./types.js";
 import {
@@ -14,19 +21,19 @@ import {
 } from "./versions.js";
 
 export class SignalJournal {
+  private readonly evaluationGate = new EvaluationPersistGate();
+
   constructor(private readonly store: JournalStore) {}
 
   /**
-   * Record EVERY evaluated setup (WAIT, NEAR ACTIVE, ENTRY ACTIVE, MISSED, etc.).
+   * Record evaluated setups when state, 5m bar, retest, or technique phase changes.
    */
-  record(card: LiveSetupCard): JournalEntry {
-    const latest = this.store
-      .list({ symbol: card.symbol, limit: 30 })
-      .find((entry) => entry.side === card.side);
-    if (latest && latest.state === card.state && isRoutineJournalState(card.state)) {
-      return latest;
+  record(card: LiveSetupCard): JournalEntry | null {
+    if (!this.evaluationGate.shouldRecord(card)) {
+      return null;
     }
     const features = buildFeatureSnapshotV1(card);
+    const calibration = buildEvaluationCalibrationV1(card);
     assertNoFeatureLeakage(features, card.evaluatedAt);
 
     const primaryStrategy = card.matchedStrategies[0] ?? null;
@@ -61,9 +68,13 @@ export class SignalJournal {
         regime: card.regime,
         historicalEdge: card.historicalEdge,
         matchedStrategies: card.matchedStrategies,
+        activeTechnique: card.activeTechnique,
+        signalIntelligence: card.signalIntelligence,
         setupScore: card.setupScore,
+        setupId: card.setupId,
       },
       features,
+      calibration,
       outcome: initialOutcome(card.state),
     };
 
@@ -115,6 +126,23 @@ export class SignalJournal {
   }
 
   /** Export feature rows for research — outcomes joined separately to avoid accidental leakage. */
+  exportCalibration(query?: JournalQuery, format: "json" | "csv" = "json"): string {
+    const entries = this.store.list({ ...query, limit: query?.limit ?? 10_000 });
+    const rows = calibrationRowsFromEntries(entries);
+    return format === "csv" ? calibrationToCsv(rows) : calibrationToJson(rows);
+  }
+
+  exportCalibrationRows(query?: JournalQuery) {
+    return calibrationRowsFromEntries(
+      this.store.list({ ...query, limit: query?.limit ?? 10_000 }),
+    );
+  }
+
+  /** @internal test helper */
+  resetEvaluationGate(): void {
+    this.evaluationGate.reset();
+  }
+
   exportFeatureRows(query?: JournalQuery): Array<{
     id: string;
     features: JournalEntry["features"];
@@ -157,10 +185,6 @@ function initialOutcome(state: LiveSetupCard["state"]): SignalOutcome {
     exitReason: "NONE",
     labeledAt: new Date().toISOString(),
   };
-}
-
-function isRoutineJournalState(state: string): boolean {
-  return state === "DATA_NOT_VERIFIED" || state === "WAIT" || state === "NO_TRADE";
 }
 
 function makeId(card: LiveSetupCard): string {

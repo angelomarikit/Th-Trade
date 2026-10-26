@@ -36,7 +36,10 @@ export class MockMarketDataProvider implements MarketDataProvider {
     limit?: number;
   }): Promise<Bar[]> {
     const snap = await this.getSnapshot(query.symbol);
-    return query.timeframe === "5Min" ? snap.bars5m : snap.bars1m;
+    if (query.timeframe === "5Min") return snap.bars5m;
+    if (query.timeframe === "15Min") return snap.bars15m;
+    if (query.timeframe === "1Hour") return snap.bars1h;
+    return snap.bars1m;
   }
 
   async getSnapshot(symbol: string): Promise<MarketSnapshot> {
@@ -56,6 +59,8 @@ export class MockMarketDataProvider implements MarketDataProvider {
       24,
       !(this.scenario.incompleteFiveMin ?? false),
     );
+    const bars15m = buildBars(sym, "15Min", base, above, highVol, now, 16, true);
+    const bars1h = buildBars(sym, "1Hour", base, above, highVol, now, 12, true);
 
     if (this.scenario.incompleteFiveMin && bars5m.length) {
       const last = bars5m[bars5m.length - 1]!;
@@ -82,6 +87,8 @@ export class MockMarketDataProvider implements MarketDataProvider {
       quote,
       bars1m,
       bars5m,
+      bars15m,
+      bars1h,
       receivedAt: now,
       marketTimestamp: quoteTs,
     };
@@ -133,7 +140,14 @@ function buildBars(
   count: number,
   allCompleted: boolean,
 ): Bar[] {
-  const tfMs = timeframe === "5Min" ? 300_000 : 60_000;
+  const tfMs =
+    timeframe === "1Hour"
+      ? 3_600_000
+      : timeframe === "15Min"
+        ? 900_000
+        : timeframe === "5Min"
+          ? 300_000
+          : 60_000;
   const bars: Bar[] = [];
   const drift = aboveVwap ? 0.15 : -0.15;
 
