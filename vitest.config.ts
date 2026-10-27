@@ -8,6 +8,7 @@ export default defineConfig({
       "@wulu/news": path.resolve(__dirname, "packages/news/src/index.ts"),
       "@wulu/market-data": path.resolve(__dirname, "packages/market-data/src/index.ts"),
       "@wulu/regime": path.resolve(__dirname, "packages/regime/src/index.ts"),
+      "@wulu/actionable": path.resolve(__dirname, "packages/actionable/src/index.ts"),
       "@wulu/strategies": path.resolve(__dirname, "packages/strategies/src/index.ts"),
       "@wulu/backtest": path.resolve(__dirname, "packages/backtest/src/index.ts"),
       "@wulu/confirmation": path.resolve(__dirname, "packages/confirmation/src/index.ts"),

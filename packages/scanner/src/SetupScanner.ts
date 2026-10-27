@@ -5,7 +5,7 @@ import {
   type RetestPhase,
 } from "@wulu/confirmation";
 import type { SetupState, TradeSide } from "@wulu/domain";
-import type { MarketDataProvider, MarketSnapshot } from "@wulu/market-data";
+import { resolveAlpacaFeed, type MarketDataProvider, type MarketSnapshot } from "@wulu/market-data";
 import {
   buildWhyMoving,
   emptyWhyMoving,
@@ -161,7 +161,7 @@ export class SetupScanner {
       edge ??
       this.tryFallbackEdge(symbol, bars, request.side, regimeCtx.regime.primary, why.hasVerifiedCatalyst);
 
-    const feed = process.env.ALPACA_DATA_FEED ?? "iex";
+    const feed = resolveAlpacaFeed();
     const relativeMomentum = buildRelativeMomentum({
       symbolSnapshot: snapshot,
       spy: regimeCtx.spy,
@@ -442,7 +442,7 @@ export class SetupScanner {
     }
 
     return {
-      feed: process.env.ALPACA_DATA_FEED ?? "iex",
+      feed: resolveAlpacaFeed(),
       universeSize: universe.length,
       scanned: snaps.length,
       elapsedMs: Date.now() - started,
@@ -483,7 +483,7 @@ export class SetupScanner {
             qqq: ctx.qqq ?? qqq,
             sectorEtf: ctx.sectorEtf,
             sector: ctx.sector,
-            feed: process.env.ALPACA_DATA_FEED ?? "iex",
+            feed: resolveAlpacaFeed(),
           }),
         });
       } catch {

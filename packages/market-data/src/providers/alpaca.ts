@@ -3,6 +3,7 @@ import type { Bar, DiscoverySnapshot, MarketSnapshot, Quote } from "../types.js"
 import { loadAlpacaCredentials } from "../credentials.js";
 import { barEffectiveEndTime } from "../freshness.js";
 import { isRegularSessionBarStart } from "../regularSession.js";
+import { resolveAlpacaFeed, type AlpacaStockFeed } from "../alpacaFeed.js";
 import {
   fetchAlpacaWithRetry,
   gateOptsFromEnv,
@@ -15,8 +16,8 @@ export interface AlpacaMarketDataConfig {
   apiSecretKey: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
-  /** iex is common on free/paper data; sip if entitled */
-  feed?: "iex" | "sip";
+  /** Consolidated SIP when entitled (default). Use iex only when explicitly configured. */
+  feed?: AlpacaStockFeed;
   /** Override shared process gate (tests). */
   requestGate?: AlpacaRequestGate;
   maxRetries?: number;
@@ -50,7 +51,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
   readonly name = "alpaca";
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
-  private readonly feed: "iex" | "sip";
+  readonly activeFeed: AlpacaStockFeed;
   private readonly gate: AlpacaRequestGate;
   private readonly maxRetries: number;
 
@@ -67,14 +68,14 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
     }
     this.baseUrl = (config.baseUrl ?? "https://data.alpaca.markets").replace(/\/$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
-    this.feed = config.feed ?? "iex";
+    this.activeFeed = config.feed ?? resolveAlpacaFeed();
     const envOpts = gateOptsFromEnv();
     this.gate = config.requestGate ?? getSharedAlpacaGate(envOpts);
     this.maxRetries = config.maxRetries ?? envOpts.maxRetries ?? 4;
   }
 
   async getQuote(symbol: string): Promise<Quote | null> {
-    const url = `${this.baseUrl}/v2/stocks/${encodeURIComponent(symbol)}/quotes/latest?feed=${this.feed}`;
+    const url = `${this.baseUrl}/v2/stocks/${encodeURIComponent(symbol)}/quotes/latest?feed=${this.activeFeed}`;
     const data = await this.getJson<{ quote?: AlpacaQuote }>(url);
     const q = data.quote;
     if (!q || q.bp == null || q.ap == null || !q.t) return null;
@@ -91,7 +92,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
   }
 
   async getLatestTrade(symbol: string): Promise<{ price: number; timestamp: Date } | null> {
-    const url = `${this.baseUrl}/v2/stocks/${encodeURIComponent(symbol)}/trades/latest?feed=${this.feed}`;
+    const url = `${this.baseUrl}/v2/stocks/${encodeURIComponent(symbol)}/trades/latest?feed=${this.activeFeed}`;
     const data = await this.getJson<{ trade?: { p?: number; t?: string } }>(url);
     const t = data.trade;
     if (!t?.p || !t.t) return null;
@@ -119,7 +120,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       timeframe: tf,
       limit: String(limit),
       adjustment: "raw",
-      feed: this.feed,
+      feed: this.activeFeed,
       // `limit` applies to this sort. Ascending returns the oldest bars in the
       // lookback, so 1m/5m/15m landed on different sessions. Descending returns
       // the latest bars; we reverse below so callers still get oldest → newest.
@@ -233,7 +234,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       const chunk = unique.slice(i, i + chunkSize);
       const url =
         `${this.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(chunk.join(","))}` +
-        `&feed=${this.feed}`;
+        `&feed=${this.activeFeed}`;
       const data = await this.getJson<Record<string, AlpacaStockSnapshot>>(url);
       for (const sym of chunk) {
         const snap = data[sym];
@@ -328,7 +329,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       timeframe: tf,
       limit: String(limit),
       adjustment: "raw",
-      feed: this.feed,
+      feed: this.activeFeed,
       sort: "desc",
       start: start.toISOString(),
       end: end.toISOString(),
@@ -381,7 +382,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       const chunk = unique.slice(i, i + chunkSize);
       const url =
         `${this.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(chunk.join(","))}` +
-        `&feed=${this.feed}`;
+        `&feed=${this.activeFeed}`;
       const data = await this.getJson<Record<string, AlpacaStockSnapshot>>(url);
       for (const sym of chunk) {
         const snap = data[sym];
@@ -469,7 +470,7 @@ export function createAlpacaMarketDataFromEnv(
     apiKeyId: creds.apiKeyId,
     apiSecretKey: creds.apiSecretKey,
     baseUrl: creds.dataBaseUrl,
-    feed: (env.ALPACA_DATA_FEED as "iex" | "sip" | undefined) ?? "iex",
+    feed: resolveAlpacaFeed(env),
   });
 }
 

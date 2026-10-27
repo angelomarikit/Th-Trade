@@ -575,7 +575,7 @@ export class MonitorHub {
   ) {
     this.maxSymbols = opts?.maxSymbols ?? MONITOR_MAX_SYMBOLS_DEFAULT;
     this.intervalMs = opts?.intervalMs ?? 20_000;
-    this.feed = opts?.feed ?? "iex";
+    this.feed = opts?.feed ?? "sip";
     this.alertStore = opts?.alertStore ?? null;
     this.persistWatchlist = opts?.persistWatchlist ?? null;
     this.onSignalCard = opts?.onSignalCard ?? null;

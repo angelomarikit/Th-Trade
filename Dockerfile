@@ -10,6 +10,7 @@ COPY packages/domain/package.json packages/domain/
 COPY packages/news/package.json packages/news/
 COPY packages/market-data/package.json packages/market-data/
 COPY packages/regime/package.json packages/regime/
+COPY packages/actionable/package.json packages/actionable/
 COPY packages/strategies/package.json packages/strategies/
 COPY packages/backtest/package.json packages/backtest/
 COPY packages/confirmation/package.json packages/confirmation/
@@ -36,6 +37,7 @@ COPY packages/domain/package.json packages/domain/
 COPY packages/news/package.json packages/news/
 COPY packages/market-data/package.json packages/market-data/
 COPY packages/regime/package.json packages/regime/
+COPY packages/actionable/package.json packages/actionable/
 COPY packages/strategies/package.json packages/strategies/
 COPY packages/backtest/package.json packages/backtest/
 COPY packages/confirmation/package.json packages/confirmation/

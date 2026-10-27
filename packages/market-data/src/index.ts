@@ -1,3 +1,4 @@
+export * from "./alpacaFeed.js";
 export * from "./credentials.js";
 export * from "./types.js";
 export * from "./session.js";

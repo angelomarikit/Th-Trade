@@ -7,6 +7,7 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../../packages/actionable" },
     { "path": "../../packages/domain" },
     { "path": "../../packages/news" },
     { "path": "../../packages/market-data" },

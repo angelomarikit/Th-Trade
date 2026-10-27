@@ -28,6 +28,8 @@ import {
   loadAlpacaCredentials,
   marketDataAuthSoftFailEnabled,
   withAlpacaPriority,
+  resolveAlpacaFeed,
+  ALPACA_SIP_STREAM_URL,
 } from "@wulu/market-data";
 import { createNewsServiceFromEnv, emptyWhyMoving } from "@wulu/news";
 import { searchSymbols } from "@wulu/regime";
@@ -86,6 +88,9 @@ import { openAiConfigured } from "./recommend/openaiEnv.js";
 import { buildWuluPlanForCard } from "./wuluPlan/buildWuluPlan.js";
 import { handleWuluPlanPost } from "./wuluPlan/handleWuluPlanRequest.js";
 import { writeSetupSessionMemory, type SetupSessionMemory } from "./setupSessionMemory.js";
+import { handleActionableAnalyze } from "./actionable/handleActionableAnalyze.js";
+import { runSipDiagnostic } from "./actionable/runSipDiagnostic.js";
+import { activeAlpacaFeed, getSipEntitlementStatus } from "./marketDataFeed.js";
 
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -146,7 +151,7 @@ async function main() {
   const monitorHub = new MonitorHub(scanner, {
     maxSymbols: Number(process.env.MONITOR_MAX_SYMBOLS ?? 12),
     intervalMs: Number(process.env.MONITOR_INTERVAL_MS ?? 20_000),
-    feed: process.env.ALPACA_DATA_FEED ?? "iex",
+    feed: resolveAlpacaFeed(),
     alertStore,
     onSignalCard: (card, userId) => {
       const uid = userId === "default" ? null : userId;
@@ -187,9 +192,19 @@ async function main() {
   });
 
   const marketData = createMarketDataFromEnv();
+  const alpacaFeed = activeAlpacaFeed(marketData);
   console.log(
-    `[market-data] provider=${marketData.name} authSoftFail=${marketDataAuthSoftFailEnabled() ? "on" : "off"}`,
+    `[market-data] provider=${marketData.name} feed=${alpacaFeed} stream=${ALPACA_SIP_STREAM_URL} authSoftFail=${marketDataAuthSoftFailEnabled() ? "on" : "off"}`,
   );
+  const sipBoot = await getSipEntitlementStatus(true);
+  console.log(
+    `[market-data] sipEntitlement=${sipBoot.ok ? "ok" : "fail"} realtimeSignalsAllowed=${sipBoot.realtimeSignalsAllowed} detail=${sipBoot.detail.slice(0, 120)}`,
+  );
+  if (alpacaFeed === "sip" && !sipBoot.ok) {
+    console.warn(
+      "[market-data] SIP feed configured but REST entitlement probe failed — live signals may show WAIT/DATA until Alpaca SIP access is confirmed.",
+    );
+  }
   const flags = loadFeatureFlags();
   const alpaca = loadAlpacaCredentials();
   const journal = scanner.signalJournal;
@@ -283,7 +298,7 @@ async function main() {
             symbol: ticker.toUpperCase(),
             timeframe,
             provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
-            feed: process.env.ALPACA_DATA_FEED ?? "iex",
+            feed: resolveAlpacaFeed(),
             count: 0,
             bars: [] as unknown[],
             timings: { alpacaMs: Date.now() - started },
@@ -299,7 +314,7 @@ async function main() {
         symbol: ticker.toUpperCase(),
         timeframe,
         provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
-        feed: process.env.ALPACA_DATA_FEED ?? "iex",
+        feed: resolveAlpacaFeed(),
         count: bars.length,
         bars: bars.map((b) => ({
           time: Math.floor(b.timestamp.getTime() / 1000),
@@ -384,7 +399,55 @@ async function main() {
         });
       }
 
+      if (url.pathname === "/v1/market-data/feed-status" && req.method === "GET") {
+        const sip = await getSipEntitlementStatus();
+        const feed = activeAlpacaFeed(marketData);
+        return json(res, 200, {
+          configuredFeed: feed,
+          streamUrl: ALPACA_SIP_STREAM_URL,
+          provider: marketData.name,
+          sipRestEntitlement: sip,
+          realtimeSignalsAllowed: sip.realtimeSignalsAllowed,
+          volumeFeedComparable: feed === "sip",
+          automaticOrders: false,
+          note:
+            feed !== "sip"
+              ? "Non-SIP feed — relative volume and consolidated tape strategies are limited."
+              : sip.ok
+                ? "SIP REST quotes and bars probe OK."
+                : "SIP configured but REST probe failed — verify Alpaca SIP entitlement.",
+        });
+      }
+
+      if (url.pathname === "/v1/actionable/diagnostic" && req.method === "GET") {
+        const symbolsParam = url.searchParams.get("symbols");
+        const symbols = symbolsParam
+          ? symbolsParam
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
+        try {
+          const report = await runSipDiagnostic({ market: marketData, symbols });
+          const sip = await getSipEntitlementStatus();
+          return json(res, 200, {
+            ...report,
+            sipRestEntitlement: sip,
+            realtimeSignalsAllowed: sip.realtimeSignalsAllowed,
+            automaticOrders: false,
+            note: "Advisory diagnostic on SIP-backed bars — does not override live /v1/setup safety gates.",
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return json(res, 502, {
+            error: "actionable diagnostic failed",
+            detail: message.slice(0, 300),
+          });
+        }
+      }
+
       if (url.pathname === "/health") {
+        const sip = await getSipEntitlementStatus();
         return json(res, 200, {
           ok: true,
           phase: "G",
@@ -395,7 +458,10 @@ async function main() {
             (process.env.RAILWAY_GIT_COMMIT_MESSAGE ?? "").trim() || null,
           newsProvider: news.providerName,
           marketDataProvider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
-          alpacaFeed: process.env.ALPACA_DATA_FEED ?? "iex",
+          alpacaFeed,
+          alpacaStreamUrl: ALPACA_SIP_STREAM_URL,
+          sipEntitlement: sip,
+          realtimeSignalsAllowed: sip.realtimeSignalsAllowed,
           supportsFastSetup: true,
           barsCacheMs: BARS_CACHE_MS,
           alpacaInteractivePriority: true,
@@ -713,6 +779,33 @@ async function main() {
           return authError(res, err);
         }
         return;
+      }
+
+      if (url.pathname === "/v1/actionable/analyze" && req.method === "GET") {
+        const ticker = url.searchParams.get("ticker");
+        if (!ticker) {
+          return json(res, 400, { error: "ticker query required" });
+        }
+        const sym = normalizeTicker(ticker);
+        if (!sym) {
+          return json(res, 400, { error: "Invalid ticker symbol" });
+        }
+        const orbEnabled =
+          url.searchParams.get("orb") === "1" || url.searchParams.get("orb") === "true";
+        try {
+          const decision = await handleActionableAnalyze({
+            ticker: sym,
+            market: marketData,
+            orbEnabled,
+          });
+          return json(res, 200, {
+            ...decision,
+            note: "Advisory / paper research only — not auto-execution. OpenAI may narrate; it cannot override these rules.",
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return json(res, 502, { error: "actionable analyze failed", detail: message.slice(0, 300) });
+        }
       }
 
       if (url.pathname === "/v1/setup" && req.method === "GET") {
@@ -1033,7 +1126,7 @@ async function main() {
               card.nearActive.dataTimestamp ??
               card.lastCompletedBar?.timestamp ??
               card.evaluatedAt,
-            dataFeed: process.env.ALPACA_DATA_FEED ?? "iex",
+            dataFeed: alpacaFeed,
             state: card.state,
             whyMoving: card.whyMoving.whyMoving,
             catalyst: card.whyMoving.catalystLabel,
@@ -1462,7 +1555,7 @@ async function main() {
         return json(res, 200, {
           ...replay,
           automaticOrders: false,
-          feed: process.env.ALPACA_DATA_FEED ?? "iex",
+          feed: resolveAlpacaFeed(),
           liveValidated: false,
           note: "HISTORICAL REPLAY — NOT LIVE. Hypothetical outcomes on 5m bars are not a published win rate.",
         });
@@ -1516,7 +1609,7 @@ async function main() {
         const tickers = tickersParam.split(",").map((t) => t.trim()).filter(Boolean);
         const ranked = await scanner.rankWatchlist(tickers);
         return json(res, 200, {
-          feed: process.env.ALPACA_DATA_FEED ?? "iex",
+          feed: resolveAlpacaFeed(),
           provider: process.env.MARKET_DATA_PROVIDER ?? "alpaca",
           disclaimer:
             "Relative-momentum ranking is context only. Green with the market ≠ relatively strong. Ranking never grants entry permission.",

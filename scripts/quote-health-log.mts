@@ -67,7 +67,7 @@ const csv = (v: unknown) => {
 };
 
 const provider = createAlpacaMarketDataFromEnv();
-const feed = process.env.ALPACA_DATA_FEED ?? "iex";
+const feed = process.env.ALPACA_DATA_FEED ?? "sip";
 const tally = new Map<string, Record<string, number>>();
 
 async function logOnce(symbol: string): Promise<void> {

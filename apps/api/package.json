@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
+    "@wulu/actionable": "0.1.0",
     "@wulu/backtest": "0.1.0",
     "@wulu/confirmation": "0.1.0",
     "@wulu/domain": "0.1.0",
