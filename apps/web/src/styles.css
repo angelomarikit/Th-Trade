@@ -2677,6 +2677,119 @@ a {
   gap: 0.5rem;
 }
 
+.trade-signal-bar-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.decision-history-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.decision-history-link.compact {
+  font-size: 0.72rem;
+}
+
+.signal-action-hero .decision-history-link {
+  display: block;
+  margin-top: 0.45rem;
+  text-align: center;
+}
+
+.decision-history-modal .trade-plan-modal-body {
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+
+.decision-history-intro {
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.decision-history-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.decision-history-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface);
+}
+
+.decision-history-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.decision-history-item-head time {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.decision-history-action {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.decision-history-action.tone-entry {
+  color: var(--green);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.decision-history-action.tone-wait {
+  color: var(--amber);
+}
+
+.decision-history-action.tone-exit {
+  color: var(--red);
+}
+
+.decision-history-status {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.decision-history-reason {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+}
+
+.decision-history-delta {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+}
+
+.decision-history-gates {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.8rem;
+}
+
 .trade-signal-bar-status {
   display: flex;
   align-items: center;

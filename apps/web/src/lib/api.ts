@@ -335,21 +335,35 @@ export interface BarsResponse {
   bars: ChartBar[];
 }
 
+export interface DecisionJournalEntry {
+  id: string;
+  evaluationId: string | null;
+  decisionAt: string;
+  symbol: string;
+  side: string;
+  state: string;
+  statusLabel?: string;
+  strategyId: string | null;
+  strategyName: string | null;
+  strategyPhase?: string | null;
+  statusReason?: string | null;
+  tradingAction: string | null;
+  retestPhase?: string | null;
+  retestReason?: string | null;
+  qualityScore10?: number | null;
+  conditionsPassed?: number;
+  conditionsTotal?: number;
+  blockingGates?: Array<{ id: string; label: string; reason: string }>;
+  setupScore: number | null;
+  marketRegime: string | null;
+  hasCatalyst: boolean;
+  outcome: { status: string; rMultiple?: number | null };
+}
+
 export interface JournalListResponse {
   count: number;
   analytics: unknown;
-  entries: Array<{
-    id: string;
-    decisionAt: string;
-    symbol: string;
-    side: string;
-    state: string;
-    strategyId: string | null;
-    setupScore: number | null;
-    marketRegime: string | null;
-    hasCatalyst: boolean;
-    outcome: { status: string; rMultiple?: number | null };
-  }>;
+  entries: DecisionJournalEntry[];
 }
 
 export interface CatalystResponse {
@@ -587,6 +601,19 @@ export function fetchHealth() {
 
 export function fetchJournal(limit = 50) {
   return getJson<JournalListResponse>(`/v1/journal?limit=${limit}`);
+}
+
+export function fetchDecisionJournal(input: {
+  symbol: string;
+  side: "LONG" | "SHORT";
+  limit?: number;
+}) {
+  const q = new URLSearchParams({
+    symbol: input.symbol.toUpperCase(),
+    side: input.side,
+    limit: String(input.limit ?? 80),
+  });
+  return getJson<JournalListResponse>(`/v1/journal?${q}`);
 }
 
 export function fetchCatalyst(ticker: string) {

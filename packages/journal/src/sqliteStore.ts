@@ -98,6 +98,10 @@ function buildFilter(query: JournalQuery): { sql: string; params: SqlParam[] } {
     clauses.push("symbol = ?");
     params.push(query.symbol.toUpperCase());
   }
+  if (query.side) {
+    clauses.push("side = ?");
+    params.push(query.side.toUpperCase());
+  }
   if (query.state) {
     clauses.push("state = ?");
     params.push(query.state);
@@ -138,6 +142,7 @@ export class MemoryJournalStore implements JournalStore {
   list(query: JournalQuery = {}): JournalEntry[] {
     let items = [...this.rows.values()];
     if (query.symbol) items = items.filter((e) => e.symbol === query.symbol!.toUpperCase());
+    if (query.side) items = items.filter((e) => e.side === query.side!.toUpperCase());
     if (query.state) items = items.filter((e) => e.state === query.state);
     if (query.strategyId) items = items.filter((e) => e.strategyId === query.strategyId);
     if (query.from) items = items.filter((e) => e.decisionAt >= query.from!);

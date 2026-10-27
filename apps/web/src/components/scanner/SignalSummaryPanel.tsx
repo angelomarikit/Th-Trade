@@ -21,6 +21,7 @@ import { buildTradingBrief, primaryStrategyName } from "../../lib/tradingRecomme
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { enrichLiveCardWithChartPrice, liveSignalHeadline } from "../../lib/liveSignalFromPrice";
 import { setupCardSide, setupMatchesSelectedSide } from "../../lib/setupSideSync";
+import { DecisionHistoryLink } from "./DecisionHistoryModal";
 
 /**
  * Primary trading assistant panel — same setup card as chart levels and monitor.
@@ -225,6 +226,9 @@ export function SignalSummaryPanel() {
       <div className={`signal-action-hero signal-panel-hero-dup ${heroActionClass}`}>
         <p className="action-value">{heroActionValue}</p>
         <p className="action-label">{heroActionLabel}</p>
+        {sideAligned ? (
+          <DecisionHistoryLink symbol={symbol} side={side} className="decision-history-link" />
+        ) : null}
       </div>
       {(displayAction === "SKIP" || status.includes("NO TRADE")) && (
         <p className="disclaimer" style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>

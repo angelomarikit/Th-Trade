@@ -14,6 +14,7 @@ import { normalizeStatus } from "../ui/StatusBadge";
 import { effectiveTradingAction } from "../../lib/effectiveTradingAction";
 import { enrichLiveCardWithChartPrice, liveSignalHeadline } from "../../lib/liveSignalFromPrice";
 import { setupMatchesSelectedSide } from "../../lib/setupSideSync";
+import { DecisionHistoryLink } from "./DecisionHistoryModal";
 
 /** Display labels only. Engine status and gates are unchanged. */
 function signalDisplay(
@@ -112,8 +113,11 @@ export function TradeSignalBar() {
     >
       <div className="trade-signal-bar-top">
         <span className="trade-signal-headline">{headline}</span>
-        <span className="trade-signal-icon" aria-hidden="true">
-          <Icon size={18} strokeWidth={2.4} />
+        <span className="trade-signal-bar-top-actions">
+          <DecisionHistoryLink symbol={symbol} side={side} className="decision-history-link compact" />
+          <span className="trade-signal-icon" aria-hidden="true">
+            <Icon size={18} strokeWidth={2.4} />
+          </span>
         </span>
       </div>
       <dl className="trade-signal-levels">

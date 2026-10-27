@@ -51,6 +51,7 @@ export interface JournalEntry {
 
 export interface JournalQuery {
   symbol?: string;
+  side?: TradeSide;
   state?: SetupState;
   strategyId?: string;
   from?: string;

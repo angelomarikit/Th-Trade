@@ -1851,15 +1851,20 @@ async function main() {
           return json(res, 503, { error: "journal not enabled" });
         }
         const symbol = url.searchParams.get("symbol") ?? undefined;
+        const sideParam = url.searchParams.get("side")?.toUpperCase();
+        const side =
+          sideParam === "LONG" || sideParam === "SHORT" ? (sideParam as "LONG" | "SHORT") : undefined;
         const state = url.searchParams.get("state") ?? undefined;
         const limit = Number(url.searchParams.get("limit") ?? 50);
-        const entries = journal.list({
+        const listQuery = {
           symbol,
+          side,
           state: state as never,
           limit: Number.isFinite(limit) ? limit : 50,
-        });
+        };
+        const entries = journal.list(listQuery);
         return json(res, 200, {
-          count: journal.count({ symbol, state: state as never }),
+          count: journal.count({ symbol, side, state: state as never }),
           analytics: summarizeJournal(entries),
           entries: entries.map((e) => ({
             id: e.id,
@@ -1868,10 +1873,23 @@ async function main() {
             symbol: e.symbol,
             side: e.side,
             state: e.state,
+            statusLabel: e.statusLabel,
             strategyId: e.strategyId,
             strategyName: e.calibration?.activeTechnique?.strategyName ?? e.strategyName,
+            strategyPhase: e.calibration?.activeTechnique?.phase ?? null,
+            statusReason: e.calibration?.activeTechnique?.statusReason ?? null,
             tradingAction: e.calibration?.tradingAction ?? null,
             retestPhase: e.calibration?.retest?.phase ?? null,
+            retestReason: e.calibration?.retest?.reason ?? null,
+            qualityScore10: e.calibration?.qualityScore10 ?? null,
+            conditionsPassed: e.conditionsPassed,
+            conditionsTotal: e.conditionsTotal,
+            blockingGates:
+              e.calibration?.matrixSummary?.blocking?.slice(0, 4).map((b) => ({
+                id: b.id,
+                label: b.label,
+                reason: b.reason,
+              })) ?? [],
             setupScore: e.setupScore,
             marketRegime: e.marketRegime,
             hasCatalyst: e.hasCatalyst,
