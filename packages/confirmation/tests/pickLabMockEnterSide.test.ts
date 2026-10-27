@@ -31,6 +31,8 @@ describe("pickLabMockEnterSide", () => {
       quote: null,
       bars1m: [],
       bars5m: bars,
+      bars15m: [],
+      bars1h: [],
       receivedAt: new Date(),
       marketTimestamp: new Date(),
     };
