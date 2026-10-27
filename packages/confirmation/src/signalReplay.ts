@@ -84,6 +84,8 @@ export function runSignalReplay(input: {
       quote: null,
       bars1m: (input.bars1m ?? visible5).slice(0, i + 1),
       bars5m: visible5,
+      bars15m: [],
+      bars1h: [],
       receivedAt: lastBar.timestamp,
       marketTimestamp: lastBar.timestamp,
     };

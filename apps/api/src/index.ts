@@ -17,7 +17,6 @@ import {
   calculatePositionSize,
   loadFeatureFlags,
   POSITION_SIZE_NOT_CALCULATED_MESSAGE,
-  type SetupState,
   type TradeSide,
 } from "@wulu/domain";
 import {

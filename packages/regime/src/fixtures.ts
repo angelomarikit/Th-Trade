@@ -27,6 +27,8 @@ export function makeIndexSnapshot(input: {
     quote,
     bars1m,
     bars5m,
+    bars15m: [],
+    bars1h: [],
     receivedAt: now,
     marketTimestamp: now,
   };

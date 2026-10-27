@@ -126,6 +126,8 @@ describe("buildTradePlan", () => {
           statusReason: "Wick touched trigger; close did not confirm.",
           invalidationRules: ["Close below level"],
           confirmations: [],
+          htfTrend: "neutral",
+          relevanceScore: 0.8,
         },
       }),
       side: "LONG",
