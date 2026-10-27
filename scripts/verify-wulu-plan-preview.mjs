@@ -10,7 +10,8 @@ const API = (process.env.WULU_PREVIEW_API ?? "https://th-trade-preview.up.railwa
   /\/+$/,
   "",
 );
-const EXPECT = (process.env.EXPECT_GIT_SHA ?? "d75edcb").slice(0, 7);
+/** `railway up` uploads use Railway’s short deploy id on /health, not always git SHA. */
+const EXPECT = (process.env.EXPECT_GIT_SHA ?? "c9c7173").slice(0, 7);
 const TICKER = (process.env.WULU_TICKER ?? "NVDA").toUpperCase();
 const SIDE = (process.env.WULU_SIDE ?? "LONG").toUpperCase();
 
